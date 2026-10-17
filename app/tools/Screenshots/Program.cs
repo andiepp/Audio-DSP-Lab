@@ -1,5 +1,7 @@
-// Renders the manual's screenshots (docs/images/screenshots) from the
-// simulated board: dotnet run --project app/tools/Screenshots [-- <folder>]
+// Renders the manual's screenshots from the simulated board, every page in
+// every theme: Classic into docs/images/screenshots, the Studio themes into
+// its studio-dark and studio-light folders.
+//   dotnet run --project app/tools/Screenshots [-- <folder>]
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
@@ -7,6 +9,7 @@ using System.Windows.Media.Imaging;
 using AudioDspLab;
 using AudioDspLab.Settings;
 using AudioDspLab.Simulation;
+using AudioDspLab.Themes;
 using AudioDspLab.ViewModels;
 using AudioDspLab.Views;
 
@@ -15,8 +18,7 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
-        string output = args.Length > 0 ? args[0] : Path.Combine(RepositoryRoot(), "docs", "images", "screenshots");
-        Directory.CreateDirectory(output);
+        string root = args.Length > 0 ? args[0] : Path.Combine(RepositoryRoot(), "docs", "images", "screenshots");
         var app = new App();
         app.InitializeComponent();
         app.OpensMainWindow = false;
@@ -25,6 +27,12 @@ static class Program
         {
             try
             {
+              foreach (string theme in ThemeResources.Names)
+              {
+                ThemeResources.Apply(app, theme);
+                string output = theme == ThemeResources.Classic ? root : Path.Combine(root, theme.ToLowerInvariant().Replace(' ', '-'));
+                Directory.CreateDirectory(output);
+                Console.WriteLine($"--- {theme} -> {output}");
                 SimulatedBoard? board = null;
                 var vm = new MainViewModel(_ => board = new SimulatedBoard(demo: true), new SettingsStore(Path.Combine(Path.GetTempPath(), "Audio-DSP-Lab-screenshots")), new AppPreferences());
                 var window = new MainWindow(vm);
@@ -53,6 +61,9 @@ static class Program
                     Save(window, Path.Combine(output, $"{name}.png"));
                     Console.WriteLine($"{name}: {vm.ApplicationStateText} | {vm.StatusInfo} | {window.ActualWidth}x{window.ActualHeight}");
                 }
+
+                window.Close();
+              }
             }
             catch (Exception exception)
             {
@@ -88,7 +99,7 @@ static class Program
         var ground = new DrawingVisual();
         using (DrawingContext context = ground.RenderOpen())
         {
-            context.DrawRectangle(Brushes.Black, null, new Rect(0, 0, width, height));
+            context.DrawRectangle(window.Background ?? Brushes.Black, null, new Rect(0, 0, width, height));
         }
         bitmap.Render(ground);
         bitmap.Render(content);

@@ -1,4 +1,5 @@
 using System.Windows;
+using AudioDspLab.Themes;
 using AudioDspLab.ViewModels;
 using AudioDspLab.Views;
 
@@ -17,8 +18,10 @@ public partial class App : Application
             return;
         }
 
-        // --simulator: connect to the demonstration board at once
         var viewModel = new MainViewModel();
+        ThemeResources.Apply(this, viewModel.SelectedTheme);
+
+        // --simulator: connect to the demonstration board at once
         if (e.Args.Contains("--simulator", StringComparer.OrdinalIgnoreCase))
         {
             viewModel.SelectedPort = MainViewModel.SimulatorPort;
@@ -27,5 +30,25 @@ public partial class App : Application
 
         MainWindow = new MainWindow(viewModel);
         MainWindow.Show();
+    }
+
+    /// <summary>
+    /// Applies a theme and rebuilds the main window over the same view
+    /// model: the connection, the values and the pages stay as they are.
+    /// </summary>
+    public void SwitchTheme(MainWindow current, string theme)
+    {
+        ThemeResources.Apply(this, theme);
+        var next = new MainWindow(current.ViewModel)
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = current.Left,
+            Top = current.Top,
+            Width = current.Width,
+        };
+        MainWindow = next;
+        next.Show();
+        next.WindowState = current.WindowState;
+        current.CloseKeepingViewModel();
     }
 }

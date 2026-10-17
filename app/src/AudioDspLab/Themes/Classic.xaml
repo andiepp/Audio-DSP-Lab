@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
     <!-- The look of the author's RF-Lab application: black ground, white
          section headings, light-yellow settings blocks with blue labels,
@@ -15,6 +16,65 @@
     <SolidColorBrush x:Key="AudioLabDimText" Color="#FFC8C8C8" />
     <SolidColorBrush x:Key="AudioLabWarningText" Color="Gold" />
     <SolidColorBrush x:Key="AudioLabErrorText" Color="#FFFF6060" />
+
+    <!-- Every theme defines the keys below as well (Studio*.xaml). -->
+    <SolidColorBrush x:Key="AudioLabText" Color="White" />
+    <SolidColorBrush x:Key="AudioLabTextOnBlock" Color="Black" />
+    <SolidColorBrush x:Key="AudioLabAccentText" Color="Gold" />
+    <SolidColorBrush x:Key="AudioLabTopBarBackground" Color="LightYellow" />
+    <SolidColorBrush x:Key="AudioLabMarkerBackground" Color="Gold" />
+    <SolidColorBrush x:Key="AudioLabMarkerText" Color="Black" />
+    <SolidColorBrush x:Key="AudioLabMarkerP1" Color="Gold" />
+    <SolidColorBrush x:Key="AudioLabMarkerP2" Color="Gold" />
+    <SolidColorBrush x:Key="AudioLabMarkerP3" Color="Gold" />
+    <SolidColorBrush x:Key="AudioLabMarkerP4" Color="Gold" />
+    <SolidColorBrush x:Key="AudioLabDisplayTitle" Color="White" />
+    <SolidColorBrush x:Key="AudioLabDisplayFrame" Color="#FFB0B0B0" />
+    <SolidColorBrush x:Key="AudioLabDisplayValue" Color="White" />
+    <SolidColorBrush x:Key="AudioLabDialSelection" Color="Gold" />
+    <SolidColorBrush x:Key="AudioLabDialArrow" Color="#90FFFFFF" />
+    <SolidColorBrush x:Key="AudioLabChartBackground" Color="Black" />
+    <SolidColorBrush x:Key="AudioLabChartGrid" Color="#FF333333" />
+    <SolidColorBrush x:Key="AudioLabChartZero" Color="#FF777777" />
+    <SolidColorBrush x:Key="AudioLabChartLeft" Color="Gold" />
+    <SolidColorBrush x:Key="AudioLabChartRight" Color="#FF3FC8FF" />
+    <SolidColorBrush x:Key="AudioLabChartReference" Color="#FF909090" />
+    <SolidColorBrush x:Key="AudioLabChartLabel" Color="#FFB0B0B0" />
+    <SolidColorBrush x:Key="AudioLabChartReadout" Color="#FF111111" />
+    <SolidColorBrush x:Key="AudioLabChartMarker" Color="White" />
+    <SolidColorBrush x:Key="AudioLabNoteBackground" Color="#FFFFF3B0" />
+    <SolidColorBrush x:Key="AudioLabNoteBorder" Color="#FFD4A000" />
+    <SolidColorBrush x:Key="AudioLabNoteText" Color="#FF5A4300" />
+    <SolidColorBrush x:Key="AudioLabListBackground" Color="Black" />
+    <SolidColorBrush x:Key="AudioLabListText" Color="White" />
+    <SolidColorBrush x:Key="AudioLabLogBackground" Color="Black" />
+    <SolidColorBrush x:Key="AudioLabLogText" Color="#FFB8F0B8" />
+    <SolidColorBrush x:Key="AudioLabStatusOk" Color="LimeGreen" />
+    <SolidColorBrush x:Key="AudioLabStatusError" Color="Red" />
+    <SolidColorBrush x:Key="AudioLabStatusIdle" Color="Gray" />
+
+    <!-- The pots' knob caps, as on the author's board: P1 blue, P2 green,
+         P3 yellow, P4 red; a dark knob body around them. -->
+    <SolidColorBrush x:Key="AudioLabPot1" Color="#FF1E7FD6" />
+    <SolidColorBrush x:Key="AudioLabPot2" Color="#FF1FA35A" />
+    <SolidColorBrush x:Key="AudioLabPot3" Color="#FFF2CC3E" />
+    <SolidColorBrush x:Key="AudioLabPot4" Color="#FFD9453B" />
+    <SolidColorBrush x:Key="AudioLabKnobBody" Color="#FF202020" />
+    <SolidColorBrush x:Key="AudioLabKnobRing" Color="#FFB0B0B0" />
+    <SolidColorBrush x:Key="AudioLabKnobTrack" Color="Transparent" />
+    <SolidColorBrush x:Key="AudioLabKnobLabel" Color="White" />
+    <SolidColorBrush x:Key="AudioLabKnobRole" Color="#FFB0B0B0" />
+
+    <!-- Shapes and type the themes differ in. -->
+    <FontFamily x:Key="AudioLabDigitFont">Calibri</FontFamily>
+    <sys:Double x:Key="AudioLabDigitWidth">0.52</sys:Double>
+    <CornerRadius x:Key="AudioLabDisplayCornerRadius">0</CornerRadius>
+    <Thickness x:Key="AudioLabDisplayFrameThickness">1</Thickness>
+    <Thickness x:Key="AudioLabDisplayPadding">4,2,4,4</Thickness>
+    <Thickness x:Key="AudioLabDisplayBodyPadding">8,0</Thickness>
+    <HorizontalAlignment x:Key="AudioLabDisplayTitleAlignment">Center</HorizontalAlignment>
+    <FontWeight x:Key="AudioLabDisplayTitleWeight">Bold</FontWeight>
+    <sys:Boolean x:Key="AudioLabKnobShowsArc">False</sys:Boolean>
 
     <!-- Section heading: white on black over a thin rule, as "Signal",
          "Modulation" and "Instrument" in RF-Lab. -->

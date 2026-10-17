@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using AudioDspLab.Themes;
 
 namespace AudioDspLab.Controls;
 
@@ -36,10 +37,12 @@ public sealed class ResponseCurve : FrameworkElement
 
     private static readonly double[] GridHertz = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
     private static readonly double[] GridDecibel = [-12, -6, 0, 6, 12];
-    private static readonly Pen GridPen = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)), 1));
-    private static readonly Pen ZeroPen = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0x77, 0x77, 0x77)), 1));
-    private static readonly Pen CurvePen = Frozen(new Pen(Brushes.Gold, 2));
-    private static readonly Brush LabelBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)));
+    // the colours, from the theme when the curve is drawn
+    private Pen GridPen = new(Brushes.DimGray, 1);
+    private Pen ZeroPen = new(Brushes.Gray, 1);
+    private Pen CurvePen = new(Brushes.Gold, 2);
+    private Brush LabelBrush = Brushes.Silver;
+    private Brush MarkerBrush = Brushes.White;
     private static readonly Typeface LabelFace = new("Segoe UI");
 
     /// <summary>
@@ -76,7 +79,12 @@ public sealed class ResponseCurve : FrameworkElement
 
     protected override void OnRender(DrawingContext context)
     {
-        context.DrawRectangle(Brushes.Black, null, new Rect(0, 0, ActualWidth, ActualHeight));
+        GridPen = Frozen(new Pen(ThemeResources.Brush(this, "AudioLabChartGrid", Brushes.DimGray), 1));
+        ZeroPen = Frozen(new Pen(ThemeResources.Brush(this, "AudioLabChartZero", Brushes.Gray), 1));
+        CurvePen = Frozen(new Pen(ThemeResources.Brush(this, "AudioLabChartLeft", Brushes.Gold), 2));
+        LabelBrush = ThemeResources.Brush(this, "AudioLabChartLabel", Brushes.Silver);
+        MarkerBrush = ThemeResources.Brush(this, "AudioLabChartMarker", Brushes.White);
+        context.DrawRectangle(ThemeResources.Brush(this, "AudioLabChartBackground", Brushes.Black), null, new Rect(0, 0, ActualWidth, ActualHeight));
         double pixels = VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
         foreach (double hertz in GridHertz)
@@ -119,11 +127,11 @@ public sealed class ResponseCurve : FrameworkElement
 
         foreach (double hertz in MarkerFrequencies ?? [])
         {
-            context.DrawEllipse(Brushes.White, null, new Point(X(hertz), Y(0)), 3, 3);
+            context.DrawEllipse(MarkerBrush, null, new Point(X(hertz), Y(0)), 3, 3);
         }
     }
 
-    private static FormattedText Label(string text, double pixelsPerDip) =>
+    private FormattedText Label(string text, double pixelsPerDip) =>
         new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, LabelFace, 11, LabelBrush, pixelsPerDip);
 
     private static T Frozen<T>(T freezable) where T : Freezable

@@ -1,0 +1,84 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!-- Studio light: white cards on a pale ground, the same teal accent
+         (darker, for contrast on white), dark knob bodies as on the board.
+         The styles are in StudioStyles.xaml. -->
+
+    <SolidColorBrush x:Key="AudioLabWindowBackground" Color="#FFEEF1F5" />
+    <SolidColorBrush x:Key="AudioLabSeparator" Color="#FFD8DEE6" />
+    <SolidColorBrush x:Key="AudioLabSettingsBackground" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="AudioLabSettingsLabel" Color="#FF5F6C80" />
+    <SolidColorBrush x:Key="AudioLabFrequencyBackground" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="AudioLabAmplitudeBackground" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="AudioLabUnitText" Color="#FF8592A6" />
+    <SolidColorBrush x:Key="AudioLabDimText" Color="#FF5F6C80" />
+    <SolidColorBrush x:Key="AudioLabWarningText" Color="#FFB7791F" />
+    <SolidColorBrush x:Key="AudioLabErrorText" Color="#FFC93C3C" />
+
+    <SolidColorBrush x:Key="AudioLabText" Color="#FF17202B" />
+    <SolidColorBrush x:Key="AudioLabTextOnBlock" Color="#FF17202B" />
+    <SolidColorBrush x:Key="AudioLabAccentText" Color="#FF0D8F83" />
+    <SolidColorBrush x:Key="AudioLabTopBarBackground" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="AudioLabMarkerBackground" Color="#FFF0B54A" />
+    <SolidColorBrush x:Key="AudioLabMarkerText" Color="#FF17202B" />
+    <SolidColorBrush x:Key="AudioLabMarkerP1" Color="#FF1E7FD6" />
+    <SolidColorBrush x:Key="AudioLabMarkerP2" Color="#FF1FA35A" />
+    <SolidColorBrush x:Key="AudioLabMarkerP3" Color="#FFF2CC3E" />
+    <SolidColorBrush x:Key="AudioLabMarkerP4" Color="#FFD9453B" />
+    <SolidColorBrush x:Key="AudioLabDisplayTitle" Color="#FF5F6C80" />
+    <SolidColorBrush x:Key="AudioLabDisplayFrame" Color="Transparent" />
+    <SolidColorBrush x:Key="AudioLabDisplayValue" Color="#FF17202B" />
+    <SolidColorBrush x:Key="AudioLabDialSelection" Color="#FF0D8F83" />
+    <SolidColorBrush x:Key="AudioLabDialArrow" Color="#990D8F83" />
+    <SolidColorBrush x:Key="AudioLabChartBackground" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="AudioLabChartGrid" Color="#FFE6EAF0" />
+    <SolidColorBrush x:Key="AudioLabChartZero" Color="#FFA9B3C1" />
+    <SolidColorBrush x:Key="AudioLabChartLeft" Color="#FF0D8F83" />
+    <SolidColorBrush x:Key="AudioLabChartRight" Color="#FF3B6FD8" />
+    <SolidColorBrush x:Key="AudioLabChartReference" Color="#FF9AA5B5" />
+    <SolidColorBrush x:Key="AudioLabChartLabel" Color="#FF5F6C80" />
+    <SolidColorBrush x:Key="AudioLabChartReadout" Color="#FFF4F6F9" />
+    <SolidColorBrush x:Key="AudioLabChartMarker" Color="#FF17202B" />
+    <SolidColorBrush x:Key="AudioLabNoteBackground" Color="#FFFFF4DB" />
+    <SolidColorBrush x:Key="AudioLabNoteBorder" Color="#FFD9A21B" />
+    <SolidColorBrush x:Key="AudioLabNoteText" Color="#FF6B4A0E" />
+    <SolidColorBrush x:Key="AudioLabListBackground" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="AudioLabListText" Color="#FF17202B" />
+    <SolidColorBrush x:Key="AudioLabLogBackground" Color="#FFFBFCFD" />
+    <SolidColorBrush x:Key="AudioLabLogText" Color="#FF17202B" />
+    <SolidColorBrush x:Key="AudioLabStatusOk" Color="#FF0D8F83" />
+    <SolidColorBrush x:Key="AudioLabStatusError" Color="#FFC93C3C" />
+    <SolidColorBrush x:Key="AudioLabStatusIdle" Color="#FFA9B3C1" />
+
+    <SolidColorBrush x:Key="AudioLabPot1" Color="#FF1E7FD6" />
+    <SolidColorBrush x:Key="AudioLabPot2" Color="#FF1FA35A" />
+    <SolidColorBrush x:Key="AudioLabPot3" Color="#FFF2CC3E" />
+    <SolidColorBrush x:Key="AudioLabPot4" Color="#FFD9453B" />
+    <SolidColorBrush x:Key="AudioLabKnobBody" Color="#FF23272E" />
+    <SolidColorBrush x:Key="AudioLabKnobRing" Color="#FF3A414B" />
+    <SolidColorBrush x:Key="AudioLabKnobTrack" Color="#FFD8DEE6" />
+    <SolidColorBrush x:Key="AudioLabKnobLabel" Color="#FF17202B" />
+    <SolidColorBrush x:Key="AudioLabKnobRole" Color="#FF5F6C80" />
+
+    <FontFamily x:Key="AudioLabDigitFont">Cascadia Mono, Consolas</FontFamily>
+    <sys:Double x:Key="AudioLabDigitWidth">0.6</sys:Double>
+    <CornerRadius x:Key="AudioLabDisplayCornerRadius">10</CornerRadius>
+    <Thickness x:Key="AudioLabDisplayFrameThickness">0</Thickness>
+    <Thickness x:Key="AudioLabDisplayPadding">5,4,5,6</Thickness>
+    <Thickness x:Key="AudioLabDisplayBodyPadding">0</Thickness>
+    <HorizontalAlignment x:Key="AudioLabDisplayTitleAlignment">Left</HorizontalAlignment>
+    <FontWeight x:Key="AudioLabDisplayTitleWeight">Normal</FontWeight>
+    <sys:Boolean x:Key="AudioLabKnobShowsArc">True</sys:Boolean>
+
+    <SolidColorBrush x:Key="StudioSurface" Color="#FFF4F6F9" />
+    <SolidColorBrush x:Key="StudioLine" Color="#FFD8DEE6" />
+    <SolidColorBrush x:Key="StudioLineHover" Color="#FFAEB8C6" />
+    <SolidColorBrush x:Key="StudioPressed" Color="#FFE3E8EF" />
+    <SolidColorBrush x:Key="StudioAccent" Color="#FF0D8F83" />
+    <SolidColorBrush x:Key="StudioOnAccent" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="StudioDanger" Color="#FFC93C3C" />
+    <SolidColorBrush x:Key="StudioOnDanger" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="StudioCaution" Color="#FFD9A21B" />
+</ResourceDictionary>

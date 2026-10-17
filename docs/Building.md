@@ -93,11 +93,15 @@ dotnet run --project src/AudioDspLab -- --simulator
 | Project | Role |
 | --- | --- |
 | `src/AudioDspLab.Core` | Protocol text, line transport (serial port), connection with request/response matching and resynchronisation, `BoardClient` (every command as a method, every event as a .NET event), the model, and `SimulatedBoard` |
-| `src/AudioDspLab` | The WPF application: `MainViewModel`, one page view model per application, generic `ParameterViewModel`, the controls (digit dial, displays, pot knob, response curve, sweep chart), stored settings |
+| `src/AudioDspLab` | The WPF application: `MainViewModel`, one page view model per application, generic `ParameterViewModel`, the controls (digit dial, displays, pot knob, response curve, sweep chart), stored settings, the themes |
 | `tests/AudioDspLab.Core.Tests` | Protocol text, the client against the simulator, and the firmware/simulator table comparison |
-| `tools/Screenshots` | Renders the manual's screenshots from the simulator: `dotnet run --project app/tools/Screenshots` writes `docs/images/screenshots` |
+| `tools/Screenshots` | Renders the manual's screenshots from the simulator in every theme: `dotnet run --project app/tools/Screenshots` writes Classic to `docs/images/screenshots` and the Studio themes to its `studio-dark` and `studio-light` folders |
 
 The application binds each page to parameters by their protocol names; ranges, units and pots come from the board's `params`. Writes to one parameter are coalesced (a spinning dial sends only the newest value once the previous write is answered), and the board's events update the pages without polling.
+
+### Themes
+
+`src/AudioDspLab/Themes` holds one colour dictionary per theme, `Classic.xaml`, `StudioDark.xaml` and `StudioLight.xaml`, all with the same keys; the Studio themes share their styles in `StudioStyles.xaml`, Classic keeps its styles in its own file. `ThemeResources` loads a theme into the application's resources and gives the controls that draw themselves (pot knob, digit dial, charts) their colours. Switching the theme rebuilds the main window over the same view model, so the connection stays. A new theme is one more colour dictionary with the same keys and its name in `ThemeResources.Names`; the pot colours are `AudioLabPot1` to `AudioLabPot4`.
 
 ### The simulator
 

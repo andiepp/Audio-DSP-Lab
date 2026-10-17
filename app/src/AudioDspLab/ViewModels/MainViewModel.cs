@@ -148,6 +148,31 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public string Title => client is { } connected ? $"Audio-DSP-Lab — {connected.Name}" : "Audio-DSP-Lab";
 
+    /// <summary>The themes to choose from: Classic, Studio dark, Studio light.</summary>
+    public IReadOnlyList<string> ThemeNames => Themes.ThemeResources.Names;
+
+    /// <summary>The theme in use; choosing another raises <see cref="ThemeChanged"/> and remembers it.</summary>
+    public string SelectedTheme
+    {
+        get => Themes.ThemeResources.Normalize(preferences.Theme);
+        set
+        {
+            string theme = Themes.ThemeResources.Normalize(value);
+            if (theme == SelectedTheme)
+            {
+                return;
+            }
+
+            preferences.Theme = theme;
+            preferences.Save();
+            RaisePropertyChanged();
+            ThemeChanged?.Invoke(theme);
+        }
+    }
+
+    /// <summary>The window applies the theme (it rebuilds itself).</summary>
+    public event Action<string>? ThemeChanged;
+
     /// <summary>Asks the person; the window sets it to a message box.</summary>
     public Func<string, bool> Confirm { get; set; } = _ => true;
 
@@ -1151,6 +1176,9 @@ public sealed class AppPreferences
 
     public string? LastPort { get; set; }
 
+    /// <summary>The theme's name (Themes.ThemeResources), or null for the default.</summary>
+    public string? Theme { get; set; }
+
     public static AppPreferences Load()
     {
         var preferences = new AppPreferences();
@@ -1161,6 +1189,10 @@ public sealed class AppPreferences
                 if (line.StartsWith("port=", StringComparison.Ordinal))
                 {
                     preferences.LastPort = line[5..].Trim();
+                }
+                else if (line.StartsWith("theme=", StringComparison.Ordinal))
+                {
+                    preferences.Theme = line[6..].Trim();
                 }
             }
         }
@@ -1176,7 +1208,7 @@ public sealed class AppPreferences
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, $"port={LastPort}\n");
+            File.WriteAllText(FilePath, $"port={LastPort}\ntheme={Theme}\n");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {

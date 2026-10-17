@@ -60,7 +60,7 @@ No board at hand? Choose **Simulator (demo)** as the port. The simulator behaves
 
 | Area | What it shows or does |
 | --- | --- |
-| Board on (top) | The port, **Connect** and **Disconnect**, the firmware found; **Console** talks the protocol by hand, **Manual** opens this document |
+| Board on (top) | The port, **Connect** and **Disconnect**, the firmware found; **Theme** chooses the look, **Console** talks the protocol by hand, **Manual** opens this document |
 | Application | One key per application, and the state badge |
 | The page | The running application's values: displays, dials, keys, its **Output** key |
 | Potentiometers | P1 to P4, where each stands and what it drives now, and the **Pot control** key |
@@ -72,7 +72,13 @@ No board at hand? Choose **Simulator (demo)** as the port. The simulator behaves
 
 **Digit dials.** Every numeric value is a digit dial: turn the mouse wheel over a digit, or click its upper or lower half, to step that digit. The board answers every change with the value it took, and the dial shows that value.
 
-**Pot badges.** A gold badge such as **P2** lights on a display for a moment when the board's pot changed that value, not the window.
+**Pot badges.** A badge such as **P2** lights on a display for a moment when the board's pot changed that value, not the window: gold in the Classic theme, in the pot's colour in the Studio themes.
+
+**Themes.** **Theme** in the top bar switches between three looks: **Classic** (coloured blocks on black), **Studio dark** and **Studio light** (quiet cards, one teal accent for what is on or selected). The window rebuilds in the new look at once; the connection, the running application and its values stay as they are, and the choice is remembered for the next start.
+
+**Knob colours.** The pot knobs wear the colours of colour-coded knob caps: **P1 blue, P2 green, P3 yellow, P4 red**; the coloured cap points where the pot stands. The Studio themes add a ring in the pot's colour that fills with the pot's travel. Caps in these colours on the board's pots make the two easy to match.
+
+![The generator page in the Studio dark theme](images/screenshots/studio-dark/generator.png)
 
 ## The applications
 

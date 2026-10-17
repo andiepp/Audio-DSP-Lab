@@ -13,7 +13,7 @@ Six audio instruments for the **Elektor Audio-DSP-FX board** (ADAU1701 DSP + ESP
 | **SigmaStudio** | Runs your own SigmaStudio programs; the pots go to the DSP's auxiliary ADC, your program survives the other applications |
 | **Synthesizer** | A Minimoog-style monophonic synthesizer: three oscillators, ladder filter, envelopes, two LFOs, glide, played from any MIDI keyboard |
 
-The four pots on the board play the main values of each application, side by side with the PC. The board can start an application by itself at power-up and run without a PC.
+The four pots on the board play the main values of each application, side by side with the PC. The board can start an application by itself at power-up and run without a PC. The window comes in three themes, Classic, Studio dark and Studio light.
 
 ## How it works
 

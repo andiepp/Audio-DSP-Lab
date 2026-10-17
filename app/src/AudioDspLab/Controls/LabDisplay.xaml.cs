@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using AudioDspLab.Themes;
 
 namespace AudioDspLab.Controls;
 
@@ -19,7 +20,8 @@ public partial class LabDisplay : UserControl
         nameof(Body), typeof(object), typeof(LabDisplay), new PropertyMetadata(null));
 
     public static readonly DependencyProperty MarkerProperty = DependencyProperty.Register(
-        nameof(Marker), typeof(string), typeof(LabDisplay), new PropertyMetadata(string.Empty));
+        nameof(Marker), typeof(string), typeof(LabDisplay),
+        new PropertyMetadata(string.Empty, (display, _) => ((LabDisplay)display).ColourBadge()));
 
     public static readonly DependencyProperty IsMarkedProperty = DependencyProperty.Register(
         nameof(IsMarked), typeof(bool), typeof(LabDisplay), new PropertyMetadata(false));
@@ -36,6 +38,7 @@ public partial class LabDisplay : UserControl
     public LabDisplay()
     {
         InitializeComponent();
+        Loaded += (_, _) => ColourBadge();
     }
 
     public string Title
@@ -84,6 +87,13 @@ public partial class LabDisplay : UserControl
     {
         get => (double)GetValue(MarkerFontSizeProperty);
         set => SetValue(MarkerFontSizeProperty, value);
+    }
+
+    // each theme gives every pot's badge its colour (Studio: the knob cap's, P2 green ...)
+    private void ColourBadge()
+    {
+        Brush fallback = ThemeResources.Brush(this, "AudioLabMarkerBackground", Brushes.Gold);
+        MarkerBadge.Background = string.IsNullOrEmpty(Marker) ? fallback : ThemeResources.Brush(this, "AudioLabMarker" + Marker, fallback);
     }
 
     /// <summary>Whether the badge is visible, for tests.</summary>

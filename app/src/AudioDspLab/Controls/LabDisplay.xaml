@@ -2,9 +2,12 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Name="Root">
-    <!-- The RF-Lab signal display: a coloured block with its title on top
-         and its body, the digits, in an inset frame. -->
-    <Border Background="{Binding DisplayBackground, ElementName=Root}" Padding="4,2,4,4">
+    <!-- A signal display: a block with its title on top and its body, the
+         digits, below; the theme decides the block's shape (Classic: the
+         RF-Lab coloured block with an inset frame; Studio: a card). -->
+    <Border Background="{Binding DisplayBackground, ElementName=Root}"
+            CornerRadius="{DynamicResource AudioLabDisplayCornerRadius}"
+            Padding="{DynamicResource AudioLabDisplayPadding}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -14,7 +17,8 @@
             <!-- the badge floats over the title's right end rather than taking its
                  room: narrow dials keep their whole title -->
             <Grid Grid.Row="0" Margin="2,0,2,2">
-                <Border x:Name="MarkerBadge" Panel.ZIndex="1" HorizontalAlignment="Right" Background="Gold" CornerRadius="2"
+                <Border x:Name="MarkerBadge" Panel.ZIndex="1" HorizontalAlignment="Right"
+                        Background="{DynamicResource AudioLabMarkerBackground}" CornerRadius="3"
                         Padding="5,0" Margin="6,2,0,2" VerticalAlignment="Center">
                     <Border.Style>
                         <Style TargetType="Border">
@@ -26,15 +30,17 @@
                             </Style.Triggers>
                         </Style>
                     </Border.Style>
-                    <TextBlock Text="{Binding Marker, ElementName=Root}" Foreground="Black"
+                    <TextBlock Text="{Binding Marker, ElementName=Root}" Foreground="{DynamicResource AudioLabMarkerText}"
                                FontWeight="Bold" FontSize="{Binding MarkerFontSize, ElementName=Root}" />
                 </Border>
-                <TextBlock Text="{Binding Title, ElementName=Root}" Foreground="White" FontWeight="Bold"
+                <TextBlock Text="{Binding Title, ElementName=Root}" Foreground="{DynamicResource AudioLabDisplayTitle}"
+                           FontWeight="{DynamicResource AudioLabDisplayTitleWeight}"
                            FontSize="{Binding TitleFontSize, ElementName=Root}"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                           HorizontalAlignment="{DynamicResource AudioLabDisplayTitleAlignment}" VerticalAlignment="Center" />
             </Grid>
 
-            <Border Grid.Row="1" BorderBrush="#FFB0B0B0" BorderThickness="1" Padding="8,0">
+            <Border Grid.Row="1" BorderBrush="{DynamicResource AudioLabDisplayFrame}"
+                    BorderThickness="{DynamicResource AudioLabDisplayFrameThickness}" Padding="{DynamicResource AudioLabDisplayBodyPadding}">
                 <ContentPresenter Content="{Binding Body, ElementName=Root}"
                                   HorizontalAlignment="Right" VerticalAlignment="Center" />
             </Border>

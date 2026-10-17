@@ -5,6 +5,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using AudioDspLab.Themes;
 
 namespace AudioDspLab.Controls;
 
@@ -62,8 +63,7 @@ public partial class DigitDial : UserControl
         typeof(DigitDial),
         new PropertyMetadata(null, (dial, _) => ((DigitDial)dial).ShowSelection()));
 
-    private static readonly Brush SelectionBrush = Brushes.Gold;
-    private static readonly Brush ArrowBrush = Frozen(new SolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF)));
+    private static readonly Brush ArrowFallback = Frozen(new SolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF)));
 
     private readonly List<DigitCell> cells = [];
     private TextBlock? signText;
@@ -279,9 +279,9 @@ public partial class DigitDial : UserControl
     private TextBlock DigitText() =>
         new()
         {
-            FontFamily = new FontFamily("Calibri"),
+            FontFamily = ThemeResources.Value(this, "AudioLabDigitFont", new FontFamily("Calibri")),
             FontSize = DigitFontSize,
-            Foreground = Brushes.White,
+            Foreground = ThemeResources.Brush(this, "AudioLabDisplayValue", Brushes.White),
             VerticalAlignment = VerticalAlignment.Center
         };
 
@@ -317,12 +317,13 @@ public partial class DigitDial : UserControl
 
             text = dial.DigitText();
             text.HorizontalAlignment = HorizontalAlignment.Center;
-            up = Arrow(pointingUp: true);
-            down = Arrow(pointingUp: false);
+            Brush arrow = ThemeResources.Brush(dial, "AudioLabDialArrow", ArrowFallback);
+            up = Arrow(pointingUp: true, arrow);
+            down = Arrow(pointingUp: false, arrow);
             bar = new Rectangle
             {
                 Height = 3,
-                Fill = SelectionBrush,
+                Fill = ThemeResources.Brush(dial, "AudioLabDialSelection", Brushes.Gold),
                 VerticalAlignment = VerticalAlignment.Bottom,
                 Visibility = Visibility.Hidden
             };
@@ -337,7 +338,7 @@ public partial class DigitDial : UserControl
             {
                 Child = grid,
                 Background = Brushes.Transparent,
-                Width = dial.DigitFontSize * 0.52,
+                Width = dial.DigitFontSize * ThemeResources.Value(dial, "AudioLabDigitWidth", 0.52),
                 Cursor = Cursors.Hand,
                 ToolTip = "Wheel or click the upper or lower half to step this digit"
             };
@@ -383,11 +384,11 @@ public partial class DigitDial : UserControl
             eventArgs.Handled = true;
         }
 
-        private static Path Arrow(bool pointingUp) =>
+        private static Path Arrow(bool pointingUp, Brush fill) =>
             new()
             {
                 Data = Geometry.Parse(pointingUp ? "M 0,6 L 6,0 L 12,6 Z" : "M 0,0 L 6,6 L 12,0 Z"),
-                Fill = ArrowBrush,
+                Fill = fill,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = pointingUp ? VerticalAlignment.Top : VerticalAlignment.Bottom,
                 Margin = pointingUp ? new Thickness(0, 2, 0, 0) : new Thickness(0, 0, 0, 6),

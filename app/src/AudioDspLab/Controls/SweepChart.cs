@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using AudioDspLab.Themes;
 
 
 namespace AudioDspLab.Controls;
@@ -43,20 +44,17 @@ public sealed class SweepChart : FrameworkElement
 
     private static readonly double[] GridHertz = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
     private static readonly double[] GridSteps = [1, 2, 5, 10, 20, 50];
-    private static readonly Pen GridPen = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)), 1));
-    private static readonly Pen ZeroPen = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0x77, 0x77, 0x77)), 1));
-    private static readonly Pen LeftPen = Frozen(new Pen(Brushes.Gold, 2));
-    private static readonly Pen RightPen = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0x3F, 0xC8, 0xFF)), 2));
-    private static readonly Pen ReferencePen = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0x90, 0x90, 0x90)), 1)
-    {
-        DashStyle = DashStyles.Dash
-    });
-    private static readonly Pen HoverPen = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), 1)
-    {
-        DashStyle = DashStyles.Dot
-    });
-    private static readonly Brush LabelBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)));
-    private static readonly Brush ReadoutBackground = Frozen(new SolidColorBrush(Color.FromRgb(0x11, 0x11, 0x11)));
+    // the colours, from the theme when the chart is drawn (LoadPalette)
+    private Pen GridPen = new(Brushes.DimGray, 1);
+    private Pen ZeroPen = new(Brushes.Gray, 1);
+    private Pen LeftPen = new(Brushes.Gold, 2);
+    private Pen RightPen = new(Brushes.DeepSkyBlue, 2);
+    private Pen ReferencePen = new(Brushes.Gray, 1);
+    private Pen HoverPen = new(Brushes.Gray, 1);
+    private Brush LabelBrush = Brushes.Silver;
+    private Brush ReadoutBackground = Brushes.Black;
+    private Brush ReadoutText = Brushes.White;
+    private Brush Ground = Brushes.Black;
     private static readonly Typeface LabelFace = new("Segoe UI");
 
     private int? hoverIndex;
@@ -169,7 +167,8 @@ public sealed class SweepChart : FrameworkElement
 
     protected override void OnRender(DrawingContext context)
     {
-        context.DrawRectangle(Brushes.Black, null, new Rect(0, 0, ActualWidth, ActualHeight));
+        LoadPalette();
+        context.DrawRectangle(Ground, null, new Rect(0, 0, ActualWidth, ActualHeight));
         double pixels = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         IReadOnlyList<SweepPoint> points = Points ?? [];
         IReadOnlyList<SweepPoint> reference = Reference ?? [];
@@ -261,7 +260,7 @@ public sealed class SweepChart : FrameworkElement
 
         double x = X(point.FrequencyHertz);
         context.DrawLine(HoverPen, new Point(x, TopMargin), new Point(x, ActualHeight - BottomMargin));
-        FormattedText first = Label(frequency, pixels, Brushes.White);
+        FormattedText first = Label(frequency, pixels, ReadoutText);
         FormattedText second = Label(left, pixels, LeftPen.Brush);
         FormattedText third = Label(right, pixels, RightPen.Brush);
         double width = Math.Max(first.Width, second.Width + third.Width + 12) + 12;
@@ -271,6 +270,22 @@ public sealed class SweepChart : FrameworkElement
         context.DrawText(first, new Point(box.Left + 6, box.Top + 2));
         context.DrawText(second, new Point(box.Left + 6, box.Top + 18));
         context.DrawText(third, new Point(box.Left + 18 + second.Width, box.Top + 18));
+    }
+
+    private void LoadPalette()
+    {
+        Ground = ThemeResources.Brush(this, "AudioLabChartBackground", Brushes.Black);
+        Brush grid = ThemeResources.Brush(this, "AudioLabChartGrid", Brushes.DimGray);
+        Brush reference = ThemeResources.Brush(this, "AudioLabChartReference", Brushes.Gray);
+        GridPen = Frozen(new Pen(grid, 1));
+        ZeroPen = Frozen(new Pen(ThemeResources.Brush(this, "AudioLabChartZero", Brushes.Gray), 1));
+        LeftPen = Frozen(new Pen(ThemeResources.Brush(this, "AudioLabChartLeft", Brushes.Gold), 2));
+        RightPen = Frozen(new Pen(ThemeResources.Brush(this, "AudioLabChartRight", Brushes.DeepSkyBlue), 2));
+        ReferencePen = Frozen(new Pen(reference, 1) { DashStyle = DashStyles.Dash });
+        HoverPen = Frozen(new Pen(reference, 1) { DashStyle = DashStyles.Dot });
+        LabelBrush = ThemeResources.Brush(this, "AudioLabChartLabel", Brushes.Silver);
+        ReadoutBackground = ThemeResources.Brush(this, "AudioLabChartReadout", Brushes.Black);
+        ReadoutText = ThemeResources.Brush(this, "AudioLabChartMarker", Brushes.White);
     }
 
     private static void Polyline(DrawingContext context, Pen pen, IReadOnlyList<Point> points)

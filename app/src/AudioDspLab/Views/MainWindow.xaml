@@ -74,10 +74,13 @@
         </Grid.ColumnDefinitions>
 
         <!-- ============ Connection ============ -->
-        <Border Grid.Row="0" Grid.ColumnSpan="2" Background="{StaticResource AudioLabSettingsBackground}"
+        <Border Grid.Row="0" Grid.ColumnSpan="2" Background="{DynamicResource AudioLabTopBarBackground}"
                 BorderBrush="{StaticResource AudioLabSeparator}" BorderThickness="0,0,0,1" Padding="6,4">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource AudioLabSettingsLabelStyle}" Text="Theme" />
+                    <ComboBox x:Name="ThemeBox" Width="110" Height="24" Margin="0,0,8,0" VerticalContentAlignment="Center"
+                              ItemsSource="{Binding ThemeNames}" SelectedItem="{Binding SelectedTheme}" />
                     <Button x:Name="ConsoleKey" Style="{StaticResource AudioLabKeyStyle}" Content="Console"
                             ToolTip="Talk the board's protocol by hand" Click="Console_Click"
                             IsEnabled="{Binding IsConnected}" />
@@ -142,7 +145,7 @@
                             </Border>
                             <TextBlock Foreground="{StaticResource AudioLabDimText}" VerticalAlignment="Center"
                                        Margin="14,0,6,0" Text="Stream" />
-                            <TextBlock x:Name="SampleRateText" Foreground="White" VerticalAlignment="Center"
+                            <TextBlock x:Name="SampleRateText" Foreground="{DynamicResource AudioLabText}" VerticalAlignment="Center"
                                        Text="{Binding SampleRateText}" />
                         </StackPanel>
                         <TextBlock Style="{StaticResource AudioLabHeaderStyle}" Text="Radio" />
@@ -158,10 +161,10 @@
                                          DisplayBackground="{StaticResource AudioLabAmplitudeBackground}">
                         <controls:LabDisplay.Body>
                             <StackPanel Width="272">
-                                <TextBlock Text="{Binding StationName}" Foreground="White" FontSize="26"
+                                <TextBlock Text="{Binding StationName}" Foreground="{DynamicResource AudioLabDisplayValue}" FontSize="26"
                                            HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                 <TextBlock Text="{Binding StreamTitleText}" ToolTip="{Binding StreamTitle}"
-                                           Foreground="Gold" FontSize="12" Margin="0,2,0,4"
+                                           Foreground="{DynamicResource AudioLabAccentText}" FontSize="12" Margin="0,2,0,4"
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </controls:LabDisplay.Body>
@@ -268,7 +271,7 @@
                         <ContentControl x:Name="WaveformKeys" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Width="380"
                                         HorizontalAlignment="Left"
                                         Content="{Binding Waveform}" ContentTemplate="{StaticResource ChoiceKeys}" />
-                        <Border Grid.Row="0" Grid.Column="3" Background="Gold" CornerRadius="2" Padding="5,0"
+                        <Border Grid.Row="0" Grid.Column="3" Background="{DynamicResource AudioLabMarkerP3}" CornerRadius="3" Padding="5,0"
                                 HorizontalAlignment="Right" VerticalAlignment="Center">
                             <Border.Style>
                                 <Style TargetType="Border">
@@ -280,7 +283,7 @@
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
-                            <TextBlock Text="P3" FontWeight="Bold" />
+                            <TextBlock Text="P3" FontWeight="Bold" Foreground="{DynamicResource AudioLabMarkerText}" />
                         </Border>
 
                         <TextBlock Grid.Row="1" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="F" />
@@ -433,11 +436,11 @@
                 <DockPanel Margin="6,0,6,2">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                         <TextBlock Foreground="{StaticResource AudioLabDimText}" VerticalAlignment="Center" Margin="0,0,8,0" Text="Show" />
-                        <RadioButton x:Name="AbsoluteChoice" GroupName="ResponseMode" Foreground="White" VerticalContentAlignment="Center"
+                        <RadioButton x:Name="AbsoluteChoice" GroupName="ResponseMode" Foreground="{DynamicResource AudioLabText}" VerticalContentAlignment="Center"
                                      Margin="0,0,10,0" Content="Absolute dBFS"
                                      IsChecked="{Binding ShowAbsolute, Mode=OneWay}"
                                      Command="{Binding ShowRelativeCommand}" CommandParameter="absolute" />
-                        <RadioButton x:Name="RelativeChoice" GroupName="ResponseMode" Foreground="White" VerticalContentAlignment="Center"
+                        <RadioButton x:Name="RelativeChoice" GroupName="ResponseMode" Foreground="{DynamicResource AudioLabText}" VerticalContentAlignment="Center"
                                      Content="Relative to reference"
                                      IsChecked="{Binding ShowRelative, Mode=OneWay}"
                                      Command="{Binding ShowRelativeCommand}" CommandParameter="relative" />
@@ -450,8 +453,8 @@
                                          Points="{Binding Points}" Reference="{Binding Reference}" ShowRelative="{Binding ShowRelative}" />
                 </Border>
                 <TextBlock Margin="6,2,0,0" Foreground="{StaticResource AudioLabDimText}">
-                    <Run Foreground="Gold" Text="— left" />
-                    <Run Foreground="#FF3FC8FF" Text="  — right" />
+                    <Run Foreground="{DynamicResource AudioLabChartLeft}" Text="— left" />
+                    <Run Foreground="{DynamicResource AudioLabChartRight}" Text="  — right" />
                     <Run Text="  · the reference dashed in absolute mode · hover a point to read it" />
                 </TextBlock>
                 <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,4,0,0">
@@ -513,7 +516,7 @@
                         <Button x:Name="StopSweepKey" DockPanel.Dock="Left" Style="{StaticResource AudioLabKeyStyle}" Height="30"
                                 Content="Stop" Command="{Binding StopSweepCommand}" />
                         <TextBlock x:Name="ProgressText" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0,0,0"
-                                   Foreground="Black" MinWidth="110" Text="{Binding ProgressText}" />
+                                   Foreground="{DynamicResource AudioLabTextOnBlock}" MinWidth="110" Text="{Binding ProgressText}" />
                         <ProgressBar x:Name="SweepProgress" Height="14" Margin="8,0,0,0" Minimum="0" Maximum="1"
                                      Value="{Binding Progress, Mode=OneWay}" />
                     </DockPanel>
@@ -545,7 +548,7 @@
                         <controls:LabDisplay x:Name="InputLeftDisplay" Title="Input left" TitleFontSize="13"
                                              DisplayBackground="{StaticResource AudioLabAmplitudeBackground}">
                             <controls:LabDisplay.Body>
-                                <TextBlock Text="{Binding InputLeftText}" Foreground="White" FontSize="22" />
+                                <TextBlock Text="{Binding InputLeftText}" Foreground="{DynamicResource AudioLabDisplayValue}" FontSize="22" />
                             </controls:LabDisplay.Body>
                         </controls:LabDisplay>
                         <TextBlock Style="{StaticResource AudioLabUnitLineStyle}" Text="-- dBFS --" />
@@ -554,7 +557,7 @@
                         <controls:LabDisplay x:Name="InputRightDisplay" Title="Input right" TitleFontSize="13"
                                              DisplayBackground="{StaticResource AudioLabAmplitudeBackground}">
                             <controls:LabDisplay.Body>
-                                <TextBlock Text="{Binding InputRightText}" Foreground="White" FontSize="22" />
+                                <TextBlock Text="{Binding InputRightText}" Foreground="{DynamicResource AudioLabDisplayValue}" FontSize="22" />
                             </controls:LabDisplay.Body>
                         </controls:LabDisplay>
                         <TextBlock Style="{StaticResource AudioLabUnitLineStyle}" Text="-- dBFS --" />
@@ -579,11 +582,11 @@
                         Visibility="{Binding IsSigmaStudioSelected, Converter={StaticResource VisibleWhen}}">
                 <Border Style="{StaticResource AudioLabSettingsBlockStyle}" Margin="2,0,2,0">
                     <StackPanel Margin="2,2">
-                        <TextBlock TextWrapping="Wrap" Foreground="Black" Margin="0,1"
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource AudioLabTextOnBlock}" Margin="0,1"
                                    Text="The DSP runs the program in its EEPROM: what SigmaStudio wrote there last." />
-                        <TextBlock TextWrapping="Wrap" Foreground="Black" Margin="0,1"
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource AudioLabTextOnBlock}" Margin="0,1"
                                    Text="The board supplies the 48 kHz clock and stays off the I2C bus: download and write the EEPROM with the USBi at any time, no service mode needed." />
-                        <TextBlock TextWrapping="Wrap" Foreground="Black" Margin="0,1" Text="{Binding BackupText}" />
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource AudioLabTextOnBlock}" Margin="0,1" Text="{Binding BackupText}" />
                     </StackPanel>
                 </Border>
                 <TextBlock Margin="6,6,0,2" Foreground="{StaticResource AudioLabDimText}"
@@ -605,7 +608,7 @@
                                         </MultiBinding>
                                     </controls:LabDisplay.Title>
                                     <controls:LabDisplay.Body>
-                                        <TextBlock Text="{Binding PercentText}" Foreground="White" FontSize="22" />
+                                        <TextBlock Text="{Binding PercentText}" Foreground="{DynamicResource AudioLabDisplayValue}" FontSize="22" />
                                     </controls:LabDisplay.Body>
                                 </controls:LabDisplay>
                                 <TextBlock Style="{StaticResource AudioLabUnitLineStyle}" Text="{Binding AuxPin}" />
@@ -613,8 +616,8 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <Border Margin="2,6,2,0" Padding="10,6" Background="#FFFFF3B0" BorderBrush="#FFD4A000" BorderThickness="4,0,0,0">
-                    <TextBlock x:Name="SigmaStudioWarning" TextWrapping="Wrap" Foreground="#FF5A4300"
+                <Border Margin="2,6,2,0" Padding="10,6" Background="{DynamicResource AudioLabNoteBackground}" BorderBrush="{DynamicResource AudioLabNoteBorder}" BorderThickness="4,0,0,0">
+                    <TextBlock x:Name="SigmaStudioWarning" TextWrapping="Wrap" Foreground="{DynamicResource AudioLabNoteText}"
                                Text="Selecting another application writes its program to the EEPROM. The board keeps a copy of yours in its flash and writes it back when you return to this mode. Unplug the USBi before you switch." />
                 </Border>
             </StackPanel>
@@ -637,7 +640,7 @@
                     <controls:LabDisplay x:Name="SynthNoteDisplay" Grid.Column="0" Title="Note" TitleFontSize="14"
                                          DisplayBackground="{StaticResource AudioLabFrequencyBackground}">
                         <controls:LabDisplay.Body>
-                            <TextBlock Text="{Binding NoteText}" Foreground="White" FontSize="26"
+                            <TextBlock Text="{Binding NoteText}" Foreground="{DynamicResource AudioLabDisplayValue}" FontSize="26"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </controls:LabDisplay.Body>
                     </controls:LabDisplay>
@@ -682,7 +685,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="0,0,8,0">
-                                <TextBlock Foreground="White" FontWeight="Bold" Text="{Binding Title}" />
+                                <TextBlock Foreground="{DynamicResource AudioLabText}" FontWeight="Bold" Text="{Binding Title}" />
                                 <ContentControl Content="{Binding Waveform}" ContentTemplate="{StaticResource ChoiceKeys}" />
                                 <UniformGrid Columns="4">
                                     <ContentControl Content="{Binding Octave}" ContentTemplate="{StaticResource SmallDial}" />
@@ -729,7 +732,7 @@
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,6,0">
                             <TextBlock Foreground="{StaticResource AudioLabDimText}" Margin="0,0,6,0" Text="Mod wheel" />
-                            <TextBlock x:Name="SynthModStripText" Foreground="White" FontWeight="Bold" Text="{Binding ModStripText}" />
+                            <TextBlock x:Name="SynthModStripText" Foreground="{DynamicResource AudioLabText}" FontWeight="Bold" Text="{Binding ModStripText}" />
                         </StackPanel>
                         <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="LFOs" />
                     </DockPanel>
@@ -743,7 +746,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="0,0,8,0">
-                                <TextBlock Foreground="White" FontWeight="Bold" Text="{Binding Title}" />
+                                <TextBlock Foreground="{DynamicResource AudioLabText}" FontWeight="Bold" Text="{Binding Title}" />
                                 <ContentControl Content="{Binding Waveform}" ContentTemplate="{StaticResource ChoiceKeys}" />
                                 <UniformGrid Columns="4">
                                     <ContentControl Content="{Binding Rate}" ContentTemplate="{StaticResource SmallDial}" />
@@ -852,7 +855,7 @@
                     </Border>
                     <TextBlock Style="{StaticResource AudioLabInfoStyle}"
                                Text="Hands the DSP to SigmaStudio and the USBi. Leaving restores the application." />
-                    <CheckBox x:Name="ServiceConfirmation" Margin="8,6,8,4" Foreground="White"
+                    <CheckBox x:Name="ServiceConfirmation" Margin="8,6,8,4" Foreground="{DynamicResource AudioLabText}"
                               Content="Hand the DSP to SigmaStudio"
                               IsChecked="{Binding IsServiceConfirmed}" IsEnabled="{Binding CanSelectApplication}" />
                     <StackPanel Orientation="Horizontal" Margin="6,2">
@@ -886,7 +889,7 @@
                     </StackPanel>
                 </StackPanel>
                 <ListBox x:Name="SettingsList" Margin="6,0,6,6" MinHeight="60"
-                         Background="Black" Foreground="White" FontSize="12"
+                         Background="{DynamicResource AudioLabListBackground}" Foreground="{DynamicResource AudioLabListText}" FontSize="12"
                          BorderBrush="{StaticResource AudioLabSeparator}"
                          ItemsSource="{Binding SettingsNames}"
                          SelectedItem="{Binding SelectedSettingsName, Mode=TwoWay}"
@@ -900,13 +903,13 @@
                 <Ellipse x:Name="StatusDot" DockPanel.Dock="Right" Width="10" Height="10" Margin="8,0,10,0">
                     <Ellipse.Style>
                         <Style TargetType="Ellipse">
-                            <Setter Property="Fill" Value="LimeGreen" />
+                            <Setter Property="Fill" Value="{DynamicResource AudioLabStatusOk}" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsConnected}" Value="False">
-                                    <Setter Property="Fill" Value="Gray" />
+                                    <Setter Property="Fill" Value="{DynamicResource AudioLabStatusIdle}" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding ErrorStatus}" Value="True">
-                                    <Setter Property="Fill" Value="Red" />
+                                    <Setter Property="Fill" Value="{DynamicResource AudioLabStatusError}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
@@ -916,7 +919,7 @@
                            Text="{Binding StatusInfo}" ToolTip="{Binding StatusInfo}" TextTrimming="CharacterEllipsis">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
-                            <Setter Property="Foreground" Value="White" />
+                            <Setter Property="Foreground" Value="{DynamicResource AudioLabText}" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding ErrorStatus}" Value="True">
                                     <Setter Property="Foreground" Value="{StaticResource AudioLabErrorText}" />

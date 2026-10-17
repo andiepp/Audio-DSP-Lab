@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     public const string ManualUrl = "https://github.com/andiepp/Audio-DSP-Lab/blob/main/docs/Manual.md";
 
     private readonly MainViewModel viewModel;
+    private bool keepViewModel;
 
     public MainWindow()
         : this(new MainViewModel())
@@ -29,11 +30,36 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         viewModel.Confirm = question =>
             MessageBox.Show(this, question, "Audio-DSP-Lab", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        viewModel.ThemeChanged += OnThemeChanged;
+    }
+
+    public MainViewModel ViewModel => viewModel;
+
+    /// <summary>Closes this window for its successor in another theme; the view model lives on.</summary>
+    public void CloseKeepingViewModel()
+    {
+        keepViewModel = true;
+        Close();
+    }
+
+    private void OnThemeChanged(string theme)
+    {
+        if (Application.Current is App app && app.MainWindow == this)
+        {
+            Dispatcher.BeginInvoke(() => app.SwitchTheme(this, theme));
+        }
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs eventArgs) => _ = viewModel.ConnectToLastPortAsync();
 
-    private void Window_Closing(object sender, CancelEventArgs eventArgs) => viewModel.Dispose();
+    private void Window_Closing(object sender, CancelEventArgs eventArgs)
+    {
+        viewModel.ThemeChanged -= OnThemeChanged;
+        if (!keepViewModel)
+        {
+            viewModel.Dispose();
+        }
+    }
 
     private void SettingsList_MouseDoubleClick(object sender, MouseButtonEventArgs eventArgs)
     {

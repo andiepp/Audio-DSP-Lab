@@ -347,11 +347,189 @@ Save a sound you like with **Settings → Save**.
 
 ## Scripting and the console
 
-Everything the window does goes through the board's text protocol, described in [Protocol.md](Protocol.md). You can use it yourself:
+Everything the window does goes through the board's text protocol, described in [Protocol.md](Protocol.md). You can use it yourself: in the window's console, from a Python script, or from any serial terminal.
 
-- **Console** (top right of the window) sends requests by hand and shows the answers and the board's events. Try `help`, `params`, `get`, `set frequency 440`.
-- **[tools/adl.py](../tools/adl.py)** is a Python client: `python adl.py COM5 "app generator" "set output on"`, or `from adl import Board` in your own scripts. It needs pyserial.
-- Any serial terminal at 921600 baud works too, with DTR and RTS off. Only one program can own the port at a time: disconnect the application first.
+### The console
+
+**Console** (top right of the window) sends requests by hand. Type a request and press Enter; Up and Down bring back earlier requests. The log shows your request (`>`), the board's answer exactly as it was sent (`*` data lines, then `ok` or `err`) and, if **Show events** is ticked, what the board reports by itself (`!`). The log's text can be selected and copied.
+
+The window follows what you do in the console: after a request that changes something (`set`, `app`, `potctl`, a station …), it reads the board again, so the pages show the new values. Requests are not case-sensitive; a text with spaces goes in double quotes.
+
+**Look around.** What runs, and what the running application offers:
+
+```
+> info
+ok Audio-DSP-Lab 1.0 1 esp32-pico-kit
+> status
+ok sigmastudio running none
+> apps
+* generator 1 "Signal generator"
+* equalizer 2 "Equalizer"
+* radio 3 "Internet radio"
+* analyzer 4 "Response analyzer"
+* sigmastudio 5 "SigmaStudio mode"
+* synthesizer 6 "Synthesizer"
+ok
+```
+
+**A test tone.** Start the generator and set it up; every `ok` carries the value the board took:
+
+```
+> app generator
+ok generator running
+> set waveform sine
+ok sine
+> set frequency 440.126
+ok 440.13
+> set amplitude -12.5
+ok -12.5
+> set output on
+ok on
+> get
+* waveform sine
+* frequency 440.13
+* amplitude -12.5
+* output on
+* p1-range 200-2k
+ok
+```
+
+**What a parameter accepts.** `params` lists the running application's parameters: name, kind, value, minimum, maximum, default, unit, choices and the pot that plays it. A value outside the range is refused with the range:
+
+```
+> params
+* waveform choice sine 0 3 sine - sine,square,triangle,noise P3
+* frequency number 440.13 20 20000 1000 Hz - P1
+* amplitude number -12.5 -60 0 -20 dBFS - P2
+* output switch on 0 1 off - - -
+* p1-range choice 200-2k 0 2 200-2k - 20-200,200-2k,2k-20k -
+ok
+> set frequency 30000
+err out-of-range frequency 20..20000 Hz
+> set waveform 2
+ok triangle
+```
+
+**The pots.** With Pot control on, turning a pot is reported as an event: where the pots stand (0 to 4095) and the value they changed:
+
+```
+> potctl on
+ok on
+! pots 2048 3407 0 4095
+! value amplitude -10.08
+```
+
+**The radio.** Enter a WiFi network once (the board keeps it), choose a station, give a station slot your own name and stream:
+
+```
+> wifi 0 "My network" "my-wifi-password"
+ok
+> app radio
+ok radio running
+! radio connecting-wifi 44100
+! radio playing 48000
+! title "Deutschlandfunk - Nachrichten"
+> set station 2
+ok 2
+> station 7 name "Jazz"
+ok
+> station 7 url "http://example.com/jazz.mp3"
+ok
+```
+
+(The title, and the stream address in the last line, are examples.)
+
+**A frequency response.** Connect K3 to K2 with a cable, sweep 100 Hz to 10 kHz with 5 points per decade, and watch the points arrive:
+
+```
+> app analyzer
+ok analyzer running
+> set start 100
+ok 100
+> set stop 10000
+ok 10000
+> set points-per-decade 5
+ok 5
+> sweep start
+ok running 0 11 0
+! point 0 100 -27.47 -27.49 - -
+! point 1 158.49 -27.46 -27.48 - -
+…
+! sweep done 11 11 0
+> reference keep
+ok
+```
+
+`points` lists the last sweep again; after `reference keep` every later point also carries its levels relative to the reference.
+
+**A synthesizer sound.** The "fat lead" from the starting points above, typed in:
+
+```
+> app synthesizer
+ok synthesizer running
+> set osc2-level 100
+ok 100
+> set osc2-detune 7
+ok 7
+> set osc3-level 100
+ok 100
+> set osc3-detune -7
+ok -7
+> set cutoff 3000
+ok 3000
+> set glide 80
+ok 80
+> set output on
+ok on
+```
+
+### Python
+
+[tools/adl.py](../tools/adl.py) is a small Python client for the same protocol. It needs Python 3 and pyserial (`pip install pyserial`). Close the Audio-DSP-Lab window first, or press **Disconnect**: only one program can own the port.
+
+From the command line, each quoted argument is one request:
+
+```
+python adl.py --list
+python adl.py COM5 info "app generator" "set frequency 1000" "set output on"
+python adl.py COM5
+```
+
+The last line starts an interactive session, like the console.
+
+In your own scripts, `Board` sends requests and returns their answers. Three steps of a test tone:
+
+```
+import time
+from adl import Board
+
+with Board("COM5") as board:
+    board.select("generator")
+    board.set("amplitude", -20)
+    board.set("output", True)
+    for hertz in (100, 1000, 10000):
+        board.set("frequency", hertz)
+        time.sleep(2)
+    board.set("output", False)
+```
+
+A frequency response saved as a CSV file for a spreadsheet:
+
+```
+from adl import Board
+
+with Board("COM5") as board:
+    board.select("analyzer")
+    points = board.sweep(start=20, stop=20000, points_per_decade=10)
+    with open("response.csv", "w") as file:
+        file.write("hz;left;right\n")
+        for point in points:
+            file.write(f"{point['hz']};{point['left']};{point['right']}\n")
+```
+
+### A serial terminal
+
+Any serial terminal works too: 921600 baud, 8N1, **DTR and RTS off** (asserting them resets the ESP32), line end LF. Type `events on` to see the board's events.
 
 ## Troubleshooting
 

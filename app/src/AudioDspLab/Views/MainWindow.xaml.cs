@@ -68,7 +68,7 @@ public partial class MainWindow : Window
     {
         if (viewModel.Client is { } client)
         {
-            new ConsoleWindow(new ConsoleViewModel(client)) { Owner = this }.Show();
+            new ConsoleWindow(new ConsoleViewModel(client, viewModel.RefreshFromBoardAsync)) { Owner = this }.Show();
         }
     }
 

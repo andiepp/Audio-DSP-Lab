@@ -324,7 +324,21 @@ public sealed class ConsoleViewModel : ObservableObject, IDisposable
 {
     private const int MaximumLines = 2000;
 
+    // requests that only read: the window need not read the board again
+    // after them. A command in the second set only reads when typed bare.
+    private static readonly HashSet<string> ReadOnlyCommands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "help", "ping", "echo", "info", "status", "apps", "params", "get", "pots", "stations", "radio",
+        "points", "level", "voice", "midi", "load", "aux", "backup", "diag",
+    };
+
+    private static readonly HashSet<string> QueriesWhenBare = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "app", "potctl", "startup", "service", "led", "events", "wifi", "sweep", "reference",
+    };
+
     private readonly BoardClient client;
+    private readonly Func<Task>? afterChange;
     private readonly SynchronizationContext ui;
     private readonly List<string> history = [];
     private readonly List<string> lines = [];
@@ -332,9 +346,14 @@ public sealed class ConsoleViewModel : ObservableObject, IDisposable
     private int historyIndex;
     private bool showEvents = true;
 
-    public ConsoleViewModel(BoardClient client)
+    /// <param name="afterChange">
+    /// Called after a request that may have changed the board (a set, another
+    /// application, a station ...), so that the main window reads it again.
+    /// </param>
+    public ConsoleViewModel(BoardClient client, Func<Task>? afterChange = null)
     {
         this.client = client ?? throw new ArgumentNullException(nameof(client));
+        this.afterChange = afterChange;
         ui = SynchronizationContext.Current ?? new SynchronizationContext();
         client.EventReceived += OnEvent;
         SendCommand = new RelayCommand(() => _ = SendAsync());
@@ -395,6 +414,11 @@ public sealed class ConsoleViewModel : ObservableObject, IDisposable
             {
                 Add(line);
             }
+
+            if (afterChange is not null && MayChange(request))
+            {
+                await afterChange().ConfigureAwait(true);
+            }
         }
         catch (BoardErrorException exception)
         {
@@ -404,6 +428,18 @@ public sealed class ConsoleViewModel : ObservableObject, IDisposable
         {
             Add($"(no answer: {exception.Message})");
         }
+    }
+
+    /// <summary>Whether a request may have changed the board; queries do not.</summary>
+    public static bool MayChange(string request)
+    {
+        IReadOnlyList<string> words = ProtocolText.Tokenize(request) ?? [];
+        if (words.Count == 0 || ReadOnlyCommands.Contains(words[0]))
+        {
+            return false;
+        }
+
+        return !(words.Count == 1 && QueriesWhenBare.Contains(words[0]));
     }
 
     private void OnEvent(BoardEvent boardEvent)

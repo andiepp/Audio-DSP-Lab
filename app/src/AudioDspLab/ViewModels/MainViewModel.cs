@@ -783,6 +783,28 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         await ReloadAsync().ConfigureAwait(true);
     }
 
+    /// <summary>
+    /// Reads the whole board again, after the console changed something the
+    /// window was not told about (a set, a station, events switched off).
+    /// </summary>
+    public async Task RefreshFromBoardAsync()
+    {
+        if (client is not { } board || isBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            await board.SendAsync("events on").ConfigureAwait(true);   // the window lives on them
+            await ReadBoardAsync().ConfigureAwait(true);
+        }
+        catch (Exception exception) when (exception is BoardErrorException or IOException or TimeoutException or FormatException)
+        {
+            Fail($"Reading the board after the console's request failed: {exception.Message}");
+        }
+    }
+
     private async Task OnRestartedAsync()
     {
         if (client is not { } board)

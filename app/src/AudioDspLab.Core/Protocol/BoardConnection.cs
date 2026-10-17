@@ -180,6 +180,7 @@ public sealed class BoardConnection : IDisposable
             if (request.Echo is null && ProtocolText.Tokenize(line[2..]) is { } data)
             {
                 request.Data.Add(data);
+                request.RawLines.Add(line);
             }
 
             return;
@@ -206,7 +207,7 @@ public sealed class BoardConnection : IDisposable
 
         if (isOk)
         {
-            Complete(request, new BoardResponse([.. request.Data], [.. words2.Skip(1)]));
+            Complete(request, new BoardResponse([.. request.Data], [.. words2.Skip(1)]) { RawLines = [.. request.RawLines, line] });
         }
         else
         {
@@ -270,6 +271,8 @@ public sealed class BoardConnection : IDisposable
         public string? Echo { get; } = echo;
 
         public List<IReadOnlyList<string>> Data { get; } = [];
+
+        public List<string> RawLines { get; } = [];
 
         public TaskCompletionSource<BoardResponse> Completion { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);

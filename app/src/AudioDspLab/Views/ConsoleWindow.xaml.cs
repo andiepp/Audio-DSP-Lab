@@ -1,11 +1,15 @@
-using System.Collections.Specialized;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using AudioDspLab.ViewModels;
 
 namespace AudioDspLab.Views;
 
-/// <summary>The protocol by hand; the log follows its last line, Up and Down recall requests.</summary>
+/// <summary>
+/// The protocol by hand; the log follows its last line, Up and Down recall
+/// requests. The log is a read-only text box: its text can be selected and
+/// copied.
+/// </summary>
 public partial class ConsoleWindow : Window
 {
     private readonly ConsoleViewModel console;
@@ -15,17 +19,11 @@ public partial class ConsoleWindow : Window
         this.console = console ?? throw new ArgumentNullException(nameof(console));
         InitializeComponent();
         DataContext = console;
-        console.Lines.CollectionChanged += Lines_CollectionChanged;
         Loaded += (_, _) => InputBox.Focus();
     }
 
-    private void Lines_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
-    {
-        if (console.Lines.Count > 0)
-        {
-            Log.ScrollIntoView(console.Lines[^1]);
-        }
-    }
+    // the text box has taken the new text by now; follow it to its end
+    private void Log_TextChanged(object sender, TextChangedEventArgs eventArgs) => Log.ScrollToEnd();
 
     private void InputBox_PreviewKeyDown(object sender, KeyEventArgs eventArgs)
     {
@@ -39,7 +37,6 @@ public partial class ConsoleWindow : Window
 
     private void Window_Closed(object? sender, EventArgs eventArgs)
     {
-        console.Lines.CollectionChanged -= Lines_CollectionChanged;
         console.Dispose();
     }
 }

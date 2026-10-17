@@ -327,6 +327,7 @@ public sealed class ConsoleViewModel : ObservableObject, IDisposable
     private readonly BoardClient client;
     private readonly SynchronizationContext ui;
     private readonly List<string> history = [];
+    private readonly List<string> lines = [];
     private string input = string.Empty;
     private int historyIndex;
     private bool showEvents = true;
@@ -337,10 +338,14 @@ public sealed class ConsoleViewModel : ObservableObject, IDisposable
         ui = SynchronizationContext.Current ?? new SynchronizationContext();
         client.EventReceived += OnEvent;
         SendCommand = new RelayCommand(() => _ = SendAsync());
-        Lines.Add("Type a request and press Enter; 'help' lists them. Events are shown as they come.");
+        Add("Type a request and press Enter; 'help' lists them. Events are shown as they come.");
     }
 
-    public ObservableCollection<string> Lines { get; } = [];
+    /// <summary>The log's lines, oldest first, at most <see cref="MaximumLines"/>.</summary>
+    public IReadOnlyList<string> Lines => lines;
+
+    /// <summary>The log as one text, for a read-only text box (selectable, copyable).</summary>
+    public string Text => string.Join(Environment.NewLine, lines);
 
     public string Input
     {
@@ -386,12 +391,10 @@ public sealed class ConsoleViewModel : ObservableObject, IDisposable
         try
         {
             BoardResponse response = await client.SendAsync(request).ConfigureAwait(true);
-            foreach (IReadOnlyList<string> data in response.Data)
+            foreach (string line in response.RawLines)
             {
-                Add("* " + string.Join(' ', data.Select(Show)));
+                Add(line);
             }
-
-            Add(response.Values.Count == 0 ? "ok" : "ok " + string.Join(' ', response.Values.Select(Show)));
         }
         catch (BoardErrorException exception)
         {
@@ -421,10 +424,12 @@ public sealed class ConsoleViewModel : ObservableObject, IDisposable
 
     private void Add(string line)
     {
-        Lines.Add(line);
-        while (Lines.Count > MaximumLines)
+        lines.Add(line);
+        if (lines.Count > MaximumLines)
         {
-            Lines.RemoveAt(0);
+            lines.RemoveRange(0, lines.Count - MaximumLines);
         }
+
+        RaisePropertyChanged(nameof(Text));
     }
 }

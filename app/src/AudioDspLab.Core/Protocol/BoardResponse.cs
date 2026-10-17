@@ -3,6 +3,9 @@ namespace AudioDspLab.Protocol;
 /// <summary>A successful response: the data lines and the words after <c>ok</c>.</summary>
 public sealed record BoardResponse(IReadOnlyList<IReadOnlyList<string>> Data, IReadOnlyList<string> Values)
 {
+    /// <summary>The response's lines exactly as the board sent them (data lines, then the ok line), for a console.</summary>
+    public IReadOnlyList<string> RawLines { get; init; } = [];
+
     /// <summary>The first word after <c>ok</c>, or an empty string.</summary>
     public string Value => Values.Count > 0 ? Values[0] : string.Empty;
 }

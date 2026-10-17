@@ -17,8 +17,10 @@
                 </TextBox.InputBindings>
             </TextBox>
         </DockPanel>
-        <ListBox x:Name="Log" ItemsSource="{Binding Lines}" Background="Black" Foreground="#FFB8F0B8"
-                 FontFamily="Consolas" FontSize="12" BorderBrush="{StaticResource AudioLabSeparator}"
-                 ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+        <TextBox x:Name="Log" Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                 Background="Black" Foreground="#FFB8F0B8" FontFamily="Consolas" FontSize="12"
+                 BorderBrush="{StaticResource AudioLabSeparator}" TextWrapping="NoWrap"
+                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                 TextChanged="Log_TextChanged" />
     </DockPanel>
 </Window>

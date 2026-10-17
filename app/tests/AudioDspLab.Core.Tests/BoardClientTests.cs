@@ -117,6 +117,15 @@ public sealed class BoardClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AResponse_KeepsItsLinesAsTheBoardSentThem()
+    {
+        BoardResponse response = await client.SendAsync("stations");
+        Assert.Equal(9, response.RawLines.Count);
+        Assert.Equal("* 0 \"Deutschlandfunk\" \"http://st01.dlf.de/dlf/01/128/mp3/stream.mp3\"", response.RawLines[0]);
+        Assert.Equal("ok", response.RawLines[^1]);
+    }
+
+    [Fact]
     public async Task Wifi_NeverReturnsThePassword()
     {
         await client.SetWifiAsync(1, "Home net", "secret-password");

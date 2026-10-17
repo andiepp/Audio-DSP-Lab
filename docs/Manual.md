@@ -521,6 +521,7 @@ from adl import Board
 with Board("COM5") as board:
     board.select("analyzer")
     points = board.sweep(start=20, stop=20000, points_per_decade=10)
+    board.set("output", False)          # a sweep switches the output on
     with open("response.csv", "w") as file:
         file.write("hz;left;right\n")
         for point in points:

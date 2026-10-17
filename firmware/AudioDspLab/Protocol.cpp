@@ -2,6 +2,7 @@
 #include "Config.h"
 #include "Errors.h"
 #include "ParamInfo.h"
+#include "Board.h"
 #include "Applications.h"
 #include "Pots.h"
 #include "Dsp.h"
@@ -430,7 +431,7 @@ static void cmdEcho() {
 }
 
 static void cmdInfo() {
-  okf("%s %d.%d %d", FIRMWARE_NAME, FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, PROTOCOL_VERSION);
+  okf("%s %d.%d %d %s", FIRMWARE_NAME, FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, PROTOCOL_VERSION, boardKit());
 }
 
 static void syncEvents();

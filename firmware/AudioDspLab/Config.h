@@ -8,8 +8,10 @@
 //  Core:    ESP32 by Espressif Systems 3.3.10, board "ESP32 PICO-D4",
 //           partition scheme "Minimal SPIFFS"
 //  JP1:     on 'ext. MCLK' (the firmware supplies 12.288 MHz on GPIO0)
-//  JP2:     on 'Selfboot'; board modification: GPIO33 wired to SELFBOOT
-//           (docs/Installation.md)
+//  JP2:     on 'Selfboot'
+//  GPIO33:  routed to the DSP's MP7 by the board; a wire from MP7 to SELFBOOT
+//           lets the firmware hand the bus to SigmaStudio (docs/Installation.md)
+//  Kit:     ESP32-PICO-KIT V4 (PICO-D4) or ESP32-PICO-KIT-1 (PICO-V3), Board.h
 // ----------------------------------------------------------------------------
 
 #ifndef CONFIG_H
@@ -30,21 +32,21 @@
 #define PROTOCOL_TX_BUFFER            2048
 #define PROTOCOL_VALUE_EVENT_MS       50      // pot-driven values: at most 20 events/s each
 #define PROTOCOL_POT_EVENT_MS         100     // pot positions: at most 10 events/s
-#define PROTOCOL_POT_EVENT_COUNTS     64      // a pot must move this far to be reported (1.5 %; the
-                                              // readings jitter by up to about 50 counts)
+#define PROTOCOL_POT_EVENT_COUNTS     80      // a pot must move this far to be reported (2 %; the
+                                              // scaled readings jitter by up to about 65 counts)
 #define PROTOCOL_VOICE_EVENT_MS       50      // synthesizer voice: at most 20 events/s
 
 // --- pins -------------------------------------------------------------------
 #define PIN_LED                       2
 #define PIN_DSP_RESET                 12      // active low
 #define PIN_EEPROM_WP                 21      // high = write protected
-#define PIN_SELFBOOT                  33      // board mod, see header
+#define PIN_SELFBOOT                  33      // DSP MP7 on the stock board; SELFBOOT with the wire, see header
 #define PIN_I2C_SDA                   9
 #define PIN_I2C_SCL                   10
 #define PIN_MCLK                      0       // I2S MCLK -> JP1 -> MCLKI
 #define PIN_I2S_BCLK                  27      // -> MP5 INPUT_BCLK (radio only)
 #define PIN_I2S_LRCLK                 14      // -> MP4 INPUT_LRCLK (radio only)
-#define PIN_I2S_DATA                  18      // -> MP0 SDATA_IN0 (radio only)
+// I2S data -> MP0 SDATA_IN0 (radio, synthesizer): GPIO18 or GPIO7 by kit, Board.h
 #define PIN_POT1                      35      // P1
 #define PIN_POT2                      34      // P2
 #define PIN_POT3                      39      // P3

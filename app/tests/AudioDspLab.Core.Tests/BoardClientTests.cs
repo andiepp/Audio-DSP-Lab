@@ -24,7 +24,7 @@ public sealed class BoardClientTests : IAsyncLifetime
     [Fact]
     public async Task Connect_FindsTheFirmwareAndTurnsEventsOn()
     {
-        Assert.Equal(new BoardInfo(BoardInfo.ExpectedName, SimulatedBoard.FirmwareVersion, 1), client.Info);
+        Assert.Equal(new BoardInfo(BoardInfo.ExpectedName, SimulatedBoard.FirmwareVersion, 1, "esp32-pico-kit"), client.Info);
         Assert.Contains("events on", board.Received);
         BoardStatus status = await client.GetStatusAsync();
         Assert.Equal(Applications.SigmaStudio, status.Application);

@@ -32,14 +32,24 @@ public static class Applications
 }
 
 /// <summary>What <c>info</c> and <c>! ready</c> report.</summary>
-public sealed record BoardInfo(string Name, string Firmware, int Protocol)
+public sealed record BoardInfo(string Name, string Firmware, int Protocol, string Kit = "")
 {
     public const string ExpectedName = "Audio-DSP-Lab";
     public const int SupportedProtocol = 1;
 
+    /// <summary>The ESP32 kit for people: "ESP32-PICO-KIT-1 (PICO-V3)", or empty when the board did not say.</summary>
+    public string KitDisplayName =>
+        Kit switch
+        {
+            "esp32-pico-kit" => "ESP32-PICO-KIT (PICO-D4)",
+            "esp32-pico-kit-1" => "ESP32-PICO-KIT-1 (PICO-V3)",
+            _ => Kit
+        };
+
+    /// <summary>From <c>info</c> (with the kit) or <c>! ready</c> (without).</summary>
     public static BoardInfo Parse(IReadOnlyList<string> values) =>
         values.Count >= 3
-            ? new BoardInfo(values[0], values[1], ProtocolText.ParseInteger(values[2]))
+            ? new BoardInfo(values[0], values[1], ProtocolText.ParseInteger(values[2]), values.Count > 3 ? values[3] : string.Empty)
             : throw new FormatException("info needs a name, a firmware version and a protocol version.");
 }
 

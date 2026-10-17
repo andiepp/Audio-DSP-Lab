@@ -284,7 +284,10 @@ public sealed class BoardClient : IDisposable
             }
         }
 
-        throw new TimeoutException($"No Audio-DSP-Lab board answers on {connection.Name}.", last);
+        throw new TimeoutException(
+            $"No Audio-DSP-Lab board answers on {connection.Name}. Is the Audio-DSP-Lab firmware flashed? "
+            + "A new board runs other firmware: flash it with firmware\\Flash-Firmware.cmd (installation guide, step 3).",
+            last);
     }
 
     private void OnEvent(BoardEvent boardEvent)
@@ -296,7 +299,7 @@ public sealed class BoardClient : IDisposable
             switch (boardEvent.Name)
             {
                 case "ready":
-                    BoardInfo info = BoardInfo.Parse(values);
+                    BoardInfo info = BoardInfo.Parse(values) with { Kit = Info?.Kit ?? string.Empty };
                     Info = info;
                     Restarted?.Invoke(info);
                     break;

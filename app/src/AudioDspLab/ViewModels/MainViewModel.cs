@@ -471,7 +471,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
             BoardInfo info = await Task.Run(() => connecting.ConnectAsync()).ConfigureAwait(true);
             client = candidate;
-            FirmwareText = $"{info.Name} {info.Firmware}";
+            FirmwareText = info.Kit.Length > 0 ? $"{info.Name} {info.Firmware} · {info.KitDisplayName}" : $"{info.Name} {info.Firmware}";
             preferences.LastPort = port;
             preferences.Save();
             RaiseConnection();

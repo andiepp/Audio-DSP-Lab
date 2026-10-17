@@ -913,7 +913,7 @@
                     </Ellipse.Style>
                 </Ellipse>
                 <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="4,0"
-                           Text="{Binding StatusInfo}" TextTrimming="CharacterEllipsis">
+                           Text="{Binding StatusInfo}" ToolTip="{Binding StatusInfo}" TextTrimming="CharacterEllipsis">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Foreground" Value="White" />

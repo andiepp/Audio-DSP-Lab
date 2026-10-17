@@ -378,3 +378,4 @@ Everything the window does goes through the board's text protocol, described in 
 - **The clock.** With JP1 on ext. MCLK the ESP32 supplies 12.288 MHz (256 × 48 kHz). The radio drives the clock from its stream's rate instead (256 × 44.1 kHz for most stations), and the equalizer's filters are recomputed for it.
 - **What the board stores** in the ESP32's flash: the WiFi networks, the stations, the analyzer's reference, the power-up choice, and the copy of your SigmaStudio program. Flashing a firmware update with the flash tool keeps them; erasing the flash removes them.
 - **The pots** are read by the ESP32 (12-bit, smoothed). The DSP sees them only through the ESP32's DACs in SigmaStudio mode.
+- **The ESP32 kit.** The board takes an ESP32-PICO-KIT V4 (PICO-D4) or an ESP32-PICO-KIT-1 (PICO-V3). They differ in the pin that carries I2S audio to the DSP (GPIO18 or GPIO7); the firmware detects the kit and the window shows it beside the firmware version.

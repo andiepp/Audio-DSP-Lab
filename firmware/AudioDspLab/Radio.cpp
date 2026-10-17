@@ -8,6 +8,7 @@
 
 #include "Radio.h"
 #include "Config.h"
+#include "Board.h"
 #include <WiFi.h>
 #include <Preferences.h>
 #include <string.h>
@@ -278,7 +279,7 @@ static bool startI2s(uint32_t rate) {
   auto config = i2s.defaultConfig(TX_MODE);
   config.pin_bck = PIN_I2S_BCLK;
   config.pin_ws = PIN_I2S_LRCLK;
-  config.pin_data = PIN_I2S_DATA;
+  config.pin_data = boardI2sDataPin();
   config.pin_mck = PIN_MCLK;
   config.i2s_format = I2S_STD_FORMAT;       // ADAU1701 serial input mode 0 = I2S
   config.use_apll = true;

@@ -87,7 +87,7 @@ The board keeps numbers in hundredths. A request with more decimals is rounded, 
 | `help` | `* <usage>` per command, `ok` | |
 | `ping` | `ok` | |
 | `echo <word>` | `ok <word>` | for resynchronising |
-| `info` | `ok Audio-DSP-Lab <firmware> <protocol>` | e.g. `ok Audio-DSP-Lab 1.0 1` |
+| `info` | `ok Audio-DSP-Lab <firmware> <protocol> <kit>` | e.g. `ok Audio-DSP-Lab 1.0 1 esp32-pico-kit`; kit `esp32-pico-kit` (PICO-D4) or `esp32-pico-kit-1` (PICO-V3) |
 | `events [on\|off]` | `ok on\|off` | [events](#events) are off after every reset |
 | `status` | `ok <application> <state> <last-error>` | state: `idle`, `loading`, `running`, `failed`, `service`; last error: an error code or `none` |
 | `led [on\|off]` | `ok on\|off` | the ESP32 kit's LED |
@@ -120,7 +120,7 @@ Applications:
 
 | Request | Response | Notes |
 | --- | --- | --- |
-| `pots` | `ok <p1> <p2> <p3> <p4>` | raw readings 0 to 4095 |
+| `pots` | `ok <p1> <p2> <p3> <p4>` | 0 to 4095 from stop to stop (the readings scaled to the pots' real travel) |
 | `potctl [on\|off]` | `ok on\|off` | whether the pots set parameters; off after every reset. Turning it on moves nothing: a pot takes over once it is turned. |
 | `startup [on\|off]` | `ok on\|off <application>` | off: every power-up starts the SigmaStudio mode; on: it starts the application selected last (radio and synthesizer with their output on) |
 | `service [on\|off]` | `ok on\|off` | on: the DSP keeps running, the EEPROM is writable and the firmware leaves the I2C bus to SigmaStudio and the USBi; off: the application is written back and restarted |
@@ -191,7 +191,7 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | `! ready Audio-DSP-Lab <firmware> <protocol>` | the board has started (power-up, reset, `reset`) |
 | `! status <application> <state> <last-error>` | the application, its state or its last error changed |
 | `! value <name> <value>` | a parameter changed without a `set`: a pot turned it, or the generator's frequency followed a new P1 range. At most 20 per second for each parameter. |
-| `! pots <p1> <p2> <p3> <p4>` | a pot moved by 64 counts (1.5 %) or more; at most 10 per second |
+| `! pots <p1> <p2> <p3> <p4>` | a pot moved by 80 counts (2 %) or more; at most 10 per second |
 | `! radio <state> <sample-rate>` | the radio's connection or sample rate changed |
 | `! title "<text>"` | the stream title changed |
 | `! point <index> <hz> <left> <right> <rel-left> <rel-right>` | the analyzer measured a point |
@@ -283,7 +283,7 @@ The SigmaStudio mode has no parameters.
 
 ```
 > info
-< ok Audio-DSP-Lab 1.0 1
+< ok Audio-DSP-Lab 1.0 1 esp32-pico-kit
 > events on
 < ok on
 > app generator

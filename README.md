@@ -33,7 +33,7 @@ The ESP32 runs the Audio-DSP-Lab firmware. It writes each application's DSP prog
 
 ## Get started
 
-1. Set the board's jumpers: **JP1 on ext. MCLK**, **JP2 on Selfboot** (and the GPIO33 wire, see the installation guide).
+1. Set the board's jumpers: **JP1 on ext. MCLK**, **JP2 on Selfboot**.
 2. Download the latest **[release](https://github.com/andiepp/Audio-DSP-Lab/releases)** and unzip it.
 3. Flash the firmware: `firmware\Flash-Firmware.cmd`, or in the browser with Espressif's web flasher.
 4. Start `AudioDspLab.exe`, choose the board's COM port, **Connect**.
@@ -54,7 +54,7 @@ Step by step: **[Installation guide](docs/Installation.md)**.
 
 ## Requirements
 
-- Elektor Audio-DSP-FX board v2.2 with the ESP32-PICO-KIT V4
+- Elektor Audio-DSP-FX board v2.2, with either ESP32 kit: ESP32-PICO-KIT V4 (PICO-D4) or ESP32-PICO-KIT-1 (PICO-V3)
 - Windows 10 or 11, 64-bit (the application is self-contained; nothing else to install)
 - Optional: 2.4 GHz WiFi for the radio; a MIDI keyboard with DIN MIDI Out for the synthesizer; SigmaStudio 4.7 and a USBi for your own programs
 

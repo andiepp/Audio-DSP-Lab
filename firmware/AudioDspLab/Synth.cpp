@@ -1,5 +1,6 @@
 #include "Synth.h"
 #include "Config.h"
+#include "Board.h"
 #include <Arduino.h>
 #include <driver/i2s_std.h>
 #include <math.h>
@@ -446,7 +447,7 @@ static bool startI2s() {
       .mclk = (gpio_num_t)PIN_MCLK,
       .bclk = (gpio_num_t)PIN_I2S_BCLK,
       .ws   = (gpio_num_t)PIN_I2S_LRCLK,
-      .dout = (gpio_num_t)PIN_I2S_DATA,
+      .dout = (gpio_num_t)boardI2sDataPin(),
       .din  = I2S_GPIO_UNUSED,
       .invert_flags = { .mclk_inv = false, .bclk_inv = false, .ws_inv = false },
     },

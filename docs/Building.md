@@ -20,7 +20,7 @@ This guide is for developers: building the firmware and the application, running
 
 - **Arduino IDE 2.3** (or arduino-cli 1.x)
 - **ESP32 by Espressif Systems**, version **3.3.10** (Boards Manager). Other 3.3.x versions should work; 2.x does not.
-- Board **ESP32 PICO-D4** (`esp32:esp32:pico32`), partition scheme **Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)**. The default scheme is too small for WiFi and the MP3 decoder, and the firmware keeps its copy of your SigmaStudio program in the SPIFFS partition.
+- Board **ESP32 PICO-D4** (`esp32:esp32:pico32`; the same build runs on the PICO-V3 of the ESP32-PICO-KIT-1), partition scheme **Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)**. The default scheme is too small for WiFi and the MP3 decoder, and the firmware keeps its copy of your SigmaStudio program in the SPIFFS partition.
 - The libraries in `firmware/libraries`.
 
 ### The libraries
@@ -44,6 +44,7 @@ The build takes a few minutes the first time and uses about 61 % of the applicat
 | --- | --- |
 | `AudioDspLab.ino` | `setup()` and `loop()`: drivers up, the applications, the protocol |
 | `Config.h` | Pins, versions, protocol settings, the DSP's rates |
+| `Board.cpp/.h` | Which ESP32 kit is fitted (PICO-D4 or PICO-V3) and the pin that differs |
 | `Protocol.cpp/.h` | The serial protocol: line reader, commands, values, events (docs/Protocol.md) |
 | `ParamInfo.cpp/.h` | The protocol's names, kinds and units for every application parameter |
 | `Applications.cpp/.h` | The applications: DSP image, parameter table (ranges in scaled integers, what a change does), pot mapping; starting, service mode, power-up |

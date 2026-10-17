@@ -248,7 +248,7 @@ public sealed class SimulatedBoard : ILineTransport
         {
             case "ping": Ok(); break;
             case "echo" when args.Count == 1: Ok(args[0]); break;
-            case "info": Ok($"{BoardInfo.ExpectedName} {FirmwareVersion} 1"); break;
+            case "info": Ok($"{BoardInfo.ExpectedName} {FirmwareVersion} 1 esp32-pico-kit"); break;
             case "help": Help(); break;
             case "events": Switch(args, ref eventsOn, SyncEvents); break;
             case "status": Ok(StatusText()); break;
@@ -994,7 +994,7 @@ public sealed class SimulatedBoard : ILineTransport
         }
 
         pendingValueEvents.Clear();
-        if (pots.Where((raw, index) => Math.Abs(raw - reportedPots[index]) >= 64).Any())
+        if (pots.Where((raw, index) => Math.Abs(raw - reportedPots[index]) >= 80).Any())
         {
             Array.Copy(pots, reportedPots, pots.Length);
             Emit($"! pots {string.Join(' ', pots)}");

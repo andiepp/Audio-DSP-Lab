@@ -22,7 +22,7 @@
 
 #define MAX_PARAMS                    56      // the synthesizer has 48
 #define POT_PICKUP_THRESHOLD          80      // counts of 4095 (~2 %)
-#define POT_BACKLASH                  10      // ADC noise measured at 15 counts peak-to-peak
+#define POT_BACKLASH                  14      // ADC noise: about 15 counts peak-to-peak, x1.28 by the scaling (Pots.cpp)
 #define POT_RAW_MAX                   4095
 // a self-boot reads at most 9248 bytes at 384 kHz (8 x fs): about 0.25 s
 #define SIGMASTUDIO_BOOT_MS           600

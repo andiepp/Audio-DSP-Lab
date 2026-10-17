@@ -10,7 +10,7 @@ This guide takes you from an Elektor Audio-DSP-FX board to a running Audio-DSP-L
 
 | Item | Notes |
 | --- | --- |
-| Elektor Audio-DSP-FX board v2.2 | ADAU1701 DSP with ESP32-PICO-KIT V4. Elektor article "Audio DSP FX Processor Board" (230510) |
+| Elektor Audio-DSP-FX board v2.2 | ADAU1701 DSP with an ESP32-PICO-KIT V4 (ESP32-PICO-D4) or the newer ESP32-PICO-KIT-1 (ESP32-PICO-V3); the firmware tells them apart by itself. Elektor article "Audio DSP FX Processor Board" (230510) |
 | USB cable | Micro-USB **data** cable for the ESP32 kit; charge-only cables do not work |
 | Windows PC | Windows 10 or 11, 64-bit. Nothing else to install: the application brings its own .NET runtime |
 | Headphone amplifier or active speakers | For K3/K4, line level (about 0.9 Vrms at full scale) |
@@ -20,16 +20,21 @@ This guide takes you from an Elektor Audio-DSP-FX board to a running Audio-DSP-L
 
 ## 1. Prepare the board
 
-The firmware drives the DSP's clock and its boot. Set two jumpers and make one wire connection.
+The firmware drives the DSP's clock and its boot. Set two jumpers:
 
 | Jumper | Setting | Why |
 | --- | --- | --- |
 | **JP1** (DSP clock) | **ext. MCLK** | The ESP32 supplies the DSP's master clock (12.288 MHz on GPIO0). On the crystal (X1) the DSP runs, but the radio, the synthesizer and the clock-dependent filters are wrong, and the firmware may report `dsp-not-responding`. |
 | **JP2** (boot) | **Selfboot** | The DSP loads each application's program from its EEPROM. |
 
-**Board modification: GPIO33 to SELFBOOT.** The firmware controls the DSP's SELFBOOT pin through the ESP32's GPIO33, the same modification Elektor's demo sketch uses for its programming mode. Connect GPIO33 of the ESP32-PICO-KIT to the SELFBOOT net of the ADAU1701 (pin 5; it is also the middle pin of JP2). The firmware uses it in SigmaStudio mode and service mode, so that SigmaStudio and the USBi can reach the DSP and its EEPROM.
+Every application works on a board as Elektor ships it, with either ESP32 kit.
 
-> **To be completed by the author:** a photo of the modification and the exact solder points.
+**SELFBOOT and GPIO33 (for SigmaStudio).** In SigmaStudio mode and service mode the firmware pulls GPIO33 low to take the DSP's SELFBOOT pin low after the DSP has booted, so that SigmaStudio and the USBi can reach the DSP. On the stock board GPIO33 is routed to the DSP's multipurpose pin **MP7**, not to SELFBOOT; the author's board has a wire that also connects it to SELFBOOT (ADAU1701 pin 5). Whether SigmaStudio and the USBi need that wire has not been tested on a stock board yet. Two consequences on any board:
+
+- Do not use MP7 as an output in your own SigmaStudio programs: in SigmaStudio mode the firmware drives it low.
+- The other applications never touch GPIO33.
+
+> **To be completed by the author:** the wire's exact solder points, and whether a stock board works with the USBi without it.
 
 Leave SigmaStudio's USBi off the I2C header unless you are working in SigmaStudio: while it sits on the bus, the firmware cannot write the EEPROM.
 
@@ -132,7 +137,7 @@ Audio-DSP-Lab does not lock the board: flash any other sketch (Elektor's demos, 
 | Flash tool: "esptool was not found" | No Arduino IDE, no Python | Put `esptool.exe` into the `firmware` folder, or `pip install esptool` |
 | Flash tool: "Failed to connect to ESP32" | The port is held by another program, or the kit did not enter its boot loader | Close the other program; hold BOOT while flashing starts; try `-Baud 115200` |
 | The application: "COMn is in use by another program" | A serial monitor or terminal holds the port | Close it |
-| The application: "No Audio-DSP-Lab board answers" | Other firmware on the board, or a board still booting | Flash the firmware; press **Connect** again |
+| The application: "No Audio-DSP-Lab board answers" | A new board runs Elektor's or no firmware; a board flashed from the Arduino IDE with other settings (another partition scheme) may not start | Flash the release with the flash tool (step 3), which also writes the right partition table; press **Connect** again |
 | Every application fails with `dsp-not-responding` | JP1 not on ext. MCLK, or JP2 not on Selfboot | Set the jumpers as in step 1 |
 | Every application fails with `eeprom-failed` | The USBi sits on the I2C header | Unplug it, select again |
 | No sound | Output off, or the amplifier on K4 while you listen to K3 | Press **Output on**; K3 and K4 carry the same signal |

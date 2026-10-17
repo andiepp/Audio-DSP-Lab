@@ -990,6 +990,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         ["frequency"] = "Frequency",
         ["amplitude"] = "Amplitude",
         ["waveform"] = "Waveform",
+        ["width"] = "Width",
         ["bass-gain"] = "Bass",
         ["middle-gain"] = "Middle",
         ["treble-gain"] = "Treble",

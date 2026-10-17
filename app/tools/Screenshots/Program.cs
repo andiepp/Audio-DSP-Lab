@@ -1,6 +1,6 @@
 // Renders the manual's screenshots from the simulated board, every page in
-// every theme: Classic into docs/images/screenshots, the Studio themes into
-// its studio-dark and studio-light folders.
+// every theme: Studio dark, the manual's, into docs/images/screenshots,
+// Classic and Studio light into its classic and studio-light folders.
 //   dotnet run --project app/tools/Screenshots [-- <folder>]
 using System.IO;
 using System.Windows;
@@ -30,11 +30,11 @@ static class Program
               foreach (string theme in ThemeResources.Names)
               {
                 ThemeResources.Apply(app, theme);
-                string output = theme == ThemeResources.Classic ? root : Path.Combine(root, theme.ToLowerInvariant().Replace(' ', '-'));
+                string output = theme == ThemeResources.StudioDark ? root : Path.Combine(root, theme.ToLowerInvariant().Replace(' ', '-'));
                 Directory.CreateDirectory(output);
                 Console.WriteLine($"--- {theme} -> {output}");
                 SimulatedBoard? board = null;
-                var vm = new MainViewModel(_ => board = new SimulatedBoard(demo: true), new SettingsStore(Path.Combine(Path.GetTempPath(), "Audio-DSP-Lab-screenshots")), new AppPreferences());
+                var vm = new MainViewModel(_ => board = new SimulatedBoard(demo: true), new SettingsStore(Path.Combine(Path.GetTempPath(), "Audio-DSP-Lab-screenshots")), new AppPreferences { Theme = theme });
                 var window = new MainWindow(vm);
                 window.Show();
                 Save(window, Path.Combine(output, "disconnected.png"));
@@ -55,7 +55,7 @@ static class Program
                     if (name == "generator")
                     {
                         await vm.SetPotentiometerControlAsync(true);
-                        board!.SetPot(0, 3000);
+                        board!.SetPot(2, 1100);           // P3: the triangle's rise
                         await Task.Delay(300);
                     }
                     Save(window, Path.Combine(output, $"{name}.png"));

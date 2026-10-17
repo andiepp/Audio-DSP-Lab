@@ -6,7 +6,7 @@ Six audio instruments for the **Elektor Audio-DSP-FX board** (ADAU1701 DSP + ESP
 
 | Application | What it does |
 | --- | --- |
-| **Generator** | Sine, square, triangle or noise, 20 Hz to 20 kHz, −60 to 0 dBFS |
+| **Generator** | Sine, rectangle, triangle, saw, inverse saw or noise, 20 Hz to 20 kHz, −60 to 0 dBFS; a width for the rectangle (pulse) and the triangle (rise) |
 | **Equalizer** | Bass, middle and treble with adjustable frequencies on the line input |
 | **Radio** | MP3 internet radio over WiFi, through the equalizer; eight editable stations |
 | **Response** | Frequency response analyzer: sweeps a device under test, with a reference to subtract the board's own response |

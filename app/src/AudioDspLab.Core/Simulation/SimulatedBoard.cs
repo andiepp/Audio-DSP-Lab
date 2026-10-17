@@ -546,9 +546,9 @@ public sealed class SimulatedBoard : ILineTransport
             title = string.Empty;
         }
 
-        if (parameter.Name == "p1-range" && potControl)
+        if (parameter.Name == "p2-range" && potControl)
         {
-            ApplyPot(0);                                  // the frequency follows P1 into the decade
+            ApplyPot(1);                                  // the frequency follows P2 into the decade
         }
 
         Ok(Format(parameter, value));
@@ -580,8 +580,9 @@ public sealed class SimulatedBoard : ILineTransport
         double share = raw / 4095.0;
         double value = (application, name) switch
         {
-            (Applications.Generator, "frequency") => Math.Round(20 * Math.Pow(10, values["p1-range"]) * Math.Pow(10, share), 2),
-            (Applications.Generator, "waveform") => Math.Min(3, (int)(raw * 4 / 4096)),
+            (Applications.Generator, "frequency") => Math.Round(20 * Math.Pow(10, values["p2-range"]) * Math.Pow(10, share), 2),
+            (Applications.Generator, "waveform") => Math.Min(5, (int)(raw * 6 / 4096)),
+            (Applications.Generator, "width") => 5 + Math.Round(90 * share),
             (Applications.Synthesizer, "cutoff") => Math.Round(20 * Math.Pow(10, 3 * share)),
             (Applications.Synthesizer, "emphasis") => Math.Round(100 * share),
             (Applications.Synthesizer, "osc1-width") => 5 + Math.Round(90 * share),

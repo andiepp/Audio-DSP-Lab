@@ -14,7 +14,7 @@ internal sealed record SimulatedParameter(
 /// <summary>The firmware 1.0 parameter tables, in the firmware's order.</summary>
 internal static class SimulatedParameters
 {
-    private static readonly string[] GeneratorWaveforms = ["sine", "square", "triangle", "noise"];
+    private static readonly string[] GeneratorWaveforms = ["sine", "rectangle", "triangle", "saw", "inverse-saw", "noise"];
     private static readonly string[] SynthWaveforms = ["sine", "saw", "rectangle", "triangle"];
     private static readonly string[] LfoWaveforms = ["sine", "triangle", "square"];
 
@@ -31,11 +31,12 @@ internal static class SimulatedParameters
 
     private static readonly SimulatedParameter[] Generator =
     [
-        new("waveform", ParameterKind.Choice, 0, 3, 0, Choices: GeneratorWaveforms, Pot: "P3"),
-        new("frequency", ParameterKind.Number, 20, 20000, 1000, "Hz", Pot: "P1"),
-        new("amplitude", ParameterKind.Number, -60, 0, -20, "dBFS", Pot: "P2"),
+        new("waveform", ParameterKind.Choice, 0, 5, 0, Choices: GeneratorWaveforms, Pot: "P1"),
+        new("frequency", ParameterKind.Number, 20, 20000, 1000, "Hz", Pot: "P2"),
+        new("amplitude", ParameterKind.Number, -60, 0, -20, "dBFS", Pot: "P4"),
         new("output", ParameterKind.Switch, 0, 1, 0),
-        new("p1-range", ParameterKind.Choice, 0, 2, 1, Choices: ["20-200", "200-2k", "2k-20k"]),
+        new("p2-range", ParameterKind.Choice, 0, 2, 1, Choices: ["20-200", "200-2k", "2k-20k"]),
+        new("width", ParameterKind.Integer, 5, 95, 50, "%", Pot: "P3"),
     ];
 
     private static readonly SimulatedParameter[] Equalizer =

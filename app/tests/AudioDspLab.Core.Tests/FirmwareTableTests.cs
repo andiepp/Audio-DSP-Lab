@@ -35,7 +35,9 @@ public partial class FirmwareTableTests
             symbols[key] = value;
         }
 
-        // enum values the tables use (Synth.h, Radio.h)
+        // enum values the tables use (Generator.h, Synth.h, Radio.h)
+        symbols["GENERATOR_SINE"] = "0";
+        symbols["GENERATOR_WAVEFORM_LAST"] = "5";
         symbols["SYNTH_SAWTOOTH"] = "1";
         symbols["SYNTH_WAVEFORM_LAST"] = "3";
         symbols["RADIO_STATION_LAST"] = "7";

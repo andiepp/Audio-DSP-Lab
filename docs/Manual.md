@@ -10,14 +10,14 @@ Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments th
 
 Audio-DSP-Lab has two parts:
 
-- **The firmware** runs on the board's ESP32. It writes each application's DSP program into the ADAU1701's EEPROM, computes filter coefficients, reads the pots and MIDI, streams the radio and generates the synthesizer's sound. It talks to the PC over the board's USB port with a simple text protocol.
+- **The firmware** runs on the board's ESP32. It writes each application's DSP program into the ADAU1701's EEPROM, computes filter coefficients, reads the pots and MIDI, streams the radio and makes the generator's signal and the synthesizer's sound. It talks to the PC over the board's USB port with a simple text protocol.
 - **The application** (`AudioDspLab.exe`) is the PC's front panel. It shows one page per application, sets every value, and shows what the board reports, including the changes you make with the board's pots.
 
 The board keeps working without the PC: once an application runs, you can close the window and keep playing. The board can also start an application by itself at power-up.
 
 | Application | What it does | Audio |
 | --- | --- | --- |
-| Generator | Sine, square, triangle or noise, 20 Hz to 20 kHz | out K3, K4 |
+| Generator | Sine, rectangle, triangle, saw, inverse saw or noise, 20 Hz to 20 kHz, with a width for rectangle and triangle | out K3, K4 |
 | Equalizer | Bass, middle, treble and volume on the line input | in K2, out K3, K4 |
 | Radio | Eight MP3 internet stations over WiFi, through the equalizer | out K3, K4 |
 | Response | Sweeps a sine through a device under test and plots its response | out K3, K4, in K2 |
@@ -78,7 +78,7 @@ No board at hand? Choose **Simulator (demo)** as the port. The simulator behaves
 
 **Knob colours.** The pot knobs wear the colours of colour-coded knob caps: **P1 blue, P2 green, P3 yellow, P4 red**; the coloured cap points where the pot stands. The Studio themes add a ring in the pot's colour that fills with the pot's travel. Caps in these colours on the board's pots make the two easy to match.
 
-![The generator page in the Studio dark theme](images/screenshots/studio-dark/generator.png)
+![The generator page in the Classic theme](images/screenshots/classic/generator.png)
 
 ## The applications
 
@@ -86,17 +86,22 @@ Selecting an application writes its DSP program into the EEPROM (about 0.2 s; no
 
 ### Generator
 
-A test signal on K3 and K4.
+A test signal on K3 and K4. The ESP32 makes it, as it makes the synthesizer's sound, and the DSP sets its amplitude.
 
 | Control | Range | Default | Pot |
 | --- | --- | --- | --- |
-| Waveform | Sine, square, triangle, noise | Sine | P3, four zones |
-| Frequency | 20 Hz to 20 kHz, 0.01 Hz steps | 1 kHz | P1, logarithmic within the P1 range |
-| P1 range | 20–200 Hz, 200 Hz–2 kHz, 2–20 kHz | 200 Hz–2 kHz | – |
-| Amplitude | −60 to 0 dBFS | −20 dBFS | P2 |
+| Waveform | Sine, rectangle, triangle, saw, inverse saw, noise | Sine | P1, six zones |
+| Width | 5 to 95 % | 50 % | P3 |
+| Frequency | 20 Hz to 20 kHz, 0.01 Hz steps | 1 kHz | P2, logarithmic within the P2 range |
+| P2 range | 20–200 Hz, 200 Hz–2 kHz, 2–20 kHz | 200 Hz–2 kHz | – |
+| Amplitude | −60 to 0 dBFS | −20 dBFS | P4 |
 | Output | Off, on | Off | – |
 
-Type a frequency into the **F** box (a trailing `k` means kilohertz) and press Enter, or use the keys beside it. Waveform changes fade and amplitude changes glide, so neither clicks. The square wave is not band-limited and aliases at high frequencies. The line under the amplitude gives the approximate RMS voltage, from Elektor's 0.9 Vrms at full scale.
+**Width** shapes the rectangle and the triangle, as the synthesizer's width and symmetry do: the rectangle's high part of the cycle (50 % is a square, 10 % a narrow pulse) and the triangle's rising part (50 % is symmetric; toward 95 % it leans into a saw, toward 5 % into an inverse saw). The saw rises and drops; the inverse saw drops and rises. The other waveforms ignore the width.
+
+Every waveform peaks at the amplitude set; a narrow pulse is scaled so that it does. Rectangle, triangle and the saws are band-limited, so they do not alias at high frequencies; close to 20 kHz all of them come near a sine, because their harmonics lie above the audio band.
+
+Type a frequency into the **F** box (a trailing `k` means kilohertz) and press Enter, or use the keys beside it. Waveform changes fade out and in (5 ms each) and amplitude changes glide, so neither clicks. The line under the amplitude gives the approximate RMS voltage of a sine, from Elektor's 0.9 Vrms at full scale.
 
 ### Equalizer
 
@@ -180,7 +185,7 @@ The pots set values only while **Pot control** is on, and it is off at every pow
 
 | Application | P1 | P2 | P3 | P4 |
 | --- | --- | --- | --- | --- |
-| Generator | Frequency | Amplitude | Waveform | – |
+| Generator | Waveform | Frequency | Width | Amplitude |
 | Equalizer, Radio | Bass gain | Middle gain | Treble gain | Volume |
 | Response | – | Output level | – | – |
 | SigmaStudio | ADC0 | ADC1 | ADC2 | ADC3 |
@@ -397,7 +402,8 @@ ok on
 * frequency 440.13
 * amplitude -12.5
 * output on
-* p1-range 200-2k
+* p2-range 200-2k
+* width 50
 ok
 ```
 
@@ -405,11 +411,12 @@ ok
 
 ```
 > params
-* waveform choice sine 0 3 sine - sine,square,triangle,noise P3
-* frequency number 440.13 20 20000 1000 Hz - P1
-* amplitude number -12.5 -60 0 -20 dBFS - P2
+* waveform choice sine 0 5 sine - sine,rectangle,triangle,saw,inverse-saw,noise P1
+* frequency number 440.13 20 20000 1000 Hz - P2
+* amplitude number -12.5 -60 0 -20 dBFS - P4
 * output switch on 0 1 off - - -
-* p1-range choice 200-2k 0 2 200-2k - 20-200,200-2k,2k-20k -
+* p2-range choice 200-2k 0 2 200-2k - 20-200,200-2k,2k-20k -
+* width integer 50 5 95 50 % - P3
 ok
 > set frequency 30000
 err out-of-range frequency 20..20000 Hz
@@ -417,15 +424,16 @@ err out-of-range frequency 20..20000 Hz
 ok triangle
 ```
 
-**The pots.** Switching Pot control on takes the pots' positions at once, and each value that moves is reported (here P3 already stands on triangle). After that, turning a pot is reported as an event: where the pots stand (0 to 4095) and the value it changed:
+**The pots.** Switching Pot control on takes the pots' positions at once, and each value that moves is reported (here P1 already stands on triangle). After that, turning a pot is reported as an event: where the pots stand (0 to 4095) and the value it changed:
 
 ```
 > potctl on
 ok on
-! value frequency 1145.59
-! value amplitude -41.38
-! pots 3101 3407 2693 3776        (P2 turned)
-! value amplitude -10.08
+! value frequency 1021.43
+! value amplitude -11.65
+! value width 20
+! pots 1500 2900 700 3600         (P4 turned)
+! value amplitude -7.25
 ```
 
 **The radio.** Enter a WiFi network once (the board keeps it), choose a station, give a station slot your own name and stream:
@@ -562,6 +570,7 @@ Any serial terminal works too: 921600 baud, 8N1, **DTR and RTS off** (asserting 
 
 ## Technical notes
 
+- **Signals from the ESP32.** The generator and the synthesizer compute their signal on the ESP32 at 48 kHz, 16 bits, and send it to the DSP over I2S; the DSP runs the radio's program for them (the equalizer, set flat, and the volume). The generator keeps its phase in 32 bits, so its frequency is exact to the 0.01 Hz set.
 - **The DSP's core rate.** The SigmaStudio projects run the ADAU1701's core four times per 48 kHz sample (192 kHz). Every frequency the firmware computes (oscillators, filters) is computed for that rate; frequencies typed into SigmaStudio's own controls for these projects act four times higher.
 - **The clock.** With JP1 on ext. MCLK the ESP32 supplies 12.288 MHz (256 × 48 kHz). The radio drives the clock from its stream's rate instead (256 × 44.1 kHz for most stations), and the equalizer's filters are recomputed for it.
 - **What the board stores** in the ESP32's flash: the WiFi networks, the stations, the analyzer's reference, the power-up choice, and the copy of your SigmaStudio program. Flashing a firmware update with the flash tool keeps them; erasing the flash removes them.

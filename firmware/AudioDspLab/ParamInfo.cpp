@@ -3,7 +3,7 @@
 #include <string.h>
 #include <strings.h>
 
-#define WAVEFORMS_GENERATOR           "sine,square,triangle,noise"
+#define WAVEFORMS_GENERATOR           "sine,rectangle,triangle,saw,inverse-saw,noise"
 #define WAVEFORMS_SYNTH               "sine,saw,rectangle,triangle"
 #define WAVEFORMS_LFO                 "sine,triangle,square"
 
@@ -13,7 +13,8 @@ static const ParamInfo generatorInfo[] = {
   { 2, "frequency",         KIND_NUMBER,  2, "Hz",   nullptr },
   { 3, "amplitude",         KIND_NUMBER,  2, "dBFS", nullptr },
   { 4, "output",            KIND_SWITCH,  0, "",     nullptr },
-  { 5, "p1-range",          KIND_CHOICE,  0, "",     "20-200,200-2k,2k-20k" },
+  { 5, "p2-range",          KIND_CHOICE,  0, "",     "20-200,200-2k,2k-20k" },
+  { 6, "width",             KIND_INTEGER, 0, "%",    nullptr },
 };
 
 // application 0x02 - equalizer; the radio (0x03) adds its station

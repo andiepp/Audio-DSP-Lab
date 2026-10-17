@@ -54,7 +54,7 @@ Commands, application names, parameter names and words such as `on` are not case
 | number | decimal with a point, at most 2 decimals; trailing zeros left out | `1000`, `-20`, `1234.5` |
 | integer | whole number | `15` |
 | switch | `on` or `off` (`1`/`0`, `true`/`false` are accepted) | `on` |
-| choice | one of the parameter's names, or its index | `square` or `1` |
+| choice | one of the parameter's names, or its index | `rectangle` or `1` |
 | text | `"quoted"` | `"Deutschlandfunk"` |
 | no value | `-` | |
 
@@ -109,7 +109,7 @@ Applications:
 
 | Name | Id | Application |
 | --- | --- | --- |
-| `generator` | 1 | signal generator: sine, square, triangle, noise on K3 and K4 |
+| `generator` | 1 | signal generator: sine, rectangle, triangle, saw, inverse saw, noise on K3 and K4 |
 | `equalizer` | 2 | three-band equalizer from the line input K2 to K3 and K4 |
 | `radio` | 3 | internet radio over WiFi, through the equalizer |
 | `analyzer` | 4 | frequency response analyzer: sine out on K3/K4, measured on K2 |
@@ -190,7 +190,7 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | --- | --- |
 | `! ready Audio-DSP-Lab <firmware> <protocol>` | the board has started (power-up, reset, `reset`) |
 | `! status <application> <state> <last-error>` | the application, its state or its last error changed |
-| `! value <name> <value>` | a parameter changed without a `set`: a pot turned it, or the generator's frequency followed a new P1 range. At most 20 per second for each parameter. |
+| `! value <name> <value>` | a parameter changed without a `set`: a pot turned it, or the generator's frequency followed a new P2 range. At most 20 per second for each parameter. |
 | `! pots <p1> <p2> <p3> <p4>` | a pot moved by 80 counts (2 %) or more; at most 10 per second |
 | `! radio <state> <sample-rate>` | the radio's connection or sample rate changed |
 | `! title "<text>"` | the stream title changed |
@@ -206,11 +206,12 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 
 | Name | Kind | Range | Default | Pot |
 | --- | --- | --- | --- | --- |
-| `waveform` | choice | `sine`, `square`, `triangle`, `noise` | `sine` | P3 |
-| `frequency` | number, Hz | 20 to 20000 | 1000 | P1 |
-| `amplitude` | number, dBFS | -60 to 0 | -20 | P2 |
+| `waveform` | choice | `sine`, `rectangle`, `triangle`, `saw`, `inverse-saw`, `noise` | `sine` | P1 |
+| `frequency` | number, Hz | 20 to 20000 | 1000 | P2 |
+| `amplitude` | number, dBFS | -60 to 0 | -20 | P4 |
 | `output` | switch | | off | |
-| `p1-range` | choice | `20-200`, `200-2k`, `2k-20k` | `200-2k` | |
+| `p2-range` | choice | `20-200`, `200-2k`, `2k-20k`: the decade P2 sweeps | `200-2k` | |
+| `width` | integer, % | 5 to 95: the rectangle's high part, the triangle's rise | 50 | P3 |
 
 ### equalizer and radio
 
@@ -298,10 +299,11 @@ The SigmaStudio mode has no parameters.
 > potctl on
 < ok on
 < ! value waveform triangle       (the pots' positions, taken at once)
-< ! value frequency 1145.59
-< ! value amplitude -41.38
-< ! pots 3101 3120 2693 3776      (P2 turned)
-< ! value amplitude -14.27
+< ! value frequency 1021.43
+< ! value amplitude -11.65
+< ! value width 20
+< ! pots 1500 2900 700 3600       (P4 turned)
+< ! value amplitude -7.25
 > set frequency 30000
 < err out-of-range frequency 20..20000 Hz
 ```

@@ -95,7 +95,7 @@ dotnet run --project src/AudioDspLab -- --simulator
 | `src/AudioDspLab.Core` | Protocol text, line transport (serial port), connection with request/response matching and resynchronisation, `BoardClient` (every command as a method, every event as a .NET event), the model, and `SimulatedBoard` |
 | `src/AudioDspLab` | The WPF application: `MainViewModel`, one page view model per application, generic `ParameterViewModel`, the controls (digit dial, displays, pot knob, response curve, sweep chart), stored settings, the themes |
 | `tests/AudioDspLab.Core.Tests` | Protocol text, the client against the simulator, and the firmware/simulator table comparison |
-| `tools/Screenshots` | Renders the manual's screenshots from the simulator in every theme: `dotnet run --project app/tools/Screenshots` writes Classic to `docs/images/screenshots` and the Studio themes to its `studio-dark` and `studio-light` folders |
+| `tools/Screenshots` | Renders the manual's screenshots from the simulator in every theme: `dotnet run --project app/tools/Screenshots` writes Studio dark, the manual's theme, to `docs/images/screenshots` and Classic and Studio light to its `classic` and `studio-light` folders |
 
 The application binds each page to parameters by their protocol names; ranges, units and pots come from the board's `params`. Writes to one parameter are coalesced (a spinning dial sends only the newest value once the previous write is answered), and the board's events update the pages without polling.
 

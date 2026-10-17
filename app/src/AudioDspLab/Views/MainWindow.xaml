@@ -219,7 +219,7 @@
                         <RowDefinition Height="104" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <controls:LabDisplay x:Name="FrequencyDisplay" Grid.Column="0" Title="Frequency" Marker="P1"
+                    <controls:LabDisplay x:Name="FrequencyDisplay" Grid.Column="0" Title="Frequency" Marker="{Binding Frequency.Knob}"
                                          DisplayBackground="{StaticResource AudioLabFrequencyBackground}"
                                          IsMarked="{Binding Frequency.IsChangedOnBoard}">
                         <controls:LabDisplay.Body>
@@ -229,7 +229,7 @@
                                                 Value="{Binding Frequency.DialValue}" />
                         </controls:LabDisplay.Body>
                     </controls:LabDisplay>
-                    <controls:LabDisplay x:Name="AmplitudeDisplay" Grid.Column="2" Title="A" Marker="P2"
+                    <controls:LabDisplay x:Name="AmplitudeDisplay" Grid.Column="2" Title="A" Marker="{Binding Amplitude.Knob}"
                                          DisplayBackground="{StaticResource AudioLabAmplitudeBackground}"
                                          IsMarked="{Binding Amplitude.IsChangedOnBoard}">
                         <controls:LabDisplay.Body>
@@ -264,14 +264,15 @@
                             <RowDefinition Height="32" />
                             <RowDefinition Height="32" />
                             <RowDefinition Height="32" />
+                            <RowDefinition Height="32" />
                             <RowDefinition Height="44" />
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="Waveform" />
-                        <ContentControl x:Name="WaveformKeys" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Width="380"
+                        <ContentControl x:Name="WaveformKeys" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Width="500"
                                         HorizontalAlignment="Left"
                                         Content="{Binding Waveform}" ContentTemplate="{StaticResource ChoiceKeys}" />
-                        <Border Grid.Row="0" Grid.Column="3" Background="{DynamicResource AudioLabMarkerP3}" CornerRadius="3" Padding="5,0"
+                        <Border Grid.Row="0" Grid.Column="3" Background="{DynamicResource AudioLabMarkerP1}" CornerRadius="3" Padding="5,0"
                                 HorizontalAlignment="Right" VerticalAlignment="Center">
                             <Border.Style>
                                 <Style TargetType="Border">
@@ -283,11 +284,44 @@
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
+                            <TextBlock Text="P1" FontWeight="Bold" Foreground="{DynamicResource AudioLabMarkerText}" />
+                        </Border>
+
+                        <TextBlock Grid.Row="1" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="Width" />
+                        <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border x:Name="WidthDial" Background="{StaticResource AudioLabAmplitudeBackground}" Padding="6,0"
+                                    CornerRadius="{DynamicResource AudioLabDisplayCornerRadius}" IsEnabled="{Binding HasWidth}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Opacity" Value="0.4" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <controls:DigitDial IntegerDigits="2" FractionDigits="0" DigitFontSize="20"
+                                                    Minimum="5" Maximum="95" Value="{Binding Width.DialValue}" />
+                            </Border>
+                            <TextBlock Style="{StaticResource AudioLabSettingsLabelStyle}" Margin="8,0,0,0" Text="{Binding WidthHint}" />
+                        </StackPanel>
+                        <Border Grid.Row="1" Grid.Column="3" Background="{DynamicResource AudioLabMarkerP3}" CornerRadius="3" Padding="5,0"
+                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Hidden" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Width.IsChangedOnBoard}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
                             <TextBlock Text="P3" FontWeight="Bold" Foreground="{DynamicResource AudioLabMarkerText}" />
                         </Border>
 
-                        <TextBlock Grid.Row="1" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="F" />
-                        <TextBox x:Name="FrequencyBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource AudioLabEntryStyle}" Height="24"
+                        <TextBlock Grid.Row="2" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="F" />
+                        <TextBox x:Name="FrequencyBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource AudioLabEntryStyle}" Height="24"
                                  ToolTip="Hertz; a trailing k means kilohertz. Enter applies, Escape gives up."
                                  Text="{Binding FrequencyText, UpdateSourceTrigger=PropertyChanged}">
                             <TextBox.InputBindings>
@@ -295,7 +329,7 @@
                                 <KeyBinding Key="Escape" Command="{Binding RevertFrequencyTextCommand}" />
                             </TextBox.InputBindings>
                         </TextBox>
-                        <StackPanel x:Name="FrequencyKeys" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2"
+                        <StackPanel x:Name="FrequencyKeys" Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2"
                                     Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
                             <Button Style="{StaticResource AudioLabKeyStyle}" Content="20" Command="{Binding SetFrequencyCommand}" CommandParameter="20" />
                             <Button Style="{StaticResource AudioLabKeyStyle}" Content="50" Command="{Binding SetFrequencyCommand}" CommandParameter="50" />
@@ -310,15 +344,15 @@
                             <Button Style="{StaticResource AudioLabKeyStyle}" Content="20k" Command="{Binding SetFrequencyCommand}" CommandParameter="20000" />
                         </StackPanel>
 
-                        <TextBlock Grid.Row="2" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="P1 range" />
-                        <ContentControl x:Name="P1RangeKeys" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Width="300"
+                        <TextBlock Grid.Row="3" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="P2 range" />
+                        <ContentControl x:Name="P2RangeKeys" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Width="300"
                                         HorizontalAlignment="Left"
-                                        Content="{Binding P1Range}" ContentTemplate="{StaticResource ChoiceKeys}" />
-                        <TextBlock Grid.Row="2" Grid.Column="3" Style="{StaticResource AudioLabSettingsLabelStyle}"
-                                   Text="the decade P1 sweeps" />
+                                        Content="{Binding P2Range}" ContentTemplate="{StaticResource ChoiceKeys}" />
+                        <TextBlock Grid.Row="3" Grid.Column="3" Style="{StaticResource AudioLabSettingsLabelStyle}"
+                                   Text="the decade P2 sweeps" />
 
-                        <TextBlock Grid.Row="3" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="A" />
-                        <TextBox x:Name="AmplitudeBox" Grid.Row="3" Grid.Column="1" Style="{StaticResource AudioLabEntryStyle}" Height="24"
+                        <TextBlock Grid.Row="4" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="A" />
+                        <TextBox x:Name="AmplitudeBox" Grid.Row="4" Grid.Column="1" Style="{StaticResource AudioLabEntryStyle}" Height="24"
                                  ToolTip="dBFS, -60 to 0. Enter applies, Escape gives up."
                                  Text="{Binding AmplitudeText, UpdateSourceTrigger=PropertyChanged}">
                             <TextBox.InputBindings>
@@ -326,7 +360,7 @@
                                 <KeyBinding Key="Escape" Command="{Binding RevertAmplitudeTextCommand}" />
                             </TextBox.InputBindings>
                         </TextBox>
-                        <StackPanel x:Name="AmplitudeKeys" Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="2"
+                        <StackPanel x:Name="AmplitudeKeys" Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="2"
                                     Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
                             <Button Style="{StaticResource AudioLabKeyStyle}" Content="-60" Command="{Binding SetAmplitudeCommand}" CommandParameter="-60" />
                             <Button Style="{StaticResource AudioLabKeyStyle}" Content="-50" Command="{Binding SetAmplitudeCommand}" CommandParameter="-50" />
@@ -338,8 +372,8 @@
                             <Button Style="{StaticResource AudioLabKeyStyle}" Content="0" Command="{Binding SetAmplitudeCommand}" CommandParameter="0" />
                         </StackPanel>
 
-                        <TextBlock Grid.Row="4" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="Output" />
-                        <StackPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3" Orientation="Horizontal">
+                        <TextBlock Grid.Row="5" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="Output" />
+                        <StackPanel Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="3" Orientation="Horizontal">
                             <ToggleButton x:Name="OutputKey" Style="{StaticResource AudioLabToggleStyle}"
                                           Width="130" Height="34" FontSize="13" FontWeight="Bold"
                                           Content="{Binding Output.OnOffText}"

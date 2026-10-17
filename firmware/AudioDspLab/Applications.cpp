@@ -10,12 +10,12 @@
 #include "DacMux.h"
 #include "StudioBackup.h"
 #include "Synth.h"
+#include "Generator.h"
 #include <Arduino.h>
 #include <Preferences.h>
 #include <Wire.h>
 #include <math.h>
 
-#include "DspImageGenerator.h"
 #include "DspImageEqualizer.h"
 #include "DspImageRadio.h"
 #include "DspImageResponse.h"
@@ -50,101 +50,105 @@ static uint32_t coreRate = DSP_CORE_RATE;
 
 // ----------------------------------------------------------------------------
 //  Application 0x01 - signal generator
-//  SigmaStudio project sigmastudio/Generator, export of 2026-10-10 15:35.
-//  Parameter RAM (Export/ADAU1701_Generator_IC_1_PARAM.h):
-//    Triangle freq 7, Square freq 10, Sine increment 13  (5.23, f / (DSP_CORE_RATE / 2))
-//    Waveform 15  (Mono SW Slew, plain integer index 0..3; its inputs are
-//    wired sine, triangle, square, noise - see genWaveform)
-//    Amplitude target 16 (5.23 linear gain), step 17 (left at default)
-//  Output on K3 (DAC0/DAC1) and K4 (DAC2/DAC3).
+//  The signal is made on the ESP32 (Generator.cpp) and runs through the
+//  radio's image, as the synthesizer's does: I2S in, the three bands set
+//  flat, the volume (the amplitude here) as an RC-slewed gain, out on K3
+//  (DAC0/DAC1) and K4 (DAC2/DAC3).
+//  Pots as in the other applications: P1 the waveform, P2 the frequency
+//  (one decade, chosen by p2-range), P3 the width, P4 the amplitude.
 // ----------------------------------------------------------------------------
 
-#define GEN_WAVEFORM                  1       // 0 sine, 1 square, 2 triangle, 3 noise
+#define GEN_WAVEFORM                  1       // GeneratorWaveform: sine .. noise
 #define GEN_FREQUENCY                 2       // 0.01 Hz, 20 Hz .. 20 kHz
 #define GEN_AMPLITUDE                 3       // 0.01 dB, -60 .. 0 dBFS
 #define GEN_OUTPUT                    4       // 0 off, 1 on
-#define GEN_P1_RANGE                  5       // P1's decade: 0 20-200 Hz, 1 200 Hz-2 kHz, 2 2-20 kHz (1.3)
+#define GEN_P2_RANGE                  5       // P2's decade: 0 20-200 Hz, 1 200 Hz-2 kHz, 2 2-20 kHz
+#define GEN_WIDTH                     6       // %, 5 .. 95: the rectangle's high part, the triangle's rise
 
-#define GEN_ADDR_TRIANGLE_FREQ        7
-#define GEN_ADDR_SQUARE_FREQ          10
-#define GEN_ADDR_SINE_INCREMENT       13
-#define GEN_ADDR_WAVEFORM             15
-#define GEN_ADDR_AMPLITUDE_TARGET     16
-// increment = f / (rate / 2). SigmaStudio's f / 24000 assumes 48 kHz; the core
-// runs at DSP_CORE_RATE, which is why f / 24000 played four times the
-// frequency at 71D (the cause was found during development)
-#define GEN_FREQUENCY_DIVISOR         (DSP_CORE_RATE / 2.0f)
-
-// parameter value (0 sine, 1 square, 2 triangle, 3 noise) -> selector input;
-// the project wires triangle to input 1 and square to input 2 (71D scope)
-static const int32_t selectorInput[] = { 0, 2, 1, 3 };
+// the radio's volume and output gains (defined with the equalizer)
+static bool eqGain(int32_t volume, int32_t output);
 
 static bool genWaveform(int32_t value) {
-  const uint16_t address = GEN_ADDR_WAVEFORM;
-  const int32_t word = selectorInput[value];        // integer, not 5.23
-  return dspSafeloadRaw(&address, &word, 1);
+  generatorSetWaveform((uint8_t)value);
+  return true;
 }
 
-// all three oscillators follow, so changing the waveform keeps the frequency
 static bool genFrequency(int32_t value) {
-  const float increment = (value / 100.0f) / GEN_FREQUENCY_DIVISOR;
-  const uint16_t addresses[] = { GEN_ADDR_SINE_INCREMENT, GEN_ADDR_SQUARE_FREQ, GEN_ADDR_TRIANGLE_FREQ };
-  const float values[] = { increment, increment, increment };
-  return dspSafeload(addresses, values, 3);
+  generatorSetFrequency(value);
+  return true;
 }
 
-// amplitude and output switch share the slewed gain: off = gain 0
-static bool genGain(int32_t amplitude, int32_t output) {
-  return dspSafeloadOne(GEN_ADDR_AMPLITUDE_TARGET, output ? levelToGain(amplitude) : 0.0f);
+static bool genWidth(int32_t value) {
+  generatorSetWidth((uint8_t)value);
+  return true;
 }
 
+// amplitude and output share the slewed gain: off = gain 0
 static bool genAmplitude(int32_t value) {
-  return genGain(value, currentValue(GEN_OUTPUT));
+  return eqGain(value, currentValue(GEN_OUTPUT));
 }
 
 static bool genOutput(int32_t value) {
-  return genGain(currentValue(GEN_AMPLITUDE), value);
+  return eqGain(currentValue(GEN_AMPLITUDE), value);
 }
 
-// P1: one decade, logarithmic: 20 Hz x 10^range .. 10 times that
+// P2: one decade, logarithmic: 20 Hz x 10^range .. 10 times that
 static int32_t potToFrequencyIn(uint16_t raw, int32_t range) {
   return (int32_t)lroundf(2000.0f * powf(10.0f, (float)range) * powf(10.0f, raw / 4095.0f));
 }
 
 static int32_t potToFrequency(uint16_t raw) {
-  return potToFrequencyIn(raw, currentValue(GEN_P1_RANGE));
+  return potToFrequencyIn(raw, currentValue(GEN_P2_RANGE));
 }
 
-// with pot control on, a new range moves the frequency to where P1 stands
-// in it, and P1 drives it from there (defined below, with the pot state)
-static void p1FollowsRange(int32_t range);
+// with pot control on, a new range moves the frequency to where P2 stands
+// in it, and P2 drives it from there (defined below, with the pot state)
+static void p2FollowsRange(int32_t range);
 
-static bool genP1Range(int32_t value) {
-  p1FollowsRange(value);
+static bool genP2Range(int32_t value) {
+  p2FollowsRange(value);
   return true;
 }
 
-// P2: -60 .. 0 dB, linear in dB
+// P4 (the analyzer's P2): a level, -60 .. 0 dB, linear in dB
 static int32_t potToAmplitude(uint16_t raw) {
   return (int32_t)lroundf(-6000.0f + raw * (6000.0f / 4095.0f));
 }
 
-// P3: four equal zones
+// P1: six equal zones, in the order of the waveforms
 static int32_t potToWaveform(uint16_t raw) {
-  return min(3, (int)(raw * 4 / 4096));
+  return min((int)GENERATOR_WAVEFORM_LAST, (int)(raw * (GENERATOR_WAVEFORM_LAST + 1) / 4096));
+}
+
+// P3 (and the synthesizer's P1): a width, 5 .. 95 % over the travel
+static int32_t potToWidth(uint16_t raw) {
+  return 5 + (int32_t)lroundf(raw * (90.0f / 4095.0f));
+}
+
+static bool genTakeClock() {
+  mclkStop();
+  coreRate = DSP_CORE_RATE;
+  return generatorBegin();
+}
+
+static void genReleaseClock() {
+  generatorEnd();
+  if (!mclkRunning()) mclkStart(DSP_SAMPLE_RATE);
 }
 
 static const ParamDef generatorParams[] = {
-  { GEN_WAVEFORM,  0,     3,       0,      genWaveform,  false },
+  { GEN_WAVEFORM,  0,     GENERATOR_WAVEFORM_LAST, GENERATOR_SINE, genWaveform, false },
   { GEN_FREQUENCY, 2000,  2000000, 100000, genFrequency, false },
   { GEN_AMPLITUDE, -6000, 0,       -2000,  genAmplitude, false },
   { GEN_OUTPUT,    0,     1,       0,      genOutput,    true },
-  { GEN_P1_RANGE,  0,     2,       1,      genP1Range,   true },
+  { GEN_P2_RANGE,  0,     2,       1,      genP2Range,   true },
+  { GEN_WIDTH,     5,     95,      50,     genWidth,     false },
 };
 static const PotMap generatorPots[] = {
-  { 0, GEN_FREQUENCY, potToFrequency },
-  { 1, GEN_AMPLITUDE, potToAmplitude },
-  { 2, GEN_WAVEFORM,  potToWaveform },
+  { 0, GEN_WAVEFORM,  potToWaveform },
+  { 1, GEN_FREQUENCY, potToFrequency },
+  { 2, GEN_WIDTH,     potToWidth },
+  { 3, GEN_AMPLITUDE, potToAmplitude },
 };
 
 // ----------------------------------------------------------------------------
@@ -498,12 +502,6 @@ static int32_t potToEmphasis(uint16_t raw) {
   return (int32_t)lroundf(raw * (100.0f / 4095.0f));
 }
 
-// P1: oscillator 1's width, 5 .. 95 % over the travel (it chose the
-// waveform)
-static int32_t potToWidth(uint16_t raw) {
-  return 5 + (int32_t)lroundf(raw * (90.0f / 4095.0f));
-}
-
 static bool synVolume(int32_t value) {
   return eqGain(value, currentValue(SYN_OUTPUT));
 }
@@ -594,8 +592,8 @@ static const PotMap synthPots[] = {
 };
 
 static const AppDef applications[] = {
-  { 0x01, "Signal generator", DspImageGenerator, DspImageGeneratorLength,
-    generatorParams, 5, generatorPots, 3, nullptr, nullptr },
+  { 0x01, "Signal generator", DspImageRadio, DspImageRadioLength,
+    generatorParams, 6, generatorPots, 4, genTakeClock, genReleaseClock },
   { 0x02, "Equalizer", DspImageEqualizer, DspImageEqualizerLength,
     equalizerParams, 8, equalizerPots, 4, nullptr, nullptr },
   { 0x03, "Internet radio", DspImageRadio, DspImageRadioLength,
@@ -660,19 +658,19 @@ static int potPosition(uint8_t pot) {
   return raw;
 }
 
-static void p1FollowsRange(int32_t range) {
+static void p2FollowsRange(int32_t range) {
   if (!potControl || active == nullptr || state != APP_STATE_RUNNING) return;
   int index = findParam(GEN_FREQUENCY);
   if (index < 0) return;
   const ParamDef &param = active->params[index];
-  int position = potPosition(0);
+  int position = potPosition(1);
   int32_t frequency = constrain(potToFrequencyIn((uint16_t)position, range), param.minimum, param.maximum);
   if (frequency != values[index] && param.apply(frequency)) {
     values[index] = frequency;
     notifyChanged(GEN_FREQUENCY, frequency);
   }
-  potEngaged[0] = true;                     // P1 drives the frequency in its new decade
-  potApplied[0] = position;
+  potEngaged[1] = true;                     // P2 drives the frequency in its new decade
+  potApplied[1] = position;
 }
 
 // a pot must move again before it overrides the value it drives
@@ -796,7 +794,7 @@ static uint8_t start(const AppDef *app, bool resume) {
   if (app->id == APP_RESPONSE && !analyzerBegin(currentValue(RESP_TONE))) {
     return fail(ERR_DSP_WRITE_FAILED);
   }
-  if (app->id == APP_SYNTH && !synFlatBands()) {
+  if ((app->id == APP_SYNTH || app->begin == genTakeClock) && !synFlatBands()) {
     return fail(ERR_DSP_WRITE_FAILED);
   }
   state = APP_STATE_RUNNING;

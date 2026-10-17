@@ -35,12 +35,12 @@ public sealed class BoardClientTests : IAsyncLifetime
     {
         await client.SelectApplicationAsync(Applications.Generator);
         IReadOnlyList<ParameterDescriptor> parameters = await client.GetParametersAsync();
-        Assert.Equal(["waveform", "frequency", "amplitude", "output", "p1-range"], parameters.Select(p => p.Name));
+        Assert.Equal(["waveform", "frequency", "amplitude", "output", "p2-range", "width"], parameters.Select(p => p.Name));
         ParameterDescriptor frequency = parameters[1];
         Assert.Equal(ParameterKind.Number, frequency.Kind);
         Assert.Equal((20, 20000), (frequency.Minimum, frequency.Maximum));
         Assert.Equal("Hz", frequency.Unit);
-        Assert.Equal("P1", frequency.Pot);
+        Assert.Equal("P2", frequency.Pot);
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public sealed class BoardClientTests : IAsyncLifetime
     {
         await client.SelectApplicationAsync(Applications.Generator);
         Assert.Equal("440.13", await client.SetAsync("frequency", "440.126"));
-        Assert.Equal("square", await client.SetAsync("waveform", "1"));
+        Assert.Equal("rectangle", await client.SetAsync("waveform", "1"));
         BoardErrorException error = await Assert.ThrowsAsync<BoardErrorException>(() => client.SetAsync("frequency", "30000"));
         Assert.Equal("out-of-range", error.Code);
         Assert.Equal("frequency 20..20000 Hz", error.Detail);

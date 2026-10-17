@@ -11,9 +11,9 @@
     static const size_t <Name>Length = sizeof(<Name>);
 
 .EXAMPLE
-  .\Convert-E2PromImage.ps1 -Source "...\ADAU1701_Generator_IC 2\E2Prom.bin" `
-      -Name DspImageGenerator `
-      -Destination ..\firmware\AudioDspLab\DspImageGenerator.h
+  .\Convert-E2PromImage.ps1 -Source "...\ADAU1701_Equalizer_IC 1\E2Prom.bin" `
+      -Name DspImageEqualizer `
+      -Destination ..\firmware\AudioDspLab\DspImageEqualizer.h
 #>
 param(
   [Parameter(Mandatory)] [string] $Source,

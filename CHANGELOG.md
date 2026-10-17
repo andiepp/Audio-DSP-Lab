@@ -5,6 +5,7 @@
 Firmware 1.0, protocol 1, application 1.0.
 
 - Six applications for the Elektor Audio-DSP-FX board: generator, equalizer, internet radio, response analyzer, SigmaStudio mode, synthesizer.
+- The generator makes its signal on the ESP32: sine, rectangle, triangle, saw, inverse saw and noise, band-limited, with a width for the rectangle and the triangle; its pots follow the other applications (P1 waveform, P2 frequency, P3 width, P4 amplitude).
 - A line-based text protocol on the USB serial port (921600 baud) with self-describing parameters and events instead of polling.
 - WiFi networks for the radio are entered from the PC and kept on the board; no credentials are compiled into the firmware.
 - Windows application with one page per application, the board's pots shown live, stored settings, a protocol console and a built-in board simulator.

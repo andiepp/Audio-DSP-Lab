@@ -31,7 +31,7 @@ Selecting another application writes that application's program into the EEPROM.
 | IC | ADAU1701, I2C address 0x34 (0x68 in SigmaStudio's 8-bit notation) |
 | EEPROM | 24C256 (32 KB) at 0x50 (0xA0) |
 | Clock | MCLK 12.288 MHz = 256 × 48 kHz from the ESP32; PLL mode 256 × fs |
-| Inputs | ADC0/ADC1 = K2 left/right; serial input 0/1 = I2S from the ESP32 (only the radio and the synthesizer use it) |
+| Inputs | ADC0/ADC1 = K2 left/right; serial input 0/1 = I2S from the ESP32 (the radio, the synthesizer and the generator use it) |
 | Outputs | DAC0/DAC1 = K3, DAC2/DAC3 = K4 |
 | Pots | Auxiliary ADC 0 to 3 (see above), read with SigmaStudio's Auxiliary ADC input blocks |
 
@@ -49,9 +49,9 @@ Each application's DSP program is a SigmaStudio project in `sigmastudio/`. The E
 
 | Folder | Application | What the project contains | Recipe |
 | --- | --- | --- | --- |
-| `Generator` | Generator | Sine, square, triangle, noise sources; a 4-input switch; a slewed gain; outputs K3, K4 | [Generator-Instructions.md](../sigmastudio/Generator-Instructions.md) |
+| `Generator` | (the Response project's basis) | Sine, square, triangle, noise sources; a 4-input switch; a slewed gain; outputs K3, K4. The generator no longer runs it: its signal comes from the ESP32 through the Radio program | [Generator-Instructions.md](../sigmastudio/Generator-Instructions.md) |
 | `Equalizer` | Equalizer | Line input; three general biquads per channel (bass, middle, treble); slewed volume | [Equalizer-Instructions.md](../sigmastudio/Equalizer-Instructions.md) |
-| `Radio` | Radio, Synthesizer | The equalizer with its input moved to the I2S serial input | [Radio-Instructions.md](../sigmastudio/Radio-Instructions.md) |
+| `Radio` | Radio, Synthesizer, Generator | The equalizer with its input moved to the I2S serial input | [Radio-Instructions.md](../sigmastudio/Radio-Instructions.md) |
 | `Response` | Response | The generator's sine and gain; per input channel a band-pass, absolute value, smoothing low-pass and a readback | [Response-Instructions.md](../sigmastudio/Response-Instructions.md) |
 | `SigmaStudio` | (example) | A VCO controlled by P1 | – |
 

@@ -25,7 +25,7 @@ public sealed class BoardClient : IDisposable
 
     public event Action<BoardStatus>? StatusChanged;
 
-    /// <summary>A parameter changed on the board (a pot, or the generator's P1 range): name, value.</summary>
+    /// <summary>A parameter changed on the board (a pot, or the generator's P2 range): name, value.</summary>
     public event Action<string, string>? ValueChanged;
 
     public event Action<IReadOnlyList<int>>? PotsChanged;

@@ -3,7 +3,7 @@ using System.Windows.Input;
 
 namespace AudioDspLab.ViewModels;
 
-/// <summary>The signal generator: waveform, frequency, amplitude, output, P1's range.</summary>
+/// <summary>The signal generator: waveform, its width, frequency, amplitude, output, P2's range.</summary>
 public sealed class GeneratorPageViewModel : ApplicationPageViewModel
 {
     /// <summary>The analog output at 0 dBFS that Elektor gives for the board; the output stage sets the real level.</summary>
@@ -18,11 +18,19 @@ public sealed class GeneratorPageViewModel : ApplicationPageViewModel
         : base(write, run, Applications.Generator)
     {
         Waveform = Choice("waveform", "Waveform",
-            ("sine", "Sine"), ("square", "Square"), ("triangle", "Triangle"), ("noise", "Noise"));
+            ("sine", "Sine"), ("rectangle", "Rectangle"), ("triangle", "Triangle"),
+            ("saw", "Saw"), ("inverse-saw", "Inverse saw"), ("noise", "Noise"));
+        Width = Integer("width", "Width", 5, 95, string.Empty);
         Frequency = Number("frequency", "Frequency", 20, 20000, "---- Hz ----");
         Amplitude = Number("amplitude", "A", -60, 0, "-- dBFS --");
         Output = Switch("output");
-        P1Range = Choice("p1-range", "P1 range", ("20-200", "20-200 Hz"), ("200-2k", "200 Hz-2 kHz"), ("2k-20k", "2-20 kHz"));
+        P2Range = Choice("p2-range", "P2 range", ("20-200", "20-200 Hz"), ("200-2k", "200 Hz-2 kHz"), ("2k-20k", "2-20 kHz"));
+
+        Waveform.ValueChanged += _ =>
+        {
+            RaisePropertyChanged(nameof(HasWidth));
+            RaisePropertyChanged(nameof(WidthHint));
+        };
 
         Frequency.ValueChanged += _ => SeedFrequencyText(force: false);
         Amplitude.ValueChanged += _ =>
@@ -51,7 +59,20 @@ public sealed class GeneratorPageViewModel : ApplicationPageViewModel
 
     public ParameterViewModel Output { get; }
 
-    public ParameterViewModel P1Range { get; }
+    /// <summary>The rectangle's high part or the triangle's rise, in percent of the cycle.</summary>
+    public ParameterViewModel Width { get; }
+
+    /// <summary>Whether the waveform has a width: rectangle and triangle.</summary>
+    public bool HasWidth => Waveform.Selected is "rectangle" or "triangle";
+
+    public string WidthHint => Waveform.Selected switch
+    {
+        "rectangle" => "% of the cycle high · 50 % is a square",
+        "triangle" => "% of the cycle rising · 50 % is symmetric",
+        _ => "for the rectangle and the triangle",
+    };
+
+    public ParameterViewModel P2Range { get; }
 
     public ICommand ApplyFrequencyTextCommand { get; }
 

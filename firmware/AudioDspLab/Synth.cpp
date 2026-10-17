@@ -2,7 +2,8 @@
 #include "Config.h"
 #include "Board.h"
 #include <Arduino.h>
-#include <driver/i2s_std.h>
+#include "AudioOut.h"
+#include "Oscillators.h"
 #include <math.h>
 
 // one source at 100 % plays at +-0.5 of full scale: -6 dBFS, as firmware
@@ -27,10 +28,6 @@
 #define SYNTH_BRIGHTNESS_OCTAVES      3.0f
 #define SYNTH_FILTER_LFO_OCTAVES      2.0f
 #define SYNTH_BLOCK_FRAMES            64
-// 4 x 64 frames queued: about 5 ms from a key to the DSP (the radio's
-// audio-tools default queue holds close to 100 ms, too long to play)
-#define SYNTH_DMA_BUFFERS             4
-#define SYNTH_DMA_FRAMES              64
 #define SYNTH_TASK_STACK              4096
 #define SYNTH_TASK_CORE               0       // the firmware's loop never yields core 1
 #define SYNTH_TASK_PRIORITY           3
@@ -115,61 +112,12 @@ static uint32_t uartErrors = 0;                                 // written by th
 
 // --- task and I2S -----------------------------------------------------------------
 
-static i2s_chan_handle_t txChannel = NULL;
 static TaskHandle_t task = nullptr;
 static volatile bool stopRequested = false;
 
 // ----------------------------------------------------------------------------
 //  Oscillator
 // ----------------------------------------------------------------------------
-
-// the residual that removes a step's aliasing: t is the phase (0..1), dt
-// the increment; non-zero only within one sample of the step
-static inline float polyBlep(float t, float dt) {
-  if (t < dt) {
-    t /= dt;
-    return t + t - t * t - 1.0f;
-  }
-  if (t > 1.0f - dt) {
-    t = (t - 1.0f) / dt;
-    return t * t + t + t + 1.0f;
-  }
-  return 0.0f;
-}
-
-// a rectangle high for the first `width` of the cycle, with both steps
-// band-limited and its mean removed (a 25 % pulse would sit at -0.5)
-static inline float rectangle(float phase, float dt, float width) {
-  float value = phase < width ? 1.0f : -1.0f;
-  float fall = phase - width;
-  if (fall < 0.0f) fall += 1.0f;
-  return value + polyBlep(phase, dt) - polyBlep(fall, dt) + (1.0f - 2.0f * width);
-}
-
-// the residual that rounds a corner (a step in the slope): t the phase
-// since the corner, dt the increment; the integral of polyBlep's
-static inline float polyBlamp(float t, float dt) {
-  if (t < dt) {
-    float x = t / dt - 1.0f;
-    return -x * x * x * (1.0f / 3.0f);
-  }
-  if (t > 1.0f - dt) {
-    float x = (t - 1.0f) / dt + 1.0f;
-    return x * x * x * (1.0f / 3.0f);
-  }
-  return 0.0f;
-}
-
-// a triangle falling from the top over 1 - rise of the cycle and rising
-// over rise (0.5: a symmetric triangle), both corners band-limited
-static inline float triangle(float phase, float dt, float rise) {
-  const float fall = 1.0f - rise;
-  float value = phase < fall ? 1.0f - 2.0f * phase / fall : -1.0f + 2.0f * (phase - fall) / rise;
-  const float corner = (2.0f / rise + 2.0f / fall) * dt;
-  float sinceTrough = phase - fall;
-  if (sinceTrough < 0.0f) sinceTrough += 1.0f;
-  return value - corner * polyBlamp(phase, dt) + corner * polyBlamp(sinceTrough, dt);
-}
 
 static inline float oscillator(float phase, float dt, uint8_t shape, float width, float rise) {
   switch (shape) {
@@ -182,14 +130,6 @@ static inline float oscillator(float phase, float dt, uint8_t shape, float width
     default:
       return sinf(2.0f * (float)M_PI * phase);
   }
-}
-
-// white noise from a 32-bit xorshift, -1 .. 1
-static inline float noise(uint32_t &state) {
-  state ^= state << 13;
-  state ^= state >> 17;
-  state ^= state << 5;
-  return (int32_t)state * (1.0f / 2147483648.0f);
 }
 
 // linear up to the knee, then bending toward 2 x the knee: one source at
@@ -422,53 +362,11 @@ static void audioTask(void *) {
     loadCycles = loadCycles + cycles;
     loadBlocks = loadBlocks + 1;
     if (cycles > loadPeakCycles) loadPeakCycles = cycles;
-    size_t written;
-    i2s_channel_write(txChannel, frames, sizeof(frames), &written, pdMS_TO_TICKS(100));
+    audioOutWrite(frames, sizeof(frames));
   }
 
   task = nullptr;
   vTaskDelete(nullptr);
-}
-
-static bool startI2s() {
-  i2s_chan_config_t channelConfig = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
-  channelConfig.auto_clear = true;          // silence, not the last block, if the task lags
-  channelConfig.dma_desc_num = SYNTH_DMA_BUFFERS;
-  channelConfig.dma_frame_num = SYNTH_DMA_FRAMES;
-  if (i2s_new_channel(&channelConfig, &txChannel, NULL) != ESP_OK) {
-    txChannel = NULL;
-    return false;
-  }
-
-  i2s_std_config_t config = {
-    .clk_cfg  = I2S_STD_CLK_DEFAULT_CONFIG(SYNTH_SAMPLE_RATE),
-    .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
-    .gpio_cfg = {
-      .mclk = (gpio_num_t)PIN_MCLK,
-      .bclk = (gpio_num_t)PIN_I2S_BCLK,
-      .ws   = (gpio_num_t)PIN_I2S_LRCLK,
-      .dout = (gpio_num_t)boardI2sDataPin(),
-      .din  = I2S_GPIO_UNUSED,
-      .invert_flags = { .mclk_inv = false, .bclk_inv = false, .ws_inv = false },
-    },
-  };
-  config.clk_cfg.clk_src = I2S_CLK_SRC_APLL;                 // exact 12.288 MHz
-  config.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256;      // ADAU1701 PLL 256 x fs
-
-  if (i2s_channel_init_std_mode(txChannel, &config) != ESP_OK ||
-      i2s_channel_enable(txChannel) != ESP_OK) {
-    i2s_del_channel(txChannel);
-    txChannel = NULL;
-    return false;
-  }
-  return true;
-}
-
-static void stopI2s() {
-  if (txChannel == NULL) return;
-  i2s_channel_disable(txChannel);
-  i2s_del_channel(txChannel);
-  txChannel = NULL;
 }
 
 // ----------------------------------------------------------------------------
@@ -589,7 +487,7 @@ bool synthBegin() {
   bendPosition = 0.0f;                      // the pitch strip springs back to the middle
   __atomic_store_n(&uartErrors, 0, __ATOMIC_RELAXED);
 
-  if (!startI2s()) return false;
+  if (!audioOutStart()) return false;
 
   // both pins named: UART1's default pins on the ESP32 are GPIO9 and 10,
   // the firmware's I2C bus. GPIO4 (MIDI out) leads nowhere without R36.
@@ -617,7 +515,7 @@ void synthEnd() {
     Serial1.end();
     midiOpen = false;
   }
-  stopI2s();
+  audioOutStop();
   silence();
 }
 

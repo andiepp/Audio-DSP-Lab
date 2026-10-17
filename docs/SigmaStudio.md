@@ -41,7 +41,7 @@ The project `sigmastudio/SigmaStudio/ADAU1701_SigmaStudio.dspproj` is a small wo
 
 ## Service mode
 
-Service mode is for working on an application's own project while that application runs: the firmware releases the EEPROM's write protection, holds SELFBOOT low and leaves the I2C bus. Enter it from the application (**Service** on the right), work in SigmaStudio, unplug the USBi and press **Leave service**: the firmware writes the application's own program back. Whatever SigmaStudio wrote to the EEPROM meanwhile is replaced, so for your own programs use SigmaStudio mode.
+Service mode is for working on an application's own project while that application runs: the firmware releases the EEPROM's write protection and leaves the I2C bus. Enter it from the application (**Service** on the right), work in SigmaStudio, unplug the USBi and press **Leave service**: the firmware writes the application's own program back. Whatever SigmaStudio wrote to the EEPROM meanwhile is replaced, so for your own programs use SigmaStudio mode.
 
 ## The built-in applications' projects
 

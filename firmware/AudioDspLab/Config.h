@@ -9,8 +9,6 @@
 //           partition scheme "Minimal SPIFFS"
 //  JP1:     on 'ext. MCLK' (the firmware supplies 12.288 MHz on GPIO0)
 //  JP2:     on 'Selfboot'
-//  GPIO33:  routed to the DSP's MP7 by the board; a wire from MP7 to SELFBOOT
-//           lets the firmware hand the bus to SigmaStudio (docs/Installation.md)
 //  Kit:     ESP32-PICO-KIT V4 (PICO-D4) or ESP32-PICO-KIT-1 (PICO-V3), Board.h
 // ----------------------------------------------------------------------------
 
@@ -40,7 +38,6 @@
 #define PIN_LED                       2
 #define PIN_DSP_RESET                 12      // active low
 #define PIN_EEPROM_WP                 21      // high = write protected
-#define PIN_SELFBOOT                  33      // DSP MP7 on the stock board; SELFBOOT with the wire, see header
 #define PIN_I2C_SDA                   9
 #define PIN_I2C_SCL                   10
 #define PIN_MCLK                      0       // I2S MCLK -> JP1 -> MCLKI

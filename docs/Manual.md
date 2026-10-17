@@ -206,7 +206,7 @@ The **Power-up** key chooses what the board starts when it is switched on. The c
 
 ### Service mode
 
-Service mode hands the DSP to SigmaStudio while an application's program runs: the firmware releases the EEPROM's write protection, holds SELFBOOT low and leaves the I2C bus, so SigmaStudio and the USBi can download and tune the application's own SigmaStudio project.
+Service mode hands the DSP to SigmaStudio while an application's program runs: the firmware releases the EEPROM's write protection and leaves the I2C bus, so SigmaStudio and the USBi can download and tune the application's own SigmaStudio project.
 
 1. Tick **Hand the DSP to SigmaStudio** and press **Enter service**.
 2. Work in SigmaStudio with the USBi on the I2C header.

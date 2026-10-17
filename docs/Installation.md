@@ -27,14 +27,7 @@ The firmware drives the DSP's clock and its boot. Set two jumpers:
 | **JP1** (DSP clock) | **ext. MCLK** | The ESP32 supplies the DSP's master clock (12.288 MHz on GPIO0). On the crystal (X1) the DSP runs, but the radio, the synthesizer and the clock-dependent filters are wrong, and the firmware may report `dsp-not-responding`. |
 | **JP2** (boot) | **Selfboot** | The DSP loads each application's program from its EEPROM. |
 
-Every application works on a board as Elektor ships it, with either ESP32 kit.
-
-**SELFBOOT and GPIO33 (for SigmaStudio).** In SigmaStudio mode and service mode the firmware pulls GPIO33 low to take the DSP's SELFBOOT pin low after the DSP has booted, so that SigmaStudio and the USBi can reach the DSP. On the stock board GPIO33 is routed to the DSP's multipurpose pin **MP7**, not to SELFBOOT; the author's board has a wire that also connects it to SELFBOOT (ADAU1701 pin 5). Whether SigmaStudio and the USBi need that wire has not been tested on a stock board yet. Two consequences on any board:
-
-- Do not use MP7 as an output in your own SigmaStudio programs: in SigmaStudio mode the firmware drives it low.
-- The other applications never touch GPIO33.
-
-> **To be completed by the author:** the wire's exact solder points, and whether a stock board works with the USBi without it.
+Every application works on a board as Elektor ships it, with either ESP32 kit; no modification is needed.
 
 Leave SigmaStudio's USBi off the I2C header unless you are working in SigmaStudio: while it sits on the bus, the firmware cannot write the EEPROM.
 

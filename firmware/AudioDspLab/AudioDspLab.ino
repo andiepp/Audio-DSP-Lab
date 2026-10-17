@@ -37,7 +37,6 @@ void setup() {
   dspInit();                          // DSP held in reset first
   eepromInit();
   protocolInit();                     // requests wait in the buffer until ready
-  pinMode(PIN_SELFBOOT, INPUT);
 
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_CLOCK_HZ);
   mclkStart(DSP_SAMPLE_RATE);         // the DSP needs its clock before reset ends

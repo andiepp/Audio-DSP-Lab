@@ -731,7 +731,6 @@ static uint8_t start(const AppDef *app, bool resume) {
   if (leavingStudio) {
     dacMuxEnd();
     digitalWrite(PIN_EEPROM_WP, HIGH);
-    pinMode(PIN_SELFBOOT, INPUT);
   }
   // your SigmaStudio program is copied before another image replaces it,
   // leaving the mode or at power-up (nothing active yet);
@@ -754,21 +753,17 @@ static uint8_t start(const AppDef *app, bool resume) {
   }
   if (app->id == APP_SIGMASTUDIO) {
     // the DSP boots what the EEPROM holds: it self-boots on the rising
-    // edge of reset only with SELFBOOT and WP high (datasheet, Self-Boot),
-    // as a master on the bus. Once it has loaded, SELFBOOT low and WP low
-    // give the bus and the EEPROM to SigmaStudio and the USBi, as service
-    // mode does; SELFBOOT only matters at reset. The firmware writes nothing
-    // and stays off the bus.
+    // edge of reset only with WP high (and JP2 on Selfboot), as a master on
+    // the bus. Once it has loaded, WP low gives the EEPROM to SigmaStudio
+    // and the USBi, as service mode does. The firmware writes nothing and
+    // stays off the bus.
     // your SigmaStudio program back, if one of the firmware's images replaced it
     // (with the DSP still in reset); a failure (a USBi on the bus) leaves
     // the EEPROM as it is and is reported, the mode runs anyway
     BackupResult restored = studioBackupRestore(isNodeImage);
-    pinMode(PIN_SELFBOOT, INPUT);
     digitalWrite(PIN_EEPROM_WP, HIGH);
     dspReleaseReset();
     delay(SIGMASTUDIO_BOOT_MS);
-    pinMode(PIN_SELFBOOT, OUTPUT);
-    digitalWrite(PIN_SELFBOOT, LOW);
     digitalWrite(PIN_EEPROM_WP, LOW);
     if (!dacMuxBegin()) return fail(ERR_DSP_WRITE_FAILED);
     state = APP_STATE_RUNNING;
@@ -964,8 +959,8 @@ uint8_t appParamSet(uint8_t paramId, int32_t value) {
   return ERR_NONE;
 }
 
-// Service mode = the Demo sketch's PROG mode: EEPROM writable, SELFBOOT low,
-// DSP running, firmware off the I2C bus so SigmaStudio/USBi owns it.
+// Service mode = the Demo sketch's PROG mode: EEPROM writable, DSP running,
+// the firmware off the I2C bus so SigmaStudio/USBi owns it.
 uint8_t appServiceMode(bool enable) {
   if (enable) {
     if (state == APP_STATE_SERVICE) return ERR_NONE;
@@ -978,12 +973,9 @@ uint8_t appServiceMode(bool enable) {
     state = APP_STATE_SERVICE;
     digitalWrite(PIN_EEPROM_WP, LOW);
     digitalWrite(PIN_DSP_RESET, HIGH);
-    pinMode(PIN_SELFBOOT, OUTPUT);
-    digitalWrite(PIN_SELFBOOT, LOW);
     return ERR_NONE;
   }
   if (state != APP_STATE_SERVICE) return ERR_NONE;
-  pinMode(PIN_SELFBOOT, INPUT);
   digitalWrite(PIN_EEPROM_WP, HIGH);
   // the EEPROM is brought back to the active application (SigmaStudio
   // writes made in service mode are replaced)

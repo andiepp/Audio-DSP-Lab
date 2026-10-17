@@ -1,7 +1,8 @@
 0 RegReadAlgADCIn1 O_C27_A0_P1_out Link0
 1 ICSigma100In1 O_C0_A0_P1_out Link1
-2 ExtSWGainDB1 I_C4_A0_P1_in Link0 I_C4_A0_P2_in Link1 O_C4_A0_P3_out Link2
-3 ICSigma100Out1 I_C2_A0_P1_in Link2
-4 ICSigma100Out2 I_C32_A0_P1_in Link2
-5 ICSigma100Out3 I_C50_A0_P1_in Link2
-6 ICSigma100Out4 I_C58_A0_P1_in Link2
+2 EQ1940Single1 I_C1_A0_P1_in Link1 O_C1_A0_P2_out Link2
+3 ExtSWGainDB1 I_C4_A0_P1_in Link0 I_C4_A0_P2_in Link2 O_C4_A0_P3_out Link3
+4 ICSigma100Out1 I_C2_A0_P1_in Link3
+5 ICSigma100Out2 I_C32_A0_P1_in Link3
+6 ICSigma100Out3 I_C50_A0_P1_in Link3
+7 ICSigma100Out4 I_C58_A0_P1_in Link3

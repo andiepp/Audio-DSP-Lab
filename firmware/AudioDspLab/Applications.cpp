@@ -22,7 +22,7 @@
 
 #define MAX_PARAMS                    56      // the synthesizer has 48
 #define POT_PICKUP_THRESHOLD          80      // counts of 4095 (~2 %)
-#define POT_BACKLASH                  14      // ADC noise: about 15 counts peak-to-peak, x1.28 by the scaling (Pots.cpp)
+#define POT_BACKLASH                  28      // ADC noise: up to about 40 counts peak-to-peak after the scaling (Pots.cpp)
 #define POT_RAW_MAX                   4095
 // a self-boot reads at most 9248 bytes at 384 kHz (8 x fs): about 0.25 s
 #define SIGMASTUDIO_BOOT_MS           600
@@ -991,13 +991,26 @@ bool appInServiceMode() {
   return state == APP_STATE_SERVICE;
 }
 
-// turning it on arms the pick-up: a pot takes over once moved, so no value
-// jumps to where a pot happens to stand
+// turning it on takes the pots' positions at once: every pot-driven value
+// goes to where its pot stands, and the pot drives it from there (as an
+// application start with pot control on does)
 void appPotControl(bool enable) {
-  if (enable && !potControl && active != nullptr) {
-    for (uint8_t i = 0; i < active->potCount; i++) disengagePotsFor(active->pots[i].paramId);
-  }
+  bool takeOver = enable && !potControl;
   potControl = enable;
+  if (!takeOver || active == nullptr || state != APP_STATE_RUNNING) return;
+  for (uint8_t i = 0; i < active->potCount; i++) {
+    const PotMap &map = active->pots[i];
+    int index = findParam(map.paramId);
+    if (index < 0) continue;
+    const ParamDef &param = active->params[index];
+    potApplied[map.pot] = potPosition(map.pot);
+    potEngaged[map.pot] = true;
+    int32_t value = constrain(map.map((uint16_t)potApplied[map.pot]), param.minimum, param.maximum);
+    if (value != values[index] && param.apply(value)) {
+      values[index] = value;
+      notifyChanged(map.paramId, value);
+    }
+  }
 }
 
 bool appPotControlEnabled() {

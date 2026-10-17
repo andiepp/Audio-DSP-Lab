@@ -66,9 +66,13 @@ public sealed class BoardClientTests : IAsyncLifetime
         board.SetPot(3, 4095);
         Assert.False(changes.TryTake(out _, 300));
 
+        // switching pot control on takes where the pot stands now
         await client.SetPotControlAsync(true);
-        board.SetPot(3, 0);
         Assert.True(changes.TryTake(out (string Name, string Value) change, 2000));
+        Assert.Equal(("volume", "0"), change);
+
+        board.SetPot(3, 0);
+        Assert.True(changes.TryTake(out change, 2000));
         Assert.Equal(("volume", "-60"), change);
     }
 

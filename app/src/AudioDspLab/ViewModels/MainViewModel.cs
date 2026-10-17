@@ -572,7 +572,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public Task SetPotentiometerControlAsync(bool on) =>
         RunExclusiveAsync(
-            on ? "Pot control on: a knob takes over once it is turned." : "Pot control off.",
+            on ? "Pot control on: the values follow the knobs." : "Pot control off.",
             async board => IsPotentiometerControlOn = await board.SetPotControlAsync(on).ConfigureAwait(true),
             reload: false);
 

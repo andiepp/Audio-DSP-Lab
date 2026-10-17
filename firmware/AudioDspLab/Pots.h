@@ -3,7 +3,7 @@
 // ****************************************************************************
 //  P1..P4 read by the ESP32 ADC, smoothed and scaled to the pots' real
 //  travel (0..4095 from stop to stop; see Pots.cpp). Mapping to parameters
-//  and pick-up live in the application manager.
+//  and take-over live in the application manager.
 // ----------------------------------------------------------------------------
 
 #ifndef POTS_H

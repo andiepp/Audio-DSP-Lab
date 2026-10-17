@@ -186,7 +186,8 @@ The pots set values only while **Pot control** is on, and it is off at every pow
 | SigmaStudio | ADC0 | ADC1 | ADC2 | ADC3 |
 | Synthesizer | Oscillator 1 width | Cutoff | Emphasis | Volume |
 
-- After the window writes a value, or after Pot control is switched on, a pot takes the value back only once you move it by about 2 % of its travel: a pot that merely sits there never overwrites the window's value.
+- Switching Pot control on takes the pots' positions at once: every value a pot drives goes to where its pot stands, and the window shows it.
+- After the window writes a value, its pot takes the value back only once you move it by about 2 % of its travel: a pot that merely sits there never overwrites the window's value.
 - Once a pot has taken over it follows with a small backlash, so its noise does not make the value flicker; both ends stay reachable.
 - With Pot control off, every start uses the defaults. With it on, every start takes the pots' positions.
 
@@ -416,12 +417,14 @@ err out-of-range frequency 20..20000 Hz
 ok triangle
 ```
 
-**The pots.** With Pot control on, turning a pot is reported as an event: where the pots stand (0 to 4095) and the value they changed:
+**The pots.** Switching Pot control on takes the pots' positions at once, and each value that moves is reported (here P3 already stands on triangle). After that, turning a pot is reported as an event: where the pots stand (0 to 4095) and the value it changed:
 
 ```
 > potctl on
 ok on
-! pots 2048 3407 0 4095
+! value frequency 1145.59
+! value amplitude -41.38
+! pots 3101 3407 2693 3776        (P2 turned)
 ! value amplitude -10.08
 ```
 

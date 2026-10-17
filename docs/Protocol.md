@@ -121,7 +121,7 @@ Applications:
 | Request | Response | Notes |
 | --- | --- | --- |
 | `pots` | `ok <p1> <p2> <p3> <p4>` | 0 to 4095 from stop to stop (the readings scaled to the pots' real travel) |
-| `potctl [on\|off]` | `ok on\|off` | whether the pots set parameters; off after every reset. Turning it on moves nothing: a pot takes over once it is turned. |
+| `potctl [on\|off]` | `ok on\|off` | whether the pots set parameters; off after every reset. Turning it on takes the pots' positions at once: each pot-driven parameter goes to where its pot stands (a `! value` event for each that moves). After a `set`, the parameter's pot takes over again once it is turned by about 2 %. |
 | `startup [on\|off]` | `ok on\|off <application>` | off: every power-up starts the SigmaStudio mode; on: it starts the application selected last (radio and synthesizer with their output on) |
 | `service [on\|off]` | `ok on\|off` | on: the DSP keeps running, the EEPROM is writable and the firmware leaves the I2C bus to SigmaStudio and the USBi; off: the application is written back and restarted |
 
@@ -297,7 +297,10 @@ The SigmaStudio mode has no parameters.
 < ok on
 > potctl on
 < ok on
-< ! pots 2047 3120 15 4095
+< ! value waveform triangle       (the pots' positions, taken at once)
+< ! value frequency 1145.59
+< ! value amplitude -41.38
+< ! pots 3101 3120 2693 3776      (P2 turned)
 < ! value amplitude -14.27
 > set frequency 30000
 < err out-of-range frequency 20..20000 Hz

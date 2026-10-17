@@ -258,7 +258,7 @@ public sealed class SimulatedBoard : ILineTransport
             case "get": Get(args); break;
             case "set": Set(args); break;
             case "pots": Ok(string.Join(' ', pots)); break;
-            case "potctl": Switch(args, ref potControl, null); break;
+            case "potctl": Switch(args, ref potControl, TakePots); break;
             case "startup": Startup(args); break;
             case "service": Service(args); break;
             case "led": Switch(args, ref led, null); break;
@@ -552,6 +552,20 @@ public sealed class SimulatedBoard : ILineTransport
         }
 
         Ok(Format(parameter, value));
+    }
+
+    // pot control switched on: the values go to where the pots stand
+    private void TakePots()
+    {
+        if (state != BoardStatus.Running)
+        {
+            return;
+        }
+
+        for (int index = 0; index < pots.Length; index++)
+        {
+            ApplyPot(index);
+        }
     }
 
     private void ApplyPot(int index)

@@ -58,6 +58,22 @@ static class Program
                         board!.SetPot(2, 1100);           // P3: the triangle's rise
                         await Task.Delay(300);
                     }
+                    if (name == "synthesizer")
+                    {
+                        // a patch that gives the filter and envelope graphs a shape
+                        foreach ((string parameter, string value) in new[]
+                                 {
+                                     ("cutoff", "1200"), ("emphasis", "55"), ("contour-amount", "40"),
+                                     ("contour-decay", "600"), ("contour-sustain", "30"),
+                                     ("decay", "400"), ("sustain", "60"), ("release", "500"),
+                                 })
+                        {
+                            await vm.Client!.SetAsync(parameter, value);
+                        }
+
+                        await vm.RefreshFromBoardAsync();
+                        await Task.Delay(300);
+                    }
                     Save(window, Path.Combine(output, $"{name}.png"));
                     Console.WriteLine($"{name}: {vm.ApplicationStateText} | {vm.StatusInfo} | {window.ActualWidth}x{window.ActualHeight}");
                 }

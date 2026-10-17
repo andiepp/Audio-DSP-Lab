@@ -736,31 +736,59 @@
 
                 <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
                     <DockPanel>
-                        <TextBlock Style="{StaticResource HintStyle}" Text="Ladder low-pass, 24 dB/octave · the contour starts with each phrase" />
+                        <TextBlock Style="{StaticResource HintStyle}" Text="Ladder low-pass, 24 dB/octave, at middle C · dashed: at the contour's peak" />
                         <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Filter" />
                     </DockPanel>
                 </Border>
-                <ItemsControl x:Name="SynthFilter" ItemsSource="{Binding Filter}" Margin="2,0,2,0" ItemTemplate="{StaticResource SmallDial}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Columns="4" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
+                <Grid Margin="2,0,2,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="262" />
+                    </Grid.ColumnDefinitions>
+                    <ItemsControl x:Name="SynthFilter" ItemsSource="{Binding Filter}" ItemTemplate="{StaticResource SmallDial}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="4" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                    <Border Grid.Column="1" Height="112" VerticalAlignment="Top" Margin="0,2,0,0"
+                            BorderBrush="{StaticResource AudioLabSeparator}" BorderThickness="1">
+                        <controls:ResponseCurve x:Name="SynthFilterCurve" TopDecibel="24" BottomDecibel="-48" DecibelStep="24" CompactLabels="True"
+                                                Response="{Binding FilterResponse}" SecondaryResponse="{Binding ContourResponse}" />
+                    </Border>
+                </Grid>
 
-                <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
-                    <DockPanel>
-                        <TextBlock Style="{StaticResource HintStyle}" Text="Pitch bend, the keys' velocity, glide between notes" />
-                        <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Performance" />
-                    </DockPanel>
-                </Border>
-                <ItemsControl x:Name="SynthPerformance" ItemsSource="{Binding Performance}" Margin="2,0,2,0" ItemTemplate="{StaticResource SmallDial}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Columns="4" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="6*" />
+                        <ColumnDefinition Width="2*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
+                            <DockPanel>
+                                <TextBlock Style="{StaticResource HintStyle}" Text="Pitch bend, velocity, glide" />
+                                <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Performance" />
+                            </DockPanel>
+                        </Border>
+                        <ItemsControl x:Name="SynthPerformance" ItemsSource="{Binding Performance}" Margin="2,0,2,0" ItemTemplate="{StaticResource SmallDial}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="4" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
+                            <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Mixer and MIDI" />
+                        </Border>
+                        <UniformGrid Columns="2" Margin="2,0,2,0">
+                            <ContentControl x:Name="SynthNoise" Content="{Binding Noise}" ContentTemplate="{StaticResource SmallDial}" />
+                            <ContentControl x:Name="SynthChannel" Content="{Binding Channel}" ContentTemplate="{StaticResource SmallDial}" />
+                        </UniformGrid>
+                    </StackPanel>
+                </Grid>
 
                 <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
                     <DockPanel>
@@ -799,8 +827,8 @@
 
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="4*" />
-                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="300" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
                         <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
@@ -817,15 +845,9 @@
                             </ItemsControl.ItemsPanel>
                         </ItemsControl>
                     </StackPanel>
-                    <StackPanel Grid.Column="1">
-                        <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
-                            <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Mixer and MIDI" />
-                        </Border>
-                        <UniformGrid Columns="2" Margin="2,0,2,0">
-                            <ContentControl x:Name="SynthNoise" Content="{Binding Noise}" ContentTemplate="{StaticResource SmallDial}" />
-                            <ContentControl x:Name="SynthChannel" Content="{Binding Channel}" ContentTemplate="{StaticResource SmallDial}" />
-                        </UniformGrid>
-                    </StackPanel>
+                    <Border Grid.Column="1" Margin="2,6,2,14" BorderBrush="{StaticResource AudioLabSeparator}" BorderThickness="1">
+                        <controls:EnvelopeGraph x:Name="SynthEnvelopeGraph" Envelopes="{Binding Envelopes}" />
+                    </Border>
                 </Grid>
             </StackPanel>
 

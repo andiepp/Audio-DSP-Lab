@@ -127,6 +127,9 @@ public sealed class SynthPageViewModel : ApplicationPageViewModel
 
     private static readonly (string, string)[] LfoWaveforms = [("sine", "Sine"), ("triangle", "Triangle"), ("square", "Square")];
 
+    // the filter's curve: points on the equalizer's logarithmic grid
+    private static readonly IReadOnlyList<double> CurveFrequencies = EqualizerResponse.LogarithmicFrequencies(160);
+
     private SynthVoice? voice;
 
     public SynthPageViewModel(ParameterWrite write, BoardAction run)
@@ -180,6 +183,20 @@ public sealed class SynthPageViewModel : ApplicationPageViewModel
             Integer("sustain", "Sustain", 0, 100, "-- % --"),
             Integer("release", "Release", 1, 10000, "-- ms --"),
         ];
+
+        foreach (ParameterViewModel parameter in Filter.Take(3))
+        {
+            parameter.ValueChanged += _ =>
+            {
+                RaisePropertyChanged(nameof(FilterResponse));
+                RaisePropertyChanged(nameof(ContourResponse));
+            };
+        }
+
+        foreach (ParameterViewModel parameter in Filter.Skip(4).Concat(Envelope))
+        {
+            parameter.ValueChanged += _ => RaisePropertyChanged(nameof(Envelopes));
+        }
     }
 
     public ParameterViewModel Volume { get; }
@@ -199,6 +216,27 @@ public sealed class SynthPageViewModel : ApplicationPageViewModel
     public IReadOnlyList<ParameterViewModel> Performance { get; }
 
     public IReadOnlyList<ParameterViewModel> Envelope { get; }
+
+    /// <summary>The filter's response at the cutoff set (at middle C, the contour at rest).</summary>
+    public IReadOnlyList<double>? FilterResponse =>
+        Filter[0].Value is double cutoff && Filter[1].Value is double emphasis
+            ? SynthCurves.LadderResponse(cutoff, emphasis, CurveFrequencies)
+            : null;
+
+    /// <summary>The response where the contour takes the cutoff at its peak; null without a contour.</summary>
+    public IReadOnlyList<double>? ContourResponse =>
+        Filter[0].Value is double cutoff && Filter[1].Value is double emphasis && Filter[2].Value is double amount && amount > 0
+            ? SynthCurves.LadderResponse(SynthCurves.ContourPeakCutoff(cutoff, amount), emphasis, CurveFrequencies)
+            : null;
+
+    /// <summary>The loudness envelope and the filter's contour, for the envelope graph.</summary>
+    public SynthEnvelopes? Envelopes =>
+        Envelope[0].Value is double attack && Envelope[1].Value is double decay
+        && Envelope[2].Value is double sustain && Envelope[3].Value is double release
+        && Filter[4].Value is double contourAttack && Filter[5].Value is double contourDecay
+        && Filter[6].Value is double contourSustain
+            ? new SynthEnvelopes(attack, decay, sustain / 100, release, contourAttack, contourDecay, contourSustain / 100)
+            : null;
 
     /// <summary>The note sounding, as "C4 · 60", or dashes.</summary>
     public string NoteText =>

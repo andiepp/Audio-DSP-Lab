@@ -300,6 +300,8 @@ Each source at 100 % plays at −6 dBFS. Above that the sum bends softly toward 
 
 The contour starts with the first key of a phrase, together with the loudness envelope.
 
+**The filter graph** beside the dials draws the filter's response as the cutoff, the emphasis and the contour amount set it, from 20 Hz to 20 kHz between +24 and −48 dB. The solid curve is the filter at the cutoff set, at middle C with the contour at rest; the dashed curve is the filter where the contour takes it at its peak. Emphasis raises the peak at the cutoff and lowers the passband a little (the firmware makes up part of that loss). Keyboard tracking, velocity and LFO 1 move the cutoff while you play and are not drawn.
+
 ### Envelope
 
 | Control | Range | Default |
@@ -310,6 +312,8 @@ The contour starts with the first key of a phrase, together with the loudness en
 | Release | 1 ms to 10 s | 100 ms |
 
 The attack rises in a straight line; decay and release fall exponentially and come within 1 % of their target in the time set. The envelope is **single trigger**, as on the Minimoog: a key pressed while another is held changes only the pitch, so legato phrases do not restart it.
+
+**The envelope graph** beside the dials draws the loudness envelope (filled) and the filter's contour (dashed) against time: from the key down until both have reached their sustain, a stretch with the key held, then the releases after the key up, at the same time scale. The labels give the time to the sustain and the longer release.
 
 ### LFOs and the mod wheel
 

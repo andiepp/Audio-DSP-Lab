@@ -1,0 +1,64 @@
+<Window x:Class="AudioDspLab.Views.WifiWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="WiFi networks" Width="620" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource AudioLabWindowBackground}" FontSize="12"
+        Loaded="Window_Loaded">
+    <StackPanel Margin="8">
+        <TextBlock Style="{StaticResource AudioLabInfoStyle}" Margin="2,0,2,6" TextWrapping="Wrap"
+                   Text="The radio connects to network 1, or to network 2 if network 1 does not answer. The board keeps both in its flash; a password is sent to the board once and never shown again. 2.4 GHz networks only (the ESP32 has no 5 GHz radio)." />
+        <ItemsControl x:Name="Rows" ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{StaticResource AudioLabSettingsBlockStyle}" Margin="0,0,0,6">
+                        <Grid Margin="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="30" />
+                                <RowDefinition Height="30" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.ColumnSpan="3" Style="{StaticResource AudioLabSettingsLabelStyle}" FontWeight="Bold" Text="{Binding Title}" />
+                            <TextBlock Grid.Row="1" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="Name (SSID)" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Height="24" VerticalContentAlignment="Center" MaxLength="32"
+                                     Text="{Binding Ssid, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Grid.Row="2" Style="{StaticResource AudioLabSettingsLabelStyle}" Text="Password" />
+                            <DockPanel Grid.Row="2" Grid.Column="1">
+                                <TextBlock DockPanel.Dock="Right" Style="{StaticResource AudioLabSettingsLabelStyle}" Margin="8,0,0,0"
+                                           Text="{Binding PasswordState}" />
+                                <PasswordBox Height="24" VerticalContentAlignment="Center" MaxLength="63"
+                                             ToolTip="8 to 63 characters; leave empty for an open network"
+                                             PasswordChanged="PasswordBox_PasswordChanged" Loaded="PasswordBox_Loaded" />
+                            </DockPanel>
+                            <StackPanel Grid.Row="1" Grid.RowSpan="2" Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center">
+                                <Button Style="{StaticResource AudioLabGoldKeyStyle}" Margin="0,0,0,4" Content="Save" Command="{Binding SaveCommand}" />
+                                <Button Style="{StaticResource AudioLabKeyStyle}" Margin="0" Content="Forget" Command="{Binding ClearCommand}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Style="{StaticResource AudioLabInfoStyle}" Margin="2,2" Text="{Binding ConnectionText}" TextWrapping="Wrap" />
+        <DockPanel Margin="0,6,0,0">
+            <Button DockPanel.Dock="Right" Style="{StaticResource AudioLabKeyStyle}" Content="Close" IsCancel="True" Click="Close_Click" />
+            <TextBlock VerticalAlignment="Center" Margin="2,0" Text="{Binding Message}" TextWrapping="Wrap">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="White" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsError}" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource AudioLabErrorText}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </DockPanel>
+    </StackPanel>
+</Window>

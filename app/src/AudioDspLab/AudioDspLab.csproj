@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>AudioDspLab</RootNamespace>
+    <AssemblyName>AudioDspLab</AssemblyName>
+    <AssemblyTitle>Audio-DSP-Lab</AssemblyTitle>
+    <Description>Audio-DSP-Lab: the Elektor Audio-DSP-FX board's applications on a PC.</Description>
+    <ApplicationIcon>AudioDspLab.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="AudioDspLab.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AudioDspLab.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AudioDspLab.Core\AudioDspLab.Core.csproj" />
+  </ItemGroup>
+
+</Project>

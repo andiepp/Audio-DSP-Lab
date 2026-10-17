@@ -1,0 +1,12 @@
+<UserControl x:Class="AudioDspLab.Controls.DigitDial"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="True" IsTabStop="True"
+             FocusVisualStyle="{x:Null}">
+    <!-- RF-Lab's digit entry: every digit is its own cell; the mouse wheel
+         over a digit, or a click on its upper or lower half, steps the value
+         by that digit's weight. The cells are built in code from the digit
+         counts. -->
+    <StackPanel x:Name="DigitsPanel" Orientation="Horizontal"
+                HorizontalAlignment="Right" VerticalAlignment="Center" />
+</UserControl>

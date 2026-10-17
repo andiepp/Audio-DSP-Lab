@@ -1,0 +1,16 @@
+# Text files are stored with LF; the PC sees them as Windows prefers
+* text=auto
+
+# SigmaStudio writes its projects and exports with CRLF and trailing
+# whitespace: keep them byte for byte as SigmaStudio wrote them
+sigmastudio/** -text
+
+# Windows scripts keep CRLF
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# binaries
+*.pdf binary
+*.png binary
+*.ico binary
+*.bin binary

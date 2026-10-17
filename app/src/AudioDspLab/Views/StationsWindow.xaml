@@ -1,0 +1,54 @@
+<Window x:Class="AudioDspLab.Views.StationsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Radio stations" Width="860" SizeToContent="Height" ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource AudioLabWindowBackground}" FontSize="12"
+        Loaded="Window_Loaded">
+    <DockPanel Margin="8">
+        <TextBlock DockPanel.Dock="Top" Style="{StaticResource AudioLabInfoStyle}" Margin="2,0,2,6" TextWrapping="Wrap"
+                   Text="Eight stations, kept on the board. A name has up to 63 characters; a URL must be an http:// MP3 stream (no https). Save a row to store it; a station playing switches to its new URL at once." />
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <Button DockPanel.Dock="Right" Style="{StaticResource AudioLabKeyStyle}" Content="Close" IsCancel="True" Click="Close_Click" />
+            <Button DockPanel.Dock="Left" Style="{StaticResource AudioLabKeyStyle}" Content="Restore all defaults"
+                    Command="{Binding RestoreAllCommand}" />
+            <TextBlock VerticalAlignment="Center" Margin="10,0" Text="{Binding Message}" TextTrimming="CharacterEllipsis">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="White" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsError}" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource AudioLabErrorText}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </DockPanel>
+        <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{StaticResource AudioLabSettingsBlockStyle}" Margin="0,0,0,4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="22" />
+                                <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource AudioLabSettingsLabelStyle}" FontWeight="Bold" Text="{Binding Slot}" />
+                            <TextBox Grid.Column="1" Height="24" Margin="0,0,6,0" VerticalContentAlignment="Center" MaxLength="63"
+                                     ToolTip="The station's name" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBox Grid.Column="2" Height="24" Margin="0,0,6,0" VerticalContentAlignment="Center" MaxLength="200"
+                                     ToolTip="The stream's URL, http:// only" Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}" />
+                            <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                <Button Style="{StaticResource AudioLabGoldKeyStyle}" Content="Save" Command="{Binding SaveCommand}" />
+                                <Button Style="{StaticResource AudioLabKeyStyle}" Content="Default" Command="{Binding RestoreCommand}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </DockPanel>
+</Window>

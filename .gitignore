@@ -1,0 +1,23 @@
+# build output
+build/
+dist/
+bin/
+obj/
+*.user
+.vs/
+.vscode/
+.idea/
+TestResults/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# SigmaStudio's backup and temporary files
+*.dspproj.bak
+*.bak
+*~$*
+
+# never commit WiFi credentials (the firmware does not need any)
+Credentials.h

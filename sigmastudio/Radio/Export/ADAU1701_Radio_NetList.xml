@@ -1,0 +1,70 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- *
+ * This software is distributed in the hope that it will be useful,
+ * but is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+ * CONDITIONS OF ANY KIND, without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * This software may only be used to program products purchased from
+ * Analog Devices for incorporation by you into audio products that
+ * are intended for resale to audio product end users. This software
+ * may not be distributed whole or in any part to third parties.
+ *
+ * Copyright © 2026 Analog Devices, Inc. All rights reserved.
+ */
+-->
+<!--NetList XML file-->
+<NetList>
+    <IC name=" IC 1 " type="DSPSigma100">
+        <Schematic>
+            <Algorithm name="ICSigma100In1" friendlyname="170x\140x input " cell="I2SIn " location="{X=77, Y=322} " Growth="10 " GrowthB="0 " FS="48000">
+                <Link pin="O_C0_A0_P3_out" dir="out" link="Link6" />
+                <Link pin="O_C0_A0_P4_out" dir="out" link="Link7" />
+            </Algorithm>
+            <Algorithm name="EQ1940Single1" friendlyname="1 Channel - Double Precision " cell="BassL " location="{X=230, Y=271} " Growth="1 " GrowthB="0">
+                <Link pin="I_C36_A0_P1_in" dir="in" link="Link6" />
+                <Link pin="O_C36_A0_P2_out" dir="out" link="Link0" />
+            </Algorithm>
+            <Algorithm name="EQ1940Single2" friendlyname="1 Channel - Double Precision " cell="BassR " location="{X=229, Y=388} " Growth="1 " GrowthB="0">
+                <Link pin="I_C39_A0_P1_in" dir="in" link="Link7" />
+                <Link pin="O_C39_A0_P2_out" dir="out" link="Link3" />
+            </Algorithm>
+            <Algorithm name="EQ1940Single3" friendlyname="1 Channel - Double Precision " cell="MiddleL " location="{X=378, Y=271} " Growth="1 " GrowthB="0">
+                <Link pin="I_C42_A0_P1_in" dir="in" link="Link0" />
+                <Link pin="O_C42_A0_P2_out" dir="out" link="Link1" />
+            </Algorithm>
+            <Algorithm name="EQ1940Single4" friendlyname="1 Channel - Double Precision " cell="MiddleR " location="{X=378, Y=388} " Growth="1 " GrowthB="0">
+                <Link pin="I_C45_A0_P1_in" dir="in" link="Link3" />
+                <Link pin="O_C45_A0_P2_out" dir="out" link="Link4" />
+            </Algorithm>
+            <Algorithm name="EQ1940Single5" friendlyname="1 Channel - Double Precision " cell="TrebleL " location="{X=537, Y=271} " Growth="1 " GrowthB="0">
+                <Link pin="I_C48_A0_P1_in" dir="in" link="Link1" />
+                <Link pin="O_C48_A0_P2_out" dir="out" link="Link2" />
+            </Algorithm>
+            <Algorithm name="EQ1940Single6" friendlyname="1 Channel - Double Precision " cell="TrebleR " location="{X=540, Y=388} " Growth="1 " GrowthB="0">
+                <Link pin="I_C53_A0_P1_in" dir="in" link="Link4" />
+                <Link pin="O_C53_A0_P2_out" dir="out" link="Link5" />
+            </Algorithm>
+            <Algorithm name="SWGain1940DBAlg1" friendlyname="Gain (RC Slew) " cell="VolumeL " location="{X=784, Y=161} " Growth="1 " GrowthB="0">
+                <Link pin="I_C7_A0_P1_in" dir="in" link="Link2" />
+                <Link pin="O_C7_A0_P2_out" dir="out" link="Link8" />
+            </Algorithm>
+            <Algorithm name="SWGain1940DBAlg2" friendlyname="Gain (RC Slew) " cell="VolumeR " location="{X=785, Y=389} " Growth="1 " GrowthB="0">
+                <Link pin="I_C72_A0_P1_in" dir="in" link="Link5" />
+                <Link pin="O_C72_A0_P2_out" dir="out" link="Link9" />
+            </Algorithm>
+            <Algorithm name="ICSigma100Out1" friendlyname="170x\140x output " cell="OutK3L " location="{X=1093, Y=193} " Growth="0 " GrowthB="0">
+                <Link pin="I_C2_A0_P1_in" dir="in" link="Link8" />
+            </Algorithm>
+            <Algorithm name="ICSigma100Out3" friendlyname="170x\140x output " cell="OutK4L " location="{X=1091, Y=276.1914} " Growth="0 " GrowthB="0">
+                <Link pin="I_C50_A0_P1_in" dir="in" link="Link8" />
+            </Algorithm>
+            <Algorithm name="ICSigma100Out2" friendlyname="170x\140x output " cell="OutK3R " location="{X=1094, Y=423.1914} " Growth="0 " GrowthB="0">
+                <Link pin="I_C32_A0_P1_in" dir="in" link="Link9" />
+            </Algorithm>
+            <Algorithm name="ICSigma100Out4" friendlyname="170x\140x output " cell="OutK4R " location="{X=1095, Y=508.1914} " Growth="0 " GrowthB="0">
+                <Link pin="I_C58_A0_P1_in" dir="in" link="Link9" />
+            </Algorithm>
+        </Schematic>
+    </IC>
+</NetList>

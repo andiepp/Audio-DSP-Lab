@@ -51,13 +51,15 @@ Close every program that might use the board's port: the Arduino IDE's serial mo
 
 The tool needs Espressif's **esptool**. It finds it by itself if the Arduino IDE with the ESP32 core is installed. Otherwise either put `esptool.exe` into the `firmware` folder (from github.com/espressif/esptool, Releases, the Windows zip) or install it with Python: `pip install esptool`.
 
-From a PowerShell you can also run it directly:
+From a terminal in the `firmware` folder you can give the port, and options, directly. In **PowerShell**, put `.\` in front: PowerShell runs nothing from the current folder by its bare name.
 
 ```
-powershell -ExecutionPolicy Bypass -File Flash-Firmware.ps1 -Port COM5
+.\Flash-Firmware.cmd COM5
 ```
 
-`-Erase` wipes the whole flash first (every stored setting goes), `-Baud 115200` helps with a slow USB hub. If esptool cannot enter the boot loader, hold the **BOOT** button of the ESP32 kit while flashing starts.
+In a classic **Command Prompt** (cmd.exe) the `.\` is not needed: `Flash-Firmware.cmd COM5`.
+
+Options after the port: `-Erase` wipes the whole flash first (every stored setting goes), `-Baud 115200` helps with a slow USB hub, for example `.\Flash-Firmware.cmd COM5 -Erase`. If esptool cannot enter the boot loader, hold the **BOOT** button of the ESP32 kit while flashing starts.
 
 The flash tool keeps what the board has stored: the WiFi networks, your stations, the analyzer's reference and the copy of your SigmaStudio program.
 

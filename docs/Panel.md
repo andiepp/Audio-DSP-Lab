@@ -2,7 +2,7 @@
 
 A touch front panel for the board: an **ESP32-2432S028R** display board (the "CYD", "cheap yellow display": 2.8″, 320 × 240, resistive touch) on a cable to the board's panel port. With it the board works without a PC: choose an application, switch the output, and set every value. The panel and the PC application can work side by side; what one changes, the other shows.
 
-The panel is new and grows in phases. It has the home screen, each application's parameters as tiles with a value editor, the output switch and the knob strip; the radio's station keys, the analyzer's sweep and plot, and the synthesizer's sections. Still to come: the equalizer's curve, the synthesizer's filter and envelope graphs, and a settings screen.
+It has the home screen and a settings screen, each application's parameters as tiles with a value editor, the output switch and the knob strip, and pages made for the applications: the equalizer's curve, the radio's station keys, the analyzer's sweep and plot, and the synthesizer's sections with its filter and envelope graphs.
 
 ## What you need
 
@@ -30,13 +30,15 @@ Connect the CYD by USB; it usually shows up as "USB-SERIAL CH340 (COMn)". In the
 .\Flash-Panel.cmd COM18
 ```
 
-(or double-click `Flash-Panel.cmd` and type the port). It writes the panel's single image, `AudioDspLabPanel-merged.bin`, at address 0; the panel keeps no settings.
+(or double-click `Flash-Panel.cmd` and type the port). It writes the panel's single image, `AudioDspLabPanel-merged.bin`, at address 0. The panel keeps one setting of its own, the brightness; flashing resets it to full.
 
 ## Using the panel
 
-The panel finds the board by itself: "Connecting to the board" until the board answers, then the home screen. The dot in the top bar is teal while the link stands and red without it; the CYD's LED shows the same, green or red. If the board restarts or the cable comes loose, the panel connects again on its own.
+The panel finds the board by itself: "Connecting to the board" until the board answers, then the home screen. The dot in the top bar is teal while the link stands and red without it; the CYD's LED shows the same, green or red, and amber while a synthesizer note sounds. If the board restarts or the cable comes loose, the panel connects again on its own.
 
 **Home.** The six applications as keys, the running one in teal: tap one to start it and open its page. Below them **Pot control** switches whether the board's pots set values, and the firmware version and the ESP32 kit are shown.
+
+**Settings** (the gear key on the home screen): **Pot control**; **At power-up: last application**, the board's power-up choice (off: the SigmaStudio mode); **Brightness** of the display; and the panel's and the board's versions and the link. Pot control and the power-up choice are read from the board each time the screen opens, so changes made on the PC show here.
 
 **An application's page.** The running application's parameters as tiles, two to a row, each with its value; a coloured dot marks the ones a pot plays, in the knob colours (P1 blue, P2 green, P3 yellow, P4 red). A page longer than the screen scrolls: drag it up or down; the bar at the right shows where you are. **Output** in the top bar switches the output; the house key leads back home. Tap a tile to change its value:
 
@@ -48,11 +50,13 @@ The panel sends only the newest value while you hold a key, so it never falls be
 
 **The knob strip** at the bottom shows what each pot plays now. Tap a knob there to change that value on the panel: in the radio, for example, the bass, middle and treble are on P1 to P3 and only a tap away.
 
+**Equalizer.** The response of the three bands, ±15 dB from 20 Hz to 20 kHz, a dot at each band's frequency, computed as the board computes its filters. The gains and the volume are the first tiles; the band frequencies follow when you scroll.
+
 **Radio.** The station playing in large letters, the stream title running below it, and the connection (playing, connecting, no network). Eight keys with the stations' names switch the station; the volume is the one tile below them, the bands are on the pots and the knob strip.
 
-**Response.** The plot of the last sweep, the left channel in teal and the right in blue, from 20 Hz to 20 kHz, the 60 dB below its loudest point. **Start sweep** starts a sweep from the start to the stop frequency (it switches the output on) and turns into **Stop** while it runs; beside it the points measured so far. The sweep's settings are the tiles below.
+**Response.** The plot of the last sweep, the left channel in teal and the right in blue, from 20 Hz to 20 kHz, the 60 dB below its loudest point. **Start sweep** in the plot's corner starts a sweep from the start to the stop frequency (it switches the output on) and turns into **Stop** while it runs; beside it the points measured so far. The sweep's settings are the tiles below.
 
-**Synth.** Keys above the tiles choose a section: **Osc** (the three oscillators and the noise), **Filter** (cutoff, emphasis, the contour, key tracking), **Env** (the loudness envelope), **LFO** (both LFOs, PWM, the filter's LFO), **Perf** (glide, bend, velocity, volume, the MIDI channel), or **All**.
+**Synth.** Keys above the tiles choose a section: **Osc** (the three oscillators and the noise), **Filter** (cutoff, emphasis, the contour, key tracking), **Env** (the loudness envelope), **LFO** (both LFOs, PWM, the filter's LFO), **Perf** (glide, bend, velocity, volume, the MIDI channel), or **All**. **Filter** shows the filter's response at middle C, solid at the cutoff and dashed where the contour takes it at its peak; **Env** the loudness envelope, solid, and the filter's contour, dashed, from the key down through a held stretch to the end of the release.
 
 **Side by side with the PC.** Values the PC sets appear on the panel, and the other way round. Other settings (pot control, stations, WiFi networks) the panel reads when it needs them. WiFi networks and station URLs are entered on the PC.
 

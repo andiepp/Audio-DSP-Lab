@@ -2,6 +2,7 @@
 #include "Config.h"
 #include "Display.h"
 #include "Link.h"
+#include "Curves.h"
 #include <lvgl.h>
 #include <math.h>
 #include <algorithm>
@@ -31,7 +32,7 @@ static const Application applications[] = {
 };
 static const int applicationCount = sizeof(applications) / sizeof(applications[0]);
 
-enum Page : uint8_t { PAGE_HOME, PAGE_APPLICATION };
+enum Page : uint8_t { PAGE_HOME, PAGE_APPLICATION, PAGE_SETTINGS };
 static Page page = PAGE_HOME;
 
 static lv_obj_t *homeButton;
@@ -39,6 +40,12 @@ static lv_obj_t *titleLabel;
 static lv_obj_t *linkDot;
 static lv_obj_t *outputBox;
 static lv_obj_t *outputSwitch;
+static lv_obj_t *settingsButton;
+// the settings page
+static lv_obj_t *settingsPotSwitch;
+static lv_obj_t *startupSwitch;
+static lv_obj_t *brightnessSlider;
+static lv_obj_t *settingsInfo;
 static lv_obj_t *content;
 static lv_obj_t *potLabels[4];
 static lv_obj_t *cover;               // "connecting" while there is no link
@@ -75,7 +82,7 @@ static lv_obj_t *radioState;
 static std::vector<lv_obj_t *> stationKeys;
 // the analyzer's header: the plot and its key
 #define PLOT_WIDTH                    306
-#define PLOT_HEIGHT                   84      // with the key below, the first tiles still fit
+#define PLOT_HEIGHT                   86      // two tile rows below it end at the knob strip
 #define PLOT_RANGE_DB                 60
 static lv_obj_t *sweepButton;
 static lv_obj_t *sweepLabel;
@@ -400,6 +407,72 @@ static void onPot(lv_event_t *e) {
   }
 }
 
+// --- settings ------------------------------------------------------------------------------
+
+static void setChecked(lv_obj_t *obj, bool checked);   // with the refresh, below
+
+static void onSettings(lv_event_t *) {
+  linkReadSettings();
+  page = PAGE_SETTINGS;
+}
+
+static void onStartup(lv_event_t *e) {
+  linkSetStartup(lv_obj_has_state((lv_obj_t *)lv_event_get_target(e), LV_STATE_CHECKED));
+}
+
+static void onBrightness(lv_event_t *e) {
+  displaySetBrightness(lv_slider_get_value((lv_obj_t *)lv_event_get_target(e)));
+}
+
+// a line of the settings page: its text on the left, a control on the right
+static lv_obj_t *settingLine(const char *text, const char *hint) {
+  lv_obj_t *line = lv_obj_create(content);
+  plainBox(line, COLOUR_CARD);
+  lv_obj_set_size(line, lv_pct(100), hint != nullptr ? 46 : 36);
+  lv_obj_set_style_radius(line, 6, 0);
+  lv_obj_t *name = label(line, text, &lv_font_montserrat_14, COLOUR_TEXT);
+  lv_obj_align(name, hint != nullptr ? LV_ALIGN_TOP_LEFT : LV_ALIGN_LEFT_MID, 8, hint != nullptr ? 5 : 0);
+  if (hint != nullptr) {
+    lv_obj_t *small = label(line, hint, &lv_font_montserrat_12, COLOUR_MUTED);
+    lv_obj_align(small, LV_ALIGN_BOTTOM_LEFT, 8, -5);
+  }
+  return line;
+}
+
+static lv_obj_t *settingSwitch(lv_obj_t *line, lv_event_cb_t handler) {
+  lv_obj_t *control = lv_switch_create(line);
+  lv_obj_set_size(control, 50, 26);
+  lv_obj_align(control, LV_ALIGN_RIGHT_MID, -8, 0);
+  lv_obj_add_event_cb(control, handler, LV_EVENT_VALUE_CHANGED, nullptr);
+  return control;
+}
+
+static void buildSettings() {
+  lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_gap(content, 4, 0);
+  settingsPotSwitch = settingSwitch(settingLine("Pot control", "The board's pots set values"), onPotControl);
+  startupSwitch = settingSwitch(settingLine("At power-up: last application", "Off: the SigmaStudio mode"), onStartup);
+  lv_obj_t *line = settingLine("Brightness", nullptr);
+  brightnessSlider = lv_slider_create(line);
+  lv_obj_set_width(brightnessSlider, 150);
+  lv_obj_align(brightnessSlider, LV_ALIGN_RIGHT_MID, -14, 0);
+  lv_slider_set_range(brightnessSlider, 10, 100);
+  lv_slider_set_value(brightnessSlider, displayBrightness(), LV_ANIM_OFF);
+  lv_obj_add_event_cb(brightnessSlider, onBrightness, LV_EVENT_VALUE_CHANGED, nullptr);
+  settingsInfo = label(content, "", &lv_font_montserrat_12, COLOUR_MUTED);
+}
+
+static void refreshSettings() {
+  if (settingsInfo == nullptr) return;
+  setChecked(settingsPotSwitch, board.potControl);
+  setChecked(startupSwitch, board.startupRestores);
+  String info = String(PANEL_NAME " " PANEL_VERSION "\n") +
+                "Board: Audio-DSP-Lab " + board.firmware +
+                (board.kit == "esp32-pico-kit-1" ? ", ESP32-PICO-KIT-1" : board.kit.length() > 0 ? ", ESP32-PICO-KIT V4" : "") +
+                "\nLink: " + (board.linked ? "connected, 115200 baud" : "not connected");
+  lv_label_set_text(settingsInfo, info.c_str());
+}
+
 static void buildHome() {
   lv_obj_set_flex_flow(content, LV_FLEX_FLOW_ROW_WRAP);
   lv_obj_set_style_pad_gap(content, 6, 0);
@@ -531,11 +604,13 @@ static void buildAnalyzerHeader() {
   lv_obj_set_style_line_color(plotLeft, lv_color_hex(COLOUR_ACCENT), 0);
   lv_obj_set_style_line_width(plotLeft, 2, 0);
 
-  lv_obj_t *keys = row(content, 8);
-  lv_obj_set_flex_align(keys, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  sweepButton = button(keys, "Start sweep", 130, 32);
+  // the key and the progress in the plot's top corner: the tiles get the room
+  sweepButton = button(plot, "Start sweep", 96, 28);
+  lv_obj_set_style_text_font(lv_obj_get_child(sweepButton, 0), &lv_font_montserrat_12, 0);
+  lv_obj_align(sweepButton, LV_ALIGN_TOP_RIGHT, -2, 2);
   lv_obj_add_event_cb(sweepButton, onSweep, LV_EVENT_CLICKED, nullptr);
-  sweepLabel = label(keys, "", &lv_font_montserrat_14, COLOUR_MUTED);
+  sweepLabel = label(plot, "", &lv_font_montserrat_12, COLOUR_TEXT);
+  lv_obj_align(sweepLabel, LV_ALIGN_TOP_RIGHT, -104, 8);
   drawnPoints = 0xFFFFFFFF;
 }
 
@@ -568,6 +643,154 @@ static void refreshAnalyzer() {
   }
   lv_line_set_points(plotLeft, leftPoints.data(), leftPoints.size());
   lv_line_set_points(plotRight, rightPoints.data(), rightPoints.size());
+}
+
+// --- curves: the equalizer's response, the synthesizer's filter and envelopes ----------------
+
+// heights that end the tile rows below at the knob strip: the content is
+// 182 high with 6 of padding, a tile row 40 and 4 of gap
+#define CURVE_HEIGHT_EQUALIZER        86      // two rows of tiles below
+#define CURVE_HEIGHT_SYNTH            92      // the section keys above, one row below
+#define CURVE_POINTS                  64
+
+struct CurvePlot {
+  lv_obj_t *box = nullptr;
+  int height = CURVE_HEIGHT_SYNTH;
+  lv_obj_t *lines[2] = { nullptr, nullptr };
+  std::vector<lv_point_precise_t> points[2];
+  lv_obj_t *dots[3] = { nullptr, nullptr, nullptr };
+};
+
+enum CurveKind : uint8_t { CURVE_NONE, CURVE_EQUALIZER, CURVE_FILTER, CURVE_ENVELOPE };
+static CurvePlot curve;
+static CurveKind curveKind = CURVE_NONE;
+
+static float paramNumber(const char *name, float fallback) {
+  const int index = linkFindParam(name);
+  return index >= 0 ? board.params[index].value.toFloat() : fallback;
+}
+
+static int curveY(float level, float top, float bottom) {
+  return (int)lroundf(constrain((top - level) / (top - bottom), 0.0f, 1.0f) * (curve.height - 1));
+}
+
+// a frame with a line per series (the second dashed); grid lines at 100 Hz,
+// 1 kHz and 10 kHz for frequency curves, and at the given level
+static void buildCurve(CurveKind kind, int height, bool frequencyGrid, float zeroShare, const char *top, const char *bottom) {
+  curveKind = kind;
+  curve = CurvePlot();
+  curve.height = height;
+  curve.box = lv_obj_create(content);
+  plainBox(curve.box, 0x141920);
+  lv_obj_set_size(curve.box, PLOT_WIDTH, height);
+  if (frequencyGrid) {
+    for (float hertz : { 100.0f, 1000.0f, 10000.0f }) gridLine(curve.box, plotX(hertz), 0, 1, height);
+  }
+  if (zeroShare >= 0) {
+    lv_obj_t *zero = gridLine(curve.box, 0, (int)(zeroShare * (height - 1)), PLOT_WIDTH, 1);
+    lv_obj_set_style_bg_color(zero, lv_color_hex(0x4A5566), 0);
+  }
+  lv_obj_t *topLabel = label(curve.box, top, &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_obj_set_pos(topLabel, 3, 1);
+  lv_obj_t *bottomLabel = label(curve.box, bottom, &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_obj_align(bottomLabel, LV_ALIGN_BOTTOM_LEFT, 3, -1);
+  const uint32_t colours[2] = { COLOUR_ACCENT, 0x7AA7FF };
+  for (int i = 1; i >= 0; i--) {
+    curve.lines[i] = lv_line_create(curve.box);
+    lv_obj_set_style_line_color(curve.lines[i], lv_color_hex(colours[i]), 0);
+    lv_obj_set_style_line_width(curve.lines[i], i == 0 ? 2 : 1, 0);
+    if (i == 1) {
+      lv_obj_set_style_line_dash_width(curve.lines[i], 4, 0);
+      lv_obj_set_style_line_dash_gap(curve.lines[i], 3, 0);
+    }
+  }
+}
+
+static void setCurve(int series, std::vector<lv_point_precise_t> &&points) {
+  curve.points[series] = std::move(points);
+  lv_line_set_points(curve.lines[series], curve.points[series].data(), curve.points[series].size());
+}
+
+// a frequency curve from a function, CURVE_POINTS along 20 Hz .. 20 kHz
+template <typename Gain>
+static std::vector<lv_point_precise_t> frequencyCurve(float top, float bottom, Gain gain) {
+  std::vector<lv_point_precise_t> points;
+  for (int i = 0; i < CURVE_POINTS; i++) {
+    const float hertz = 20.0f * powf(1000.0f, i / (float)(CURVE_POINTS - 1));
+    points.push_back({ plotX(hertz), curveY(gain(hertz), top, bottom) });
+  }
+  return points;
+}
+
+#define EQ_RANGE_DB                   15.0f
+#define FILTER_TOP_DB                 24.0f
+#define FILTER_BOTTOM_DB              -48.0f
+
+static void buildEqualizerCurve() {
+  buildCurve(CURVE_EQUALIZER, CURVE_HEIGHT_EQUALIZER, true, 0.5f, "+15", "-15");
+  for (lv_obj_t *&dot : curve.dots) {
+    dot = lv_obj_create(curve.box);
+    plainBox(dot, COLOUR_TEXT);
+    lv_obj_set_size(dot, 6, 6);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+  }
+}
+
+static void buildFilterCurve() {
+  buildCurve(CURVE_FILTER, CURVE_HEIGHT_SYNTH, true, FILTER_TOP_DB / (FILTER_TOP_DB - FILTER_BOTTOM_DB), "+24", "-48");
+}
+
+static void buildEnvelopeCurve() {
+  buildCurve(CURVE_ENVELOPE, CURVE_HEIGHT_SYNTH, false, -1, "", "");
+}
+
+static void refreshCurve() {
+  if (curve.box == nullptr) return;
+  if (curveKind == CURVE_EQUALIZER) {
+    const float gains[3] = { paramNumber("bass-gain", 0), paramNumber("middle-gain", 0), paramNumber("treble-gain", 0) };
+    const float centres[3] = { paramNumber("bass-frequency", 200), paramNumber("middle-frequency", 1000),
+                               paramNumber("treble-frequency", 2000) };
+    setCurve(0, frequencyCurve(EQ_RANGE_DB, -EQ_RANGE_DB, [&](float hertz) { return equalizerGainDb(hertz, gains, centres); }));
+    for (int band = 0; band < 3; band++) {
+      const float level = equalizerGainDb(centres[band], gains, centres);
+      lv_obj_set_pos(curve.dots[band], plotX(centres[band]) - 3, curveY(level, EQ_RANGE_DB, -EQ_RANGE_DB) - 3);
+    }
+  } else if (curveKind == CURVE_FILTER) {
+    const float cutoff = paramNumber("cutoff", 20000);
+    const float emphasis = paramNumber("emphasis", 0);
+    const float amount = paramNumber("contour-amount", 0);
+    setCurve(0, frequencyCurve(FILTER_TOP_DB, FILTER_BOTTOM_DB, [&](float hertz) { return ladderGainDb(hertz, cutoff, emphasis); }));
+    const float peak = contourPeakHz(cutoff, amount);
+    setCurve(1, amount > 0 ? frequencyCurve(FILTER_TOP_DB, FILTER_BOTTOM_DB,
+                                            [&](float hertz) { return ladderGainDb(hertz, peak, emphasis); })
+                           : std::vector<lv_point_precise_t>());
+  } else if (curveKind == CURVE_ENVELOPE) {
+    // from the key down to the sustain, a held stretch, then the releases,
+    // the times at one scale
+    const float attack = paramNumber("attack", 5), decay = paramNumber("decay", 200);
+    const float sustain = paramNumber("sustain", 100) / 100, release = paramNumber("release", 100);
+    const float contourAttack = paramNumber("contour-attack", 5), contourDecay = paramNumber("contour-decay", 300);
+    const float contourSustain = paramNumber("contour-sustain", 50) / 100;
+    const float heldSpan = fmaxf(attack + decay, contourAttack + contourDecay);
+    const float releaseSpan = fmaxf(release, contourDecay);
+    const float held = PLOT_WIDTH * 0.2f;
+    const float scale = (PLOT_WIDTH - 1 - held) / (heldSpan + releaseSpan);
+    const auto envelope = [&](float a, float d, float s, float r) {
+      std::vector<lv_point_precise_t> points;
+      const float keyUp = heldSpan * scale + held;
+      for (int x = 0; x <= (int)(heldSpan * scale); x += 3) {
+        points.push_back({ x, curveY(heldLevel(x / scale, a, d, s), 1, 0) });
+      }
+      const float level = heldLevel(heldSpan, a, d, s);
+      points.push_back({ (int32_t)keyUp, curveY(level, 1, 0) });
+      for (int x = (int)keyUp + 3; x < PLOT_WIDTH; x += 3) {
+        points.push_back({ x, curveY(releasedLevel((x - keyUp) / scale, level, r), 1, 0) });
+      }
+      return points;
+    };
+    setCurve(0, envelope(attack, decay, sustain, release));
+    setCurve(1, envelope(contourAttack, contourDecay, contourSustain, contourDecay));
+  }
 }
 
 // --- the synthesizer's sections ------------------------------------------------------------
@@ -650,7 +873,10 @@ static void buildApplication() {
   const bool synth = board.application == "synthesizer";
   if (board.application == "radio") buildRadioHeader();
   else if (board.application == "analyzer") buildAnalyzerHeader();
+  else if (board.application == "equalizer") buildEqualizerCurve();
   else if (synth) buildSectionKeys();
+  if (synth && section == SECTION_FILTER) buildFilterCurve();
+  if (synth && section == SECTION_ENV) buildEnvelopeCurve();
 
   // the rows: on the synthesizer only the section's, a group's together
   std::vector<int> rows;
@@ -661,6 +887,11 @@ static void buildApplication() {
     if (board.application == "radio" && name != "volume") continue;
     if (synth && section != SECTION_ALL && sectionOf(name) != section) continue;
     rows.push_back((int)i);
+  }
+  if (board.application == "equalizer") {
+    std::stable_sort(rows.begin(), rows.end(), [](int a, int b) {
+      return board.params[a].name.endsWith("-frequency") < board.params[b].name.endsWith("-frequency");
+    });
   }
   if (synth) {
     const auto rank = [](int index) {
@@ -682,9 +913,13 @@ static void rebuild() {
   radioStation = radioTitle = radioState = nullptr;
   sweepButton = sweepLabel = plotLeft = plotRight = plotTopLabel = plotBottomLabel = nullptr;
   for (lv_obj_t *&key : sectionKeys) key = nullptr;
+  curve = CurvePlot();
+  curveKind = CURVE_NONE;
   stationKeys.clear();
   valueLabels.clear();
+  settingsPotSwitch = startupSwitch = brightnessSlider = settingsInfo = nullptr;
   if (page == PAGE_HOME) buildHome();
+  else if (page == PAGE_SETTINGS) buildSettings();
   else buildApplication();
   builtPage = page;
   builtParams = board.paramsVersion;
@@ -710,15 +945,18 @@ static void refresh() {
     editorClose();
   }
   lv_obj_set_style_bg_color(linkDot, lv_color_hex(board.linked ? COLOUR_ACCENT : COLOUR_DANGER), 0);
-  ledSet(board.linked ? LED_GREEN : LED_RED);
+  // the LED: red without a link, amber while a synthesizer note sounds
+  ledSet(!board.linked ? LED_RED : board.gate && board.application == "synthesizer" ? LED_AMBER : LED_GREEN);
 
   // the top bar
   if (page == PAGE_HOME) {
     lv_obj_add_flag(homeButton, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(settingsButton, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_text(titleLabel, "Audio-DSP-Lab");
   } else {
     lv_obj_remove_flag(homeButton, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_text(titleLabel, applicationTitle(board.application));
+    lv_obj_add_flag(settingsButton, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text(titleLabel, page == PAGE_SETTINGS ? "Settings" : applicationTitle(board.application));
   }
   const int output = linkFindParam("output");
   if (page == PAGE_APPLICATION && output >= 0) {
@@ -738,12 +976,15 @@ static void refresh() {
       else if (board.kit.length() > 0) info += ", KIT V4";
       lv_label_set_text(infoLabel, info.c_str());
     }
+  } else if (page == PAGE_SETTINGS) {
+    refreshSettings();
   } else {
     for (size_t i = 0; i < valueLabels.size() && i < board.params.size(); i++) {
       if (valueLabels[i] != nullptr) lv_label_set_text(valueLabels[i], shown(board.params[i]).c_str());
     }
     refreshRadio();
     refreshAnalyzer();
+    refreshCurve();
     for (int i = 0; i < sectionCount; i++) {
       if (sectionKeys[i] != nullptr) markSelected(sectionKeys[i], i == section);
     }
@@ -809,6 +1050,9 @@ void uiBegin() {
   lv_obj_set_size(outputSwitch, 44, 22);
   lv_obj_align(outputSwitch, LV_ALIGN_RIGHT_MID, 0, 0);
   lv_obj_add_event_cb(outputSwitch, onOutput, LV_EVENT_VALUE_CHANGED, nullptr);
+  settingsButton = button(bar, LV_SYMBOL_SETTINGS, 40, 26);
+  lv_obj_align(settingsButton, LV_ALIGN_RIGHT_MID, -2, 0);
+  lv_obj_add_event_cb(settingsButton, onSettings, LV_EVENT_CLICKED, nullptr);
 
   // the page
   content = lv_obj_create(screen);

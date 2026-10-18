@@ -45,6 +45,8 @@ struct Board {
   String state;             // "running", "loading", ...
   String lastError;         // "none", ...
   bool potControl = false;
+  bool startupRestores = false; // power-up: the application selected last, or the SigmaStudio mode
+  bool gate = false;            // a synthesizer note sounds
   uint16_t pots[4] = { 0, 0, 0, 0 };
   std::vector<Param> params;
   uint32_t paramsVersion = 0;   // a new list (another application)
@@ -74,5 +76,7 @@ void linkSetParam(int index, const String &value);   // coalesced
 void linkSelectApplication(const char *name);
 void linkSetPotControl(bool on);
 void linkSweep(bool start);                          // starts or stops a sweep
+void linkReadSettings();                             // pot control and the power-up choice, read again
+void linkSetStartup(bool restores);
 
 #endif

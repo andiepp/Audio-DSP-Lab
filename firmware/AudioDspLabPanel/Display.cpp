@@ -2,12 +2,18 @@
 #include "Config.h"
 #include <Arduino.h>
 #include <SPI.h>
+#include <Preferences.h>
 #include <lvgl.h>
 // LVGL 9.2 leaves its MIPI panel drivers out of lvgl.h
 #include <drivers/display/ili9341/lv_ili9341.h>
 #include <drivers/display/st7789/lv_st7789.h>
 
 #define DRAW_BUFFER_LINES             20
+#define BACKLIGHT_PWM_HZ              5000
+#define PANEL_STORE                   "adl-panel"
+#define PANEL_KEY_BRIGHTNESS          "light"
+
+static int brightness = 100;
 
 static SPIClass displaySpi(HSPI);
 static SPIClass touchSpi(VSPI);
@@ -103,6 +109,26 @@ void ledSet(LedColour colour) {
   digitalWrite(PIN_LED_BLUE, blue ? LOW : HIGH);
 }
 
+// --- backlight ---------------------------------------------------------------------------
+
+static void applyBrightness() {
+  ledcWrite(PIN_TFT_BACKLIGHT, (uint32_t)(brightness * 255 / 100));
+}
+
+void displaySetBrightness(int percent) {
+  brightness = constrain(percent, 10, 100);
+  applyBrightness();
+  Preferences store;
+  if (store.begin(PANEL_STORE, false)) {
+    store.putUChar(PANEL_KEY_BRIGHTNESS, (uint8_t)brightness);
+    store.end();
+  }
+}
+
+int displayBrightness() {
+  return brightness;
+}
+
 // --- public ------------------------------------------------------------------------------
 
 static uint32_t tick() {
@@ -122,8 +148,13 @@ void displayBegin() {
   pinMode(PIN_TFT_CS, OUTPUT);
   pinMode(PIN_TFT_DC, OUTPUT);
   digitalWrite(PIN_TFT_CS, HIGH);
-  pinMode(PIN_TFT_BACKLIGHT, OUTPUT);
-  digitalWrite(PIN_TFT_BACKLIGHT, LOW);
+  ledcAttach(PIN_TFT_BACKLIGHT, BACKLIGHT_PWM_HZ, 8);
+  ledcWrite(PIN_TFT_BACKLIGHT, 0);
+  Preferences store;
+  if (store.begin(PANEL_STORE, true)) {
+    brightness = constrain(store.getUChar(PANEL_KEY_BRIGHTNESS, 100), 10, 100);
+    store.end();
+  }
   displaySpi.begin(PIN_TFT_SCK, PIN_TFT_MISO, PIN_TFT_MOSI, PIN_TFT_CS);
 
   pinMode(PIN_TOUCH_CS, OUTPUT);
@@ -149,7 +180,7 @@ void displayBegin() {
   lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(touch, readTouch);
 
-  digitalWrite(PIN_TFT_BACKLIGHT, HIGH);
+  applyBrightness();
 }
 
 void displayPoll() {

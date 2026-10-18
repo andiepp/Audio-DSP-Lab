@@ -14,6 +14,10 @@
 void displayBegin();      // LVGL, the display, the touch, the LED
 void displayPoll();       // LVGL's timers: call often
 
+// the backlight, 10 .. 100 %, kept in the panel's flash
+void displaySetBrightness(int percent);
+int displayBrightness();
+
 enum LedColour : uint8_t { LED_OFF, LED_GREEN, LED_RED, LED_AMBER, LED_BLUE };
 void ledSet(LedColour colour);
 

@@ -6,7 +6,7 @@ Board board;
 enum RequestKind : uint8_t {
   REQ_SYNC, REQ_INFO, REQ_EVENTS, REQ_STATUS, REQ_POTCTL, REQ_PARAMS, REQ_POTS,
   REQ_SET, REQ_APP, REQ_SET_POTCTL, REQ_CHECK,
-  REQ_RADIO, REQ_STATIONS, REQ_SWEEP, REQ_POINTS,
+  REQ_RADIO, REQ_STATIONS, REQ_SWEEP, REQ_POINTS, REQ_STARTUP,
 };
 
 struct Request {
@@ -237,6 +237,10 @@ static void answered(bool ok, const std::vector<String> &w) {
     case REQ_SWEEP:
       readSweep(w, 1);
       break;
+    case REQ_STARTUP:
+      // ok on|off <application>
+      board.startupRestores = first == "on";
+      break;
     case REQ_POINTS:
       // * <index> <hz> <left> <right> <rel-left> <rel-right>
       board.points.clear();
@@ -259,6 +263,7 @@ static void event(const std::vector<String> &w) {
     loseLink("the board restarted");
   } else if (name == "status" && w.size() >= 5) {
     const bool another = w[2] != board.application;
+    if (another) board.gate = false;
     board.application = w[2];
     board.state = w[3];
     board.lastError = w[4];
@@ -280,6 +285,10 @@ static void event(const std::vector<String> &w) {
     changed();
   } else if (name == "title") {
     board.title = w.size() >= 3 ? w[2] : String();
+    changed();
+  } else if (name == "voice" && w.size() >= 4) {
+    // ! voice <note> <gate> ...
+    board.gate = w[3] == "on";
     changed();
   } else if (name == "sweep") {
     readSweep(w, 2);
@@ -407,6 +416,19 @@ void linkSweep(bool start) {
     board.pointsVersion++;
   }
   enqueue(start ? "sweep start" : "sweep stop", REQ_SWEEP);
+  changed();
+}
+
+void linkReadSettings() {
+  if (!board.linked) return;
+  enqueue("potctl", REQ_POTCTL);
+  enqueue("startup", REQ_STARTUP);
+}
+
+void linkSetStartup(bool restores) {
+  if (!board.linked) return;
+  enqueue(restores ? "startup on" : "startup off", REQ_STARTUP);
+  board.startupRestores = restores;
   changed();
 }
 

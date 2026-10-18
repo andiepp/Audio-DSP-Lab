@@ -94,6 +94,13 @@ static lv_obj_t *plotBottomLabel;
 static std::vector<lv_point_precise_t> leftPoints;
 static std::vector<lv_point_precise_t> rightPoints;
 static uint32_t drawnPoints = 0xFFFFFFFF;
+// the measurement cursor: a line on the point nearest the touch, a dot on
+// each channel, and the point's frequency and levels
+static lv_obj_t *cursorLine;
+static lv_obj_t *cursorDots[2];
+static lv_obj_t *cursorLabel;
+static int cursorIndex = -1;            // the point, -1 none
+static float plotTop = 0;               // the level at the plot's top edge
 
 // the editor
 static lv_obj_t *editor;
@@ -607,10 +614,70 @@ static int plotX(float hertz) {
   return (int)lroundf((log10f(fmaxf(hertz, 20)) - log10f(20)) / 3.0f * (PLOT_WIDTH - 1));
 }
 
+static int plotY(float level) {
+  return (int)lroundf(constrain((plotTop - level) / PLOT_RANGE_DB, 0.0f, 1.0f) * (PLOT_HEIGHT - 1));
+}
+
+static String hertzText(float hertz) {
+  char text[24];
+  if (hertz >= 1000) snprintf(text, sizeof(text), "%.2f kHz", hertz / 1000);
+  else snprintf(text, sizeof(text), "%.0f Hz", hertz);
+  return String(text);
+}
+
+// the cursor where cursorIndex says, or hidden while there is no such point
+static void drawCursor() {
+  if (cursorLine == nullptr) return;
+  if (cursorIndex < 0 || cursorIndex >= (int)board.points.size()) {
+    lv_obj_add_flag(cursorLine, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(cursorLabel, LV_OBJ_FLAG_HIDDEN);
+    for (lv_obj_t *dot : cursorDots) lv_obj_add_flag(dot, LV_OBJ_FLAG_HIDDEN);
+    return;
+  }
+  const SweepPoint &point = board.points[cursorIndex];
+  const int x = plotX(point.hertz);
+  lv_obj_set_pos(cursorLine, x, 0);
+  lv_obj_remove_flag(cursorLine, LV_OBJ_FLAG_HIDDEN);
+  const float levels[2] = { point.left, point.right };
+  for (int channel = 0; channel < 2; channel++) {
+    lv_obj_set_pos(cursorDots[channel], x - 3, plotY(levels[channel]) - 3);
+    lv_obj_remove_flag(cursorDots[channel], LV_OBJ_FLAG_HIDDEN);
+  }
+  char text[64];
+  snprintf(text, sizeof(text), "%s\nL %.1f  R %.1f dB", hertzText(point.hertz).c_str(), point.left, point.right);
+  lv_label_set_text(cursorLabel, text);
+  lv_obj_remove_flag(cursorLabel, LV_OBJ_FLAG_HIDDEN);
+  // beside the line, on the side with room
+  lv_obj_update_layout(cursorLabel);
+  const int width = lv_obj_get_width(cursorLabel);
+  lv_obj_set_pos(cursorLabel, x + 6 + width < PLOT_WIDTH ? x + 6 : x - 6 - width, 32);
+}
+
+// a touch on the plot, or a finger moving on it: the cursor to the nearest point
+static void onPlot(lv_event_t *e) {
+  if (board.points.empty()) return;
+  lv_point_t touch;
+  lv_indev_get_point(lv_indev_active(), &touch);
+  lv_area_t area;
+  lv_obj_get_coords((lv_obj_t *)lv_event_get_current_target(e), &area);
+  const int x = touch.x - area.x1;
+  int nearest = 0;
+  for (size_t i = 1; i < board.points.size(); i++) {
+    if (abs(plotX(board.points[i].hertz) - x) < abs(plotX(board.points[nearest].hertz) - x)) nearest = (int)i;
+  }
+  cursorIndex = nearest;
+  drawCursor();
+}
+
 static void buildAnalyzerHeader() {
   lv_obj_t *plot = lv_obj_create(content);
   plainBox(plot, 0x141920);
   lv_obj_set_size(plot, PLOT_WIDTH, PLOT_HEIGHT);
+  // the plot takes touches for its cursor; a finger moving on it does not scroll the page
+  lv_obj_add_flag(plot, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_remove_flag(plot, LV_OBJ_FLAG_SCROLL_CHAIN);
+  lv_obj_add_event_cb(plot, onPlot, LV_EVENT_PRESSED, nullptr);
+  lv_obj_add_event_cb(plot, onPlot, LV_EVENT_PRESSING, nullptr);
   for (float hertz : { 100.0f, 1000.0f, 10000.0f }) gridLine(plot, plotX(hertz), 0, 1, PLOT_HEIGHT);
   for (int i = 1; i < 3; i++) gridLine(plot, 0, i * PLOT_HEIGHT / 3, PLOT_WIDTH, 1);
   const char *const marks[] = { "100", "1k", "10k" };
@@ -629,6 +696,26 @@ static void buildAnalyzerHeader() {
   plotLeft = lv_line_create(plot);
   lv_obj_set_style_line_color(plotLeft, lv_color_hex(COLOUR_ACCENT), 0);
   lv_obj_set_style_line_width(plotLeft, 2, 0);
+
+  cursorLine = gridLine(plot, 0, 0, 1, PLOT_HEIGHT);
+  lv_obj_set_style_bg_color(cursorLine, lv_color_hex(COLOUR_TEXT), 0);
+  const uint32_t dotColours[2] = { COLOUR_ACCENT, 0x7AA7FF };
+  for (int channel = 0; channel < 2; channel++) {
+    cursorDots[channel] = lv_obj_create(plot);
+    plainBox(cursorDots[channel], dotColours[channel]);
+    lv_obj_set_size(cursorDots[channel], 7, 7);
+    lv_obj_set_style_radius(cursorDots[channel], LV_RADIUS_CIRCLE, 0);
+  }
+  cursorLabel = label(plot, "", &lv_font_montserrat_12, COLOUR_TEXT);
+  lv_obj_set_style_bg_color(cursorLabel, lv_color_hex(0x0E1116), 0);
+  lv_obj_set_style_bg_opa(cursorLabel, LV_OPA_80, 0);
+  lv_obj_set_style_pad_hor(cursorLabel, 4, 0);
+  lv_obj_set_style_pad_ver(cursorLabel, 2, 0);
+  lv_obj_set_style_radius(cursorLabel, 4, 0);
+  for (lv_obj_t *part : { cursorLine, cursorDots[0], cursorDots[1], cursorLabel }) {
+    lv_obj_remove_flag(part, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(part, LV_OBJ_FLAG_HIDDEN);
+  }
 
   // the key and the progress in the plot's top corner: the tiles get the room
   sweepButton = button(plot, "Start sweep", 96, 28);
@@ -655,6 +742,7 @@ static void refreshAnalyzer() {
   for (const SweepPoint &point : board.points) loudest = fmaxf(loudest, fmaxf(point.left, point.right));
   const float top = board.points.empty() ? 0 : ceilf(loudest / 10) * 10;
   const float bottom = top - PLOT_RANGE_DB;
+  plotTop = top;
   lv_label_set_text(plotTopLabel, (String((int)top) + " dB").c_str());
   lv_label_set_text(plotBottomLabel, (String((int)bottom) + " dB").c_str());
   leftPoints.clear();
@@ -669,6 +757,7 @@ static void refreshAnalyzer() {
   }
   lv_line_set_points(plotLeft, leftPoints.data(), leftPoints.size());
   lv_line_set_points(plotRight, rightPoints.data(), rightPoints.size());
+  drawCursor();
 }
 
 // --- curves: the equalizer's response, the synthesizer's filter and envelopes ----------------
@@ -938,6 +1027,7 @@ static void rebuild() {
   potControlSwitch = infoLabel = startingLabel = nullptr;
   radioStation = radioTitle = radioState = nullptr;
   sweepButton = sweepLabel = plotLeft = plotRight = plotTopLabel = plotBottomLabel = nullptr;
+  cursorLine = cursorLabel = cursorDots[0] = cursorDots[1] = nullptr;
   for (lv_obj_t *&key : sectionKeys) key = nullptr;
   curve = CurvePlot();
   curveKind = CURVE_NONE;
@@ -1169,7 +1259,8 @@ void uiPoll() {
 }
 
 // commands on the USB port, for screenshots and tests: "page home|app|settings",
-// "section osc|filter|env|lfo|perf|all", "edit <parameter>", "close"
+// "section osc|filter|env|lfo|perf|all", "edit <parameter>", "close",
+// "cursor <point>" (the Response plot's cursor on that point, -1 none)
 void uiCommand(const String &line) {
   if (line.startsWith("page ")) {
     const String name = line.substring(5);
@@ -1189,6 +1280,9 @@ void uiCommand(const String &line) {
     if (index >= 0) editorOpen(index);
   } else if (line == "close") {
     editorClose();
+  } else if (line.startsWith("cursor ")) {
+    cursorIndex = line.substring(7).toInt();
+    drawCursor();
   } else {
     Serial.printf("? %s\n", line.c_str());
     return;

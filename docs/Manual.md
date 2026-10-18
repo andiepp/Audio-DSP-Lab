@@ -564,7 +564,7 @@ Wiring, power and flashing are in [the front panel guide](Panel.md). In short: C
 
 ![Home: the six applications, the running one in teal, Pot control, and the knob strip](images/panel/home.png)
 
-The panel connects by itself: "Connecting to the board" until the board answers, then the home screen. The six keys start an application and open its page; the running one is teal. **Pot control** switches whether the board's pots set values.
+The panel connects by itself: "Connecting to the board" until the board answers, then the home screen. It follows the board live: whatever the pots, the PC application or a script changes appears on the panel at once. The six keys start an application and open its page; the running one is teal. **Pot control** switches whether the board's pots set values.
 
 Every screen has the same frame. The top bar shows the page's name, a dot that is teal while the link stands (red without it), and, on an application's page, the **Output** switch and the house key back home. The **knob strip** at the bottom names what each pot plays now, in the knob colours: P1 blue, P2 green, P3 yellow, P4 red. Tap a knob there to set that value on the panel. The CYD's LED is green while the link stands, red without it, and amber while a synthesizer note sounds.
 
@@ -592,9 +592,11 @@ In the editor **−** and **+** step the value; hold them to repeat, and after a
 
 **Radio.** The station playing, its stream title running below it, and the connection: playing with its sample rate, connecting, or no network. The eight station keys carry the stations' names; the volume is the tile below them, and bass, middle and treble are on the pots and in the knob strip. Station names and URLs, and WiFi networks, are entered in the PC application. The panel's font has no accents: "Zwischentöne" reads "Zwischentoene".
 
-![Response: the last sweep, Start sweep in the plot's corner, the sweep's settings](images/panel/response.png)
+![Response: the last sweep with the cursor on one of its points, Start sweep in the plot's corner](images/panel/response.png)
 
 **Response.** The plot of the last sweep, the left channel teal and the right blue, from 20 Hz to 20 kHz, scaled to the 60 dB below its loudest point. **Start sweep** in the plot's corner starts a sweep and switches the output on; it reads **Stop** while the sweep runs, and the points measured stand beside it. The start and stop frequencies, the points per decade and the level are the tiles below.
+
+**The cursor.** Touch the plot, or move a finger along it: a line jumps to the nearest measured point, a dot marks it on each channel, and a box beside the line gives the point's frequency and both levels. The cursor stays where you leave it; during the next sweep it shows again as soon as the sweep reaches its point. (In the PC application, the mouse over the plot does the same.)
 
 ![The synthesizer's filter section: the response at the cutoff, dashed at the contour's peak](images/panel/synth-filter.png)
 

@@ -50,7 +50,7 @@ Step by step: **[Installation guide](docs/Installation.md)**.
 | [Manual](docs/Manual.md) | Every application, the pots, stored settings, power-up, the synthesizer in depth, troubleshooting |
 | [Protocol](docs/Protocol.md) | The serial protocol: commands, events, every parameter; for scripts and other front ends |
 | [SigmaStudio](docs/SigmaStudio.md) | Your own DSP programs on the board; the built-in applications' projects |
-| [Front panel](docs/Panel.md) | A touch panel on an ESP32 "CYD" display board: wiring, flashing, use |
+| [Front panel](docs/Panel.md) | A touch panel on an ESP32 "CYD" display board, and WiFi control through it: wiring, flashing, use |
 | [Building from source](docs/Building.md) | Firmware and application builds, tests, releases, code structure |
 
 ## Requirements

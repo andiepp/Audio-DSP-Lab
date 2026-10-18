@@ -3,6 +3,7 @@
 ## Unreleased
 
 - A second protocol port for a front panel (an ESP32 CYD display board): UART2 on GPIO37 (RX) and GPIO4 (TX) at 115200 baud. The PC application and the panel can work side by side; a value one sets reaches the other as an event. The synthesizer's MIDI port no longer claims GPIO4.
+- A front panel on an ESP32-2432S028R ("CYD") display board, phase 1: the home screen, each application's parameters as a list with a value editor, the output switch and the pot strip in the knob colours; it connects and reconnects by itself (docs/Panel.md). `Flash-Panel.cmd` flashes it; the release carries its image.
 
 ## 1.0 — first public release
 

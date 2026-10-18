@@ -1,12 +1,16 @@
 <#
 .SYNOPSIS
-    Writes the Audio-DSP-Lab firmware into the ESP32 of the Elektor Audio-DSP-FX board.
+    Writes the Audio-DSP-Lab firmware into the ESP32 of the Elektor Audio-DSP-FX board,
+    or (with -Panel) the panel firmware into an ESP32-2432S028R "CYD" display board.
 
 .DESCRIPTION
     Flashes the four parts of a release (bootloader, partition table,
     boot_app0 and the application) with Espressif's esptool. The board
     keeps its stored settings (WiFi networks, stations, the analyzer's
     reference, the copy of your SigmaStudio program) unless -Erase is given.
+
+    With -Panel it writes the front panel's one image (AudioDspLabPanel-merged.bin)
+    at address 0; the panel keeps no settings.
 
     esptool is looked for, in this order: esptool.exe beside this script,
     esptool(.exe) on the PATH, the Arduino IDE's ESP32 core, and Python's
@@ -25,15 +29,22 @@
 .PARAMETER Baud
     The upload speed; 460800 by default. Try 115200 if uploading fails.
 
+.PARAMETER Panel
+    Flashes the front panel (the CYD display board) instead of the Audio-DSP-FX board.
+
 .EXAMPLE
     .\Flash-Firmware.ps1 -Port COM5
+
+.EXAMPLE
+    .\Flash-Firmware.ps1 -Port COM18 -Panel
 #>
 [CmdletBinding()]
 param(
     [string] $Port,
     [string] $Folder,
     [switch] $Erase,
-    [int] $Baud = 460800
+    [int] $Baud = 460800,
+    [switch] $Panel
 )
 
 $ErrorActionPreference = 'Stop'
@@ -70,21 +81,27 @@ if (-not $Port) {
     Get-CimInstance Win32_PnPEntity -Filter "Name LIKE '%(COM%'" |
         Sort-Object Name | ForEach-Object { Write-Host "  $($_.Name)" }
     Write-Host ''
-    Write-Host 'The board shows up as "Silicon Labs CP210x USB to UART Bridge (COMn)". Run again with -Port COMn.'
+    Write-Host 'The board shows up as "Silicon Labs CP210x USB to UART Bridge (COMn)", the CYD panel usually as'
+    Write-Host '"USB-SERIAL CH340 (COMn)". Run again with -Port COMn.'
     return
 }
 
+$marker = if ($Panel) { 'AudioDspLabPanel-merged.bin' } else { 'AudioDspLab.bin' }
 if (-not $Folder) {
     $Folder = @((Join-Path $PSScriptRoot 'firmware'), $PSScriptRoot) |
-        Where-Object { Test-Path (Join-Path $_ 'AudioDspLab.bin') } | Select-Object -First 1
-    if (-not $Folder) { throw "No AudioDspLab.bin beside this script; name the folder with -Folder." }
+        Where-Object { Test-Path (Join-Path $_ $marker) } | Select-Object -First 1
+    if (-not $Folder) { throw "No $marker beside this script; name the folder with -Folder." }
 }
 
-$parts = [ordered]@{
-    '0x1000'  = 'AudioDspLab.bootloader.bin'
-    '0x8000'  = 'AudioDspLab.partitions.bin'
-    '0xe000'  = 'boot_app0.bin'
-    '0x10000' = 'AudioDspLab.bin'
+$parts = if ($Panel) {
+    [ordered]@{ '0x0' = 'AudioDspLabPanel-merged.bin' }
+} else {
+    [ordered]@{
+        '0x1000'  = 'AudioDspLab.bootloader.bin'
+        '0x8000'  = 'AudioDspLab.partitions.bin'
+        '0xe000'  = 'boot_app0.bin'
+        '0x10000' = 'AudioDspLab.bin'
+    }
 }
 $arguments = @()
 foreach ($offset in $parts.Keys) {
@@ -113,4 +130,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ''
-Write-Host 'Done. The board restarts with the new firmware; connect with the Audio-DSP-Lab application.'
+if ($Panel) {
+    Write-Host 'Done. The panel restarts and connects to the board over its cable.'
+} else {
+    Write-Host 'Done. The board restarts with the new firmware; connect with the Audio-DSP-Lab application.'
+}

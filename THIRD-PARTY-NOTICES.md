@@ -1,6 +1,6 @@
 # Third-party notices
 
-Audio-DSP-Lab's own code (the firmware's sketch in `firmware/AudioDspLab`, the application in `app/`, the tools in `tools/`, the SigmaStudio projects in `sigmastudio/` and the documentation) is under the MIT licence in [LICENSE](LICENSE).
+Audio-DSP-Lab's own code (the firmware's sketch in `firmware/AudioDspLab`, the panel firmware in `firmware/AudioDspLabPanel`, the application in `app/`, the tools in `tools/`, the SigmaStudio projects in `sigmastudio/` and the documentation) is under the MIT licence in [LICENSE](LICENSE).
 
 The **compiled firmware** also contains the following works. Whoever distributes the firmware binary (`AudioDspLab.bin`, `AudioDspLab-merged.bin`) distributes these works too, under their licences.
 
@@ -19,6 +19,17 @@ Their source code is in this repository (`firmware/libraries`) or at the address
 **Local change.** arduino-audio-tools carries one change, marked in the file: `src/AudioTools/CoreAudio/AudioMetaData/MetaDataICY.h` accepts ICY metadata blocks up to 4080 bytes instead of 200.
 
 **Note on licence compatibility.** The Free Software Foundation lists the RPSL as incompatible with the GPL. The firmware binary combines GPL-3.0 code (arduino-audio-tools, the libhelix wrapper) with the RPSL-licensed Helix decoder, as the upstream codec-helix library does. If you redistribute the binary, check that this combination is acceptable for your purpose.
+
+## The panel firmware
+
+The front panel's firmware (`AudioDspLabPanel-merged.bin`) contains:
+
+| Work | Author | Licence | Where |
+| --- | --- | --- | --- |
+| LVGL 9.2.2 | LVGL Kft and contributors | MIT | `firmware/libraries/lvgl` (licence: `LICENCE.txt`); configuration `firmware/libraries/lv_conf.h` |
+| Arduino core for the ESP32 3.3.10, ESP-IDF 5 components | Espressif Systems and contributors | LGPL v2.1, Apache 2.0, MIT and others | as for the board's firmware |
+
+**Local change.** The repository's copy of LVGL leaves out the fonts the panel does not use (all but Montserrat 12, 14, 16, 20, 24 and 28) and the ThorVG vector engine (`src/libs/thorvg`); nothing else is changed.
 
 ## The application
 

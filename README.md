@@ -50,6 +50,7 @@ Step by step: **[Installation guide](docs/Installation.md)**.
 | [Manual](docs/Manual.md) | Every application, the pots, stored settings, power-up, the synthesizer in depth, troubleshooting |
 | [Protocol](docs/Protocol.md) | The serial protocol: commands, events, every parameter; for scripts and other front ends |
 | [SigmaStudio](docs/SigmaStudio.md) | Your own DSP programs on the board; the built-in applications' projects |
+| [Front panel](docs/Panel.md) | A touch panel on an ESP32 "CYD" display board: wiring, flashing, use |
 | [Building from source](docs/Building.md) | Firmware and application builds, tests, releases, code structure |
 
 ## Requirements
@@ -64,7 +65,7 @@ Scripting works on any system: [tools/adl.py](tools/adl.py) is a Python client (
 
 | Folder | Content |
 | --- | --- |
-| [firmware](firmware) | The ESP32 firmware (Arduino, ESP32 core 3.3.10) and the libraries it needs |
+| [firmware](firmware) | The ESP32 firmware (Arduino, ESP32 core 3.3.10), the front panel's firmware, and the libraries they need |
 | [app](app) | The Windows application (.NET 10, WPF), its protocol library, a board simulator and tests |
 | [sigmastudio](sigmastudio) | The DSP programs as SigmaStudio projects |
 | [tools](tools) | Flash tool, release builder, Python client |
@@ -72,6 +73,6 @@ Scripting works on any system: [tools/adl.py](tools/adl.py) is a Python client (
 
 ## Licence
 
-MIT for this project's own code: see [LICENSE](LICENSE). The compiled firmware includes third-party libraries under their own licences (GPL-3.0, RPSL, LGPL-2.1, Apache-2.0): see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+MIT for this project's own code: see [LICENSE](LICENSE). The compiled firmware includes third-party libraries under their own licences (GPL-3.0, RPSL, LGPL-2.1, Apache-2.0; the panel firmware LVGL, MIT): see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 Audio-DSP-Lab is an independent project, not affiliated with Elektor or Analog Devices.

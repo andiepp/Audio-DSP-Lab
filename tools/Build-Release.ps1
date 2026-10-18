@@ -6,7 +6,8 @@
 .DESCRIPTION
     1. Compiles the firmware with arduino-cli (ESP32 core 3.3.10, board
        ESP32 PICO-D4, partition scheme Minimal SPIFFS, the libraries in
-       firmware/libraries).
+       firmware/libraries), and the front panel's firmware for the
+       ESP32-2432S028R display board (board ESP32 Dev Module, LVGL).
     2. Runs the tests and publishes the application as one self-contained
        AudioDspLab.exe for Windows x64 (no .NET installation needed).
     3. Builds the manual's PDF (needs Python with reportlab; skipped otherwise).
@@ -83,7 +84,16 @@ Copy-Item (Join-Path $firmwareOut 'AudioDspLab.ino.merged.bin') (Join-Path $firm
 $core = Get-ChildItem "$env:LOCALAPPDATA\Arduino15\packages\esp32\hardware\esp32" -Directory |
     Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
 Copy-Item (Join-Path $core.FullName 'tools\partitions\boot_app0.bin') $firmware
-Copy-Item (Join-Path $PSScriptRoot 'Flash-Firmware.ps1'), (Join-Path $PSScriptRoot 'Flash-Firmware.cmd') $firmware
+Copy-Item (Join-Path $PSScriptRoot 'Flash-Firmware.ps1'), (Join-Path $PSScriptRoot 'Flash-Firmware.cmd'), (Join-Path $PSScriptRoot 'Flash-Panel.cmd') $firmware
+
+Step 'Panel firmware'
+$panelOut = Join-Path $build 'panel-raw'
+& $cli compile --fqbn 'esp32:esp32:esp32' --libraries (Join-Path $root 'firmware\libraries') --warnings default `
+    --output-dir $panelOut (Join-Path $root 'firmware\AudioDspLabPanel')
+if ($LASTEXITCODE -ne 0 -and -not (Test-Path (Join-Path $panelOut 'AudioDspLabPanel.ino.merged.bin'))) {
+    throw "The panel firmware did not compile (exit code $LASTEXITCODE)."
+}
+Copy-Item (Join-Path $panelOut 'AudioDspLabPanel.ino.merged.bin') (Join-Path $firmware 'AudioDspLabPanel-merged.bin')
 @"
 Audio-DSP-Lab firmware $version for the Elektor Audio-DSP-FX board (ESP32-PICO-D4)
 
@@ -97,8 +107,13 @@ Offsets, for other flash tools:
   0x10000  AudioDspLab.bin
 or AudioDspLab-merged.bin alone at 0x0 (erases every stored setting).
 
-The compiled firmware contains arduino-audio-tools and libhelix (GPL-3.0);
-see THIRD-PARTY-NOTICES.md. Source: https://github.com/andiepp/Audio-DSP-Lab
+The front panel (an ESP32-2432S028R "CYD" display board on the board's
+panel port, see docs/Panel.md): Flash-Panel.cmd, or
+  powershell -ExecutionPolicy Bypass -File Flash-Firmware.ps1 -Port COM18 -Panel
+It writes AudioDspLabPanel-merged.bin at 0x0.
+
+The compiled firmware contains arduino-audio-tools and libhelix (GPL-3.0),
+the panel firmware LVGL (MIT); see THIRD-PARTY-NOTICES.md. Source: https://github.com/andiepp/Audio-DSP-Lab
 "@ | Set-Content (Join-Path $firmware 'README.txt') -Encoding utf8
 
 # --- application -----------------------------------------------------------------------

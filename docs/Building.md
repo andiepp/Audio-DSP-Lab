@@ -7,7 +7,8 @@ This guide is for developers: building the firmware and the application, running
 | Path | Content |
 | --- | --- |
 | `firmware/AudioDspLab/` | The ESP32 firmware (Arduino sketch) |
-| `firmware/libraries/` | The libraries the firmware needs, as used: arduino-audio-tools (with one local fix) and libhelix |
+| `firmware/AudioDspLabPanel/` | The front panel's firmware for the ESP32-2432S028R display board ([Panel.md](Panel.md)) |
+| `firmware/libraries/` | The libraries the firmwares need, as used: arduino-audio-tools (with one local fix), libhelix, and LVGL with its configuration `lv_conf.h` |
 | `firmware/MidiMonitor/` | A separate diagnostic sketch: prints what arrives on the MIDI input |
 | `app/` | The Windows application (.NET 10, WPF), its core library and tests |
 | `sigmastudio/` | The DSP programs as SigmaStudio projects, with their recipes |
@@ -67,6 +68,17 @@ The loop alone talks to the DSP and the serial port; the radio and the synthesiz
 2. Add its name, kind, decimals and unit to `ParamInfo.cpp`.
 3. Add it to the simulator's table, `app/src/AudioDspLab.Core/Simulation/SimulatedParameters.cs`. The test `FirmwareTableTests` compares the two and fails until they agree.
 4. Show it in the application: a `ParameterViewModel` on the application's page, bound in `MainWindow.xaml`.
+
+### The panel firmware
+
+`firmware/AudioDspLabPanel` builds for the board **ESP32 Dev Module** (`esp32:esp32:esp32`, default partition scheme) with **LVGL 9.2.2** from `firmware/libraries/lvgl`, configured by `firmware/libraries/lv_conf.h` (LVGL finds it as `../../lv_conf.h` from its `src` folder). The repository carries LVGL's sources without the fonts the panel does not use (it keeps Montserrat 12 to 28) and without its ThorVG vector engine.
+
+```
+arduino-cli compile --fqbn esp32:esp32:esp32 --libraries firmware/libraries firmware/AudioDspLabPanel
+arduino-cli upload  --fqbn esp32:esp32:esp32 -p COM18 firmware/AudioDspLabPanel
+```
+
+It uses about 48 % of the application partition. LVGL 9.2's `lvgl.h` leaves its MIPI display drivers out, so `Display.cpp` includes the ILI9341 and ST7789 headers itself; LVGL's draw buffers must be 4-byte aligned. The panel speaks the protocol of [Protocol.md](Protocol.md) on its UART2 (RX GPIO35, TX GPIO22, 115200) to the board's panel port.
 
 ### Partition and NVS
 

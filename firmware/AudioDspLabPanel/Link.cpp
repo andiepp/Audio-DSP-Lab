@@ -6,6 +6,7 @@ Board board;
 enum RequestKind : uint8_t {
   REQ_SYNC, REQ_INFO, REQ_EVENTS, REQ_STATUS, REQ_POTCTL, REQ_PARAMS, REQ_POTS,
   REQ_SET, REQ_APP, REQ_SET_POTCTL, REQ_CHECK,
+  REQ_RADIO, REQ_STATIONS, REQ_SWEEP, REQ_POINTS,
 };
 
 struct Request {
@@ -131,6 +132,33 @@ static void readParams() {
     board.params.push_back(param);
   }
   board.paramsVersion++;
+  // what the application's own page needs besides its parameters
+  if (board.application == "radio") {
+    enqueue("stations", REQ_STATIONS);
+    enqueue("radio", REQ_RADIO);
+  } else if (board.application == "analyzer") {
+    enqueue("sweep", REQ_SWEEP);
+    enqueue("points", REQ_POINTS);
+  }
+}
+
+// <state> <measured> <total> <reference-points>, from w[from] on
+static void readSweep(const std::vector<String> &w, size_t from) {
+  if (w.size() < from + 3) return;
+  board.sweepState = w[from];
+  board.sweepMeasured = w[from + 1].toInt();
+  board.sweepTotal = w[from + 2].toInt();
+}
+
+// <index> <hz> <left> <right> ..., from w[from] on; index 0 starts anew
+static void readPoint(const std::vector<String> &w, size_t from) {
+  if (w.size() < from + 4) return;
+  const int index = w[from].toInt();
+  if (index == 0) board.points.clear();
+  const SweepPoint point = { w[from + 1].toFloat(), w[from + 2].toFloat(), w[from + 3].toFloat() };
+  if (index < (int)board.points.size()) board.points[index] = point;
+  else if (index == (int)board.points.size()) board.points.push_back(point);
+  board.pointsVersion++;
 }
 
 static void answered(bool ok, const std::vector<String> &w) {
@@ -188,6 +216,33 @@ static void answered(bool ok, const std::vector<String> &w) {
       }
       enqueue("params", REQ_PARAMS);
       break;
+    case REQ_RADIO:
+      // ok <state> <sample-rate> "<title>"
+      if (w.size() >= 3) {
+        board.radioState = w[1];
+        board.radioRate = w[2].toInt();
+      }
+      board.title = w.size() >= 4 ? w[3] : String();
+      break;
+    case REQ_STATIONS:
+      // * <slot> "<name>" "<url>"
+      board.stations.assign(8, String());
+      for (const String &line : dataLines) {
+        std::vector<String> d = words(line.c_str());
+        const int slot = d.size() >= 2 ? d[0].toInt() : -1;
+        if (slot >= 0 && slot < 8) board.stations[slot] = d[1];
+      }
+      board.stationsVersion++;
+      break;
+    case REQ_SWEEP:
+      readSweep(w, 1);
+      break;
+    case REQ_POINTS:
+      // * <index> <hz> <left> <right> <rel-left> <rel-right>
+      board.points.clear();
+      for (const String &line : dataLines) readPoint(words(line.c_str()), 0);
+      board.pointsVersion++;
+      break;
     default:
       break;
   }
@@ -218,6 +273,19 @@ static void event(const std::vector<String> &w) {
     }
   } else if (name == "pots" && w.size() >= 6) {
     for (int i = 0; i < 4; i++) board.pots[i] = w[i + 2].toInt();
+    changed();
+  } else if (name == "radio" && w.size() >= 4) {
+    board.radioState = w[2];
+    board.radioRate = w[3].toInt();
+    changed();
+  } else if (name == "title") {
+    board.title = w.size() >= 3 ? w[2] : String();
+    changed();
+  } else if (name == "sweep") {
+    readSweep(w, 2);
+    changed();
+  } else if (name == "point") {
+    readPoint(w, 2);
     changed();
   }
 }
@@ -329,6 +397,16 @@ void linkSelectApplication(const char *name) {
   if (!board.linked) return;
   enqueue(String("app ") + name, REQ_APP);
   board.state = "loading";
+  changed();
+}
+
+void linkSweep(bool start) {
+  if (!board.linked) return;
+  if (start) {
+    board.points.clear();
+    board.pointsVersion++;
+  }
+  enqueue(start ? "sweep start" : "sweep stop", REQ_SWEEP);
   changed();
 }
 

@@ -31,6 +31,12 @@ struct Param {
   bool inFlight;            // a set is on its way
 };
 
+struct SweepPoint {
+  float hertz;
+  float left;               // dBFS
+  float right;
+};
+
 struct Board {
   bool linked = false;
   String firmware;          // "1.0"
@@ -44,6 +50,18 @@ struct Board {
   uint32_t paramsVersion = 0;   // a new list (another application)
   uint32_t version = 0;         // anything changed
   String message;               // the last error answered, for a toast
+  // the radio
+  String radioState;            // "playing", "connecting-wifi", ...
+  uint32_t radioRate = 0;
+  String title;                 // the stream title
+  std::vector<String> stations; // the eight slots' names
+  uint32_t stationsVersion = 0;
+  // the response analyzer
+  String sweepState;            // "idle", "running", "done", ...
+  int sweepMeasured = 0;
+  int sweepTotal = 0;
+  std::vector<SweepPoint> points;
+  uint32_t pointsVersion = 0;
 };
 
 extern Board board;
@@ -55,5 +73,6 @@ int linkFindParam(const char *name);
 void linkSetParam(int index, const String &value);   // coalesced
 void linkSelectApplication(const char *name);
 void linkSetPotControl(bool on);
+void linkSweep(bool start);                          // starts or stops a sweep
 
 #endif

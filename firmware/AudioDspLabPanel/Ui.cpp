@@ -4,6 +4,7 @@
 #include "Link.h"
 #include <lvgl.h>
 #include <math.h>
+#include <algorithm>
 
 // Studio dark, as the PC application's theme
 #define COLOUR_GROUND                 0x11151B
@@ -58,6 +59,33 @@ static lv_obj_t *infoLabel;
 // application page: a row's value label per parameter
 static std::vector<lv_obj_t *> valueLabels;
 static lv_obj_t *startingLabel;
+
+// the synthesizer's sections: keys that filter its long list
+enum Section : uint8_t { SECTION_OSC, SECTION_FILTER, SECTION_ENV, SECTION_LFO, SECTION_PERF, SECTION_ALL };
+static const char *const sectionTitles[] = { "Osc", "Filter", "Env", "LFO", "Perf", "All" };
+static const int sectionCount = 6;
+static Section section = SECTION_OSC;
+static Section builtSection = SECTION_ALL;
+static lv_obj_t *sectionKeys[sectionCount];
+// the radio's header
+static uint32_t builtStations = 0xFFFFFFFF;
+static lv_obj_t *radioStation;
+static lv_obj_t *radioTitle;
+static lv_obj_t *radioState;
+static std::vector<lv_obj_t *> stationKeys;
+// the analyzer's header: the plot and its key
+#define PLOT_WIDTH                    306
+#define PLOT_HEIGHT                   84      // with the key below, the first tiles still fit
+#define PLOT_RANGE_DB                 60
+static lv_obj_t *sweepButton;
+static lv_obj_t *sweepLabel;
+static lv_obj_t *plotLeft;
+static lv_obj_t *plotRight;
+static lv_obj_t *plotTopLabel;
+static lv_obj_t *plotBottomLabel;
+static std::vector<lv_point_precise_t> leftPoints;
+static std::vector<lv_point_precise_t> rightPoints;
+static uint32_t drawnPoints = 0xFFFFFFFF;
 
 // the editor
 static lv_obj_t *editor;
@@ -360,6 +388,18 @@ static void onRow(lv_event_t *e) {
   else editorOpen(index);
 }
 
+// a knob in the strip: edits the parameter its pot plays now
+static void onPot(lv_event_t *e) {
+  const int pot = (int)(intptr_t)lv_event_get_user_data(e);
+  if (!board.linked || board.state != "running") return;
+  for (size_t i = 0; i < board.params.size(); i++) {
+    if (board.params[i].pot != pot) continue;
+    if (board.params[i].kind == KIND_SWITCH) linkSetParam(i, board.params[i].value == "on" ? "off" : "on");
+    else editorOpen(i);
+    return;
+  }
+}
+
 static void buildHome() {
   lv_obj_set_flex_flow(content, LV_FLEX_FLOW_ROW_WRAP);
   lv_obj_set_style_pad_gap(content, 6, 0);
@@ -380,8 +420,224 @@ static void buildHome() {
   lv_obj_align(infoLabel, LV_ALIGN_RIGHT_MID, -4, 0);
 }
 
+// --- the radio's header -------------------------------------------------------------------
+
+static void onStation(lv_event_t *e) {
+  const int index = linkFindParam("station");
+  if (index >= 0) linkSetParam(index, String((int)(intptr_t)lv_event_get_user_data(e)));
+}
+
+static lv_obj_t *column(lv_obj_t *parent, int gap) {
+  lv_obj_t *box = lv_obj_create(parent);
+  lv_obj_set_size(box, lv_pct(100), LV_SIZE_CONTENT);
+  lv_obj_set_style_bg_opa(box, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(box, 0, 0);
+  lv_obj_set_style_pad_all(box, 0, 0);
+  lv_obj_set_style_pad_gap(box, gap, 0);
+  lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+  return box;
+}
+
+static lv_obj_t *row(lv_obj_t *parent, int gap) {
+  lv_obj_t *box = column(parent, gap);
+  lv_obj_set_flex_flow(box, LV_FLEX_FLOW_ROW_WRAP);
+  return box;
+}
+
+static void buildRadioHeader() {
+  lv_obj_t *box = column(content, 2);
+  radioStation = label(box, "", &lv_font_montserrat_20, COLOUR_TEXT);
+  radioTitle = label(box, "", &lv_font_montserrat_14, COLOUR_TEXT);
+  lv_label_set_long_mode(radioTitle, LV_LABEL_LONG_SCROLL_CIRCULAR);
+  lv_obj_set_width(radioTitle, lv_pct(100));
+  radioState = label(box, "", &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_obj_t *keys = row(box, 4);
+  stationKeys.clear();
+  for (int slot = 0; slot < 8; slot++) {
+    const String name = slot < (int)board.stations.size() && board.stations[slot].length() > 0
+                          ? board.stations[slot] : String(slot + 1);
+    lv_obj_t *key = button(keys, name.c_str(), 73, 34);
+    lv_obj_t *text = lv_obj_get_child(key, 0);
+    lv_obj_set_style_text_font(text, &lv_font_montserrat_12, 0);
+    lv_label_set_long_mode(text, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(text, 66);
+    lv_obj_set_style_text_align(text, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_add_event_cb(key, onStation, LV_EVENT_CLICKED, (void *)(intptr_t)slot);
+    stationKeys.push_back(key);
+  }
+}
+
+static const char *radioWords(const String &state) {
+  if (state == "playing") return "Playing";
+  if (state == "connecting-wifi") return "Connecting to WiFi";
+  if (state == "connecting-stream") return "Connecting to the station";
+  if (state == "no-network") return "No WiFi network (enter one on the PC)";
+  if (state == "stream-error") return "The station does not answer";
+  return "Idle";
+}
+
+static void refreshRadio() {
+  if (radioStation == nullptr) return;
+  const int index = linkFindParam("station");
+  const int slot = index >= 0 ? board.params[index].value.toInt() : -1;
+  const String name = slot >= 0 && slot < (int)board.stations.size() ? board.stations[slot] : String();
+  lv_label_set_text(radioStation, name.length() > 0 ? name.c_str() : "Radio");
+  lv_label_set_text(radioTitle, board.title.c_str());
+  String state = radioWords(board.radioState);
+  if (board.radioState == "playing" && board.radioRate > 0) state += String(", ") + (board.radioRate / 1000.0f) + " kHz";
+  lv_label_set_text(radioState, state.c_str());
+  for (size_t i = 0; i < stationKeys.size(); i++) markSelected(stationKeys[i], (int)i == slot);
+}
+
+// --- the analyzer's header -----------------------------------------------------------------
+
+static void onSweep(lv_event_t *) {
+  linkSweep(board.sweepState != "running");
+}
+
+static lv_obj_t *gridLine(lv_obj_t *parent, int x, int y, int width, int height) {
+  lv_obj_t *line = lv_obj_create(parent);
+  plainBox(line, 0x232B35);
+  lv_obj_set_size(line, width, height);
+  lv_obj_set_pos(line, x, y);
+  return line;
+}
+
+static int plotX(float hertz) {
+  return (int)lroundf((log10f(fmaxf(hertz, 20)) - log10f(20)) / 3.0f * (PLOT_WIDTH - 1));
+}
+
+static void buildAnalyzerHeader() {
+  lv_obj_t *plot = lv_obj_create(content);
+  plainBox(plot, 0x141920);
+  lv_obj_set_size(plot, PLOT_WIDTH, PLOT_HEIGHT);
+  for (float hertz : { 100.0f, 1000.0f, 10000.0f }) gridLine(plot, plotX(hertz), 0, 1, PLOT_HEIGHT);
+  for (int i = 1; i < 3; i++) gridLine(plot, 0, i * PLOT_HEIGHT / 3, PLOT_WIDTH, 1);
+  const char *const marks[] = { "100", "1k", "10k" };
+  const float hertz[] = { 100, 1000, 10000 };
+  for (int i = 0; i < 3; i++) {
+    lv_obj_t *mark = label(plot, marks[i], &lv_font_montserrat_12, COLOUR_MUTED);
+    lv_obj_set_pos(mark, plotX(hertz[i]) + 3, PLOT_HEIGHT - 16);
+  }
+  plotTopLabel = label(plot, "", &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_obj_set_pos(plotTopLabel, 3, 1);
+  plotBottomLabel = label(plot, "", &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_obj_set_pos(plotBottomLabel, 3, PLOT_HEIGHT - 30);
+  plotRight = lv_line_create(plot);
+  lv_obj_set_style_line_color(plotRight, lv_color_hex(0x7AA7FF), 0);
+  lv_obj_set_style_line_width(plotRight, 1, 0);
+  plotLeft = lv_line_create(plot);
+  lv_obj_set_style_line_color(plotLeft, lv_color_hex(COLOUR_ACCENT), 0);
+  lv_obj_set_style_line_width(plotLeft, 2, 0);
+
+  lv_obj_t *keys = row(content, 8);
+  lv_obj_set_flex_align(keys, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  sweepButton = button(keys, "Start sweep", 130, 32);
+  lv_obj_add_event_cb(sweepButton, onSweep, LV_EVENT_CLICKED, nullptr);
+  sweepLabel = label(keys, "", &lv_font_montserrat_14, COLOUR_MUTED);
+  drawnPoints = 0xFFFFFFFF;
+}
+
+static void refreshAnalyzer() {
+  if (sweepButton == nullptr) return;
+  const bool running = board.sweepState == "running";
+  lv_label_set_text(lv_obj_get_child(sweepButton, 0), running ? "Stop" : "Start sweep");
+  markSelected(sweepButton, running);
+  String progress = board.sweepTotal > 0 ? String(board.sweepMeasured) + " / " + board.sweepTotal : String();
+  if (board.sweepState.length() > 0 && board.sweepState != "running") progress += String("  ") + board.sweepState;
+  lv_label_set_text(sweepLabel, progress.c_str());
+  if (drawnPoints == board.pointsVersion) return;
+  drawnPoints = board.pointsVersion;
+  // the 60 dB below the loudest point, its top on a 10 dB line
+  float loudest = -200;
+  for (const SweepPoint &point : board.points) loudest = fmaxf(loudest, fmaxf(point.left, point.right));
+  const float top = board.points.empty() ? 0 : ceilf(loudest / 10) * 10;
+  const float bottom = top - PLOT_RANGE_DB;
+  lv_label_set_text(plotTopLabel, (String((int)top) + " dB").c_str());
+  lv_label_set_text(plotBottomLabel, (String((int)bottom) + " dB").c_str());
+  leftPoints.clear();
+  rightPoints.clear();
+  for (const SweepPoint &point : board.points) {
+    const int x = plotX(point.hertz);
+    const auto y = [&](float level) {
+      return (int32_t)lroundf(constrain((top - level) / PLOT_RANGE_DB, 0.0f, 1.0f) * (PLOT_HEIGHT - 1));
+    };
+    leftPoints.push_back({ x, y(point.left) });
+    rightPoints.push_back({ x, y(point.right) });
+  }
+  lv_line_set_points(plotLeft, leftPoints.data(), leftPoints.size());
+  lv_line_set_points(plotRight, rightPoints.data(), rightPoints.size());
+}
+
+// --- the synthesizer's sections ------------------------------------------------------------
+
+static Section sectionOf(const String &name) {
+  if (name.startsWith("osc") || name == "noise-level") return SECTION_OSC;
+  if (name == "cutoff" || name == "emphasis" || name.startsWith("contour") || name == "key-tracking") return SECTION_FILTER;
+  if (name == "attack" || name == "decay" || name == "sustain" || name == "release") return SECTION_ENV;
+  if (name.startsWith("lfo") || name == "pwm-depth" || name == "filter-lfo") return SECTION_LFO;
+  return SECTION_PERF;
+}
+
+// what a parameter belongs with: "osc2-detune" with "osc2", the rest alone
+static String groupOf(const String &name) {
+  const int dash = name.indexOf('-');
+  return (name.startsWith("osc") || name.startsWith("lfo")) && dash > 0 ? name.substring(0, dash) : name;
+}
+
+static void onSection(lv_event_t *e) {
+  section = (Section)(intptr_t)lv_event_get_user_data(e);
+}
+
+static void buildSectionKeys() {
+  lv_obj_t *keys = row(content, 4);
+  for (int i = 0; i < sectionCount; i++) {
+    sectionKeys[i] = button(keys, sectionTitles[i], 48, 32);
+    lv_obj_set_style_text_font(lv_obj_get_child(sectionKeys[i], 0), &lv_font_montserrat_12, 0);
+    lv_obj_add_event_cb(sectionKeys[i], onSection, LV_EVENT_CLICKED, (void *)(intptr_t)i);
+  }
+}
+
+// --- the application's page ------------------------------------------------------------------
+
+// a parameter as a tile, two to a row: its name above, its value below
+#define TILE_WIDTH                    150
+#define TILE_HEIGHT                   40
+
+static void buildRow(size_t i) {
+  const Param &param = board.params[i];
+  lv_obj_t *tile = lv_obj_create(content);
+  lv_obj_set_size(tile, TILE_WIDTH, TILE_HEIGHT);
+  lv_obj_set_style_bg_color(tile, lv_color_hex(COLOUR_CARD), 0);
+  lv_obj_set_style_border_width(tile, 0, 0);
+  lv_obj_set_style_radius(tile, 6, 0);
+  lv_obj_set_style_pad_hor(tile, 6, 0);
+  lv_obj_set_style_pad_ver(tile, 2, 0);
+  lv_obj_remove_flag(tile, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(tile, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_style_bg_color(tile, lv_color_hex(COLOUR_LINE), LV_STATE_PRESSED);
+  lv_obj_add_event_cb(tile, onRow, LV_EVENT_CLICKED, (void *)(intptr_t)i);
+  int nameX = 0;
+  if (param.pot >= 0 && param.pot < 4) {
+    lv_obj_t *dot = lv_obj_create(tile);
+    plainBox(dot, potColours[param.pot]);
+    lv_obj_set_size(dot, 8, 8);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_align(dot, LV_ALIGN_TOP_LEFT, 0, 4);
+    nameX = 12;
+  }
+  lv_obj_t *name = label(tile, pretty(param.name).c_str(), &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
+  lv_obj_set_width(name, TILE_WIDTH - 12 - nameX);
+  lv_obj_align(name, LV_ALIGN_TOP_LEFT, nameX, 0);
+  valueLabels[i] = label(tile, "", &lv_font_montserrat_16, COLOUR_TEXT);
+  lv_obj_align(valueLabels[i], LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+}
+
 static void buildApplication() {
-  lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
+  // headers take a whole line, the tiles two to a line
+  lv_obj_set_flex_flow(content, LV_FLEX_FLOW_ROW_WRAP);
   lv_obj_set_style_pad_gap(content, 4, 0);
   valueLabels.assign(board.params.size(), nullptr);
   startingLabel = nullptr;
@@ -391,44 +647,50 @@ static void buildApplication() {
     startingLabel = label(content, text, &lv_font_montserrat_16, COLOUR_MUTED);
     return;
   }
+  const bool synth = board.application == "synthesizer";
+  if (board.application == "radio") buildRadioHeader();
+  else if (board.application == "analyzer") buildAnalyzerHeader();
+  else if (synth) buildSectionKeys();
+
+  // the rows: on the synthesizer only the section's, a group's together
+  std::vector<int> rows;
   for (size_t i = 0; i < board.params.size(); i++) {
-    const Param &param = board.params[i];
-    if (param.name == "output") continue;        // the switch in the top bar
-    lv_obj_t *row = lv_obj_create(content);
-    lv_obj_set_size(row, lv_pct(100), 34);
-    lv_obj_set_style_bg_color(row, lv_color_hex(COLOUR_CARD), 0);
-    lv_obj_set_style_border_width(row, 0, 0);
-    lv_obj_set_style_radius(row, 6, 0);
-    lv_obj_set_style_pad_hor(row, 8, 0);
-    lv_obj_set_style_pad_ver(row, 0, 0);
-    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_bg_color(row, lv_color_hex(COLOUR_LINE), LV_STATE_PRESSED);
-    lv_obj_add_event_cb(row, onRow, LV_EVENT_CLICKED, (void *)(intptr_t)i);
-    if (param.pot >= 0 && param.pot < 4) {
-      lv_obj_t *dot = lv_obj_create(row);
-      plainBox(dot, potColours[param.pot]);
-      lv_obj_set_size(dot, 10, 10);
-      lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-      lv_obj_align(dot, LV_ALIGN_LEFT_MID, 0, 0);
-    }
-    lv_obj_t *name = label(row, pretty(param.name).c_str(), &lv_font_montserrat_14, COLOUR_MUTED);
-    lv_obj_align(name, LV_ALIGN_LEFT_MID, 16, 0);
-    valueLabels[i] = label(row, "", &lv_font_montserrat_16, COLOUR_TEXT);
-    lv_obj_align(valueLabels[i], LV_ALIGN_RIGHT_MID, 0, 0);
+    const String &name = board.params[i].name;
+    if (name == "output") continue;                     // the switch in the top bar
+    // the radio: the volume beside its station keys; the bands are on the pots
+    if (board.application == "radio" && name != "volume") continue;
+    if (synth && section != SECTION_ALL && sectionOf(name) != section) continue;
+    rows.push_back((int)i);
   }
+  if (synth) {
+    const auto rank = [](int index) {
+      const String group = groupOf(board.params[index].name);
+      for (size_t i = 0; i < board.params.size(); i++) {
+        if (groupOf(board.params[i].name) == group) return (int)i;
+      }
+      return index;
+    };
+    std::stable_sort(rows.begin(), rows.end(), [&](int a, int b) { return rank(a) < rank(b); });
+  }
+  for (int i : rows) buildRow(i);
 }
 
 static void rebuild() {
   editorClose();
   lv_obj_clean(content);
   potControlSwitch = infoLabel = startingLabel = nullptr;
+  radioStation = radioTitle = radioState = nullptr;
+  sweepButton = sweepLabel = plotLeft = plotRight = plotTopLabel = plotBottomLabel = nullptr;
+  for (lv_obj_t *&key : sectionKeys) key = nullptr;
+  stationKeys.clear();
   valueLabels.clear();
   if (page == PAGE_HOME) buildHome();
   else buildApplication();
   builtPage = page;
   builtParams = board.paramsVersion;
   builtApplication = board.application + board.state;
+  builtSection = section;
+  builtStations = board.stationsVersion;
 }
 
 // --- refresh ------------------------------------------------------------------------------
@@ -479,6 +741,11 @@ static void refresh() {
   } else {
     for (size_t i = 0; i < valueLabels.size() && i < board.params.size(); i++) {
       if (valueLabels[i] != nullptr) lv_label_set_text(valueLabels[i], shown(board.params[i]).c_str());
+    }
+    refreshRadio();
+    refreshAnalyzer();
+    for (int i = 0; i < sectionCount; i++) {
+      if (sectionKeys[i] != nullptr) markSelected(sectionKeys[i], i == section);
     }
   }
   editorShow();
@@ -552,20 +819,33 @@ void uiBegin() {
   lv_obj_set_style_radius(content, 0, 0);
   lv_obj_set_style_pad_all(content, 6, 0);
   lv_obj_set_scroll_dir(content, LV_DIR_VER);
+  // a visible bar: on a resistive screen a list that goes on is not obvious
+  lv_obj_set_scrollbar_mode(content, LV_SCROLLBAR_MODE_ACTIVE);
+  lv_obj_set_style_bg_color(content, lv_color_hex(COLOUR_ACCENT), LV_PART_SCROLLBAR);
+  lv_obj_set_style_width(content, 4, LV_PART_SCROLLBAR);
 
   // the pot strip
   lv_obj_t *strip = lv_obj_create(screen);
   plainBox(strip, COLOUR_BAR);
   lv_obj_set_size(strip, DISPLAY_WIDTH, POT_STRIP_HEIGHT);
   lv_obj_align(strip, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+  // each knob a key: a tap edits what the pot plays
   for (int pot = 0; pot < 4; pot++) {
-    lv_obj_t *dot = lv_obj_create(strip);
+    lv_obj_t *cell = lv_obj_create(strip);
+    plainBox(cell, COLOUR_BAR);
+    lv_obj_set_size(cell, 80, POT_STRIP_HEIGHT);
+    lv_obj_set_pos(cell, pot * 80, 0);
+    lv_obj_add_flag(cell, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_bg_color(cell, lv_color_hex(COLOUR_LINE), LV_STATE_PRESSED);
+    lv_obj_add_event_cb(cell, onPot, LV_EVENT_CLICKED, (void *)(intptr_t)pot);
+    lv_obj_t *dot = lv_obj_create(cell);
     plainBox(dot, potColours[pot]);
     lv_obj_set_size(dot, 10, 10);
     lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-    lv_obj_align(dot, LV_ALIGN_LEFT_MID, 3 + pot * 80, 0);
-    potLabels[pot] = label(strip, "-", &lv_font_montserrat_12, COLOUR_MUTED);
-    lv_obj_align(potLabels[pot], LV_ALIGN_LEFT_MID, 15 + pot * 80, 0);
+    lv_obj_align(dot, LV_ALIGN_LEFT_MID, 3, 0);
+    lv_obj_remove_flag(dot, LV_OBJ_FLAG_CLICKABLE);
+    potLabels[pot] = label(cell, "-", &lv_font_montserrat_12, COLOUR_MUTED);
+    lv_obj_align(potLabels[pot], LV_ALIGN_LEFT_MID, 15, 0);
   }
 
   // an error's toast above the strip
@@ -604,7 +884,8 @@ void uiPoll() {
     toastAt = 0;
   }
   if (page != builtPage || board.paramsVersion != builtParams ||
-      (page == PAGE_APPLICATION && board.application + board.state != builtApplication)) {
+      (page == PAGE_APPLICATION && (board.application + board.state != builtApplication || section != builtSection ||
+                                    (board.application == "radio" && board.stationsVersion != builtStations)))) {
     rebuild();
     seenVersion = board.version - 1;
   }

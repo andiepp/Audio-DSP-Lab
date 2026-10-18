@@ -615,6 +615,12 @@ bool radioWifiHasPassword(uint8_t slot) {
   return wifiPasswords[slot][0] != '\0';
 }
 
+const char *radioWifiPassword(uint8_t slot) {
+  if (slot >= RADIO_WIFI_NETWORKS) return nullptr;
+  loadWifi();
+  return wifiPasswords[slot];
+}
+
 // an SSID of 1..32 bytes; a password empty (open network) or 8..63
 // printable characters (WPA2); an empty SSID clears the slot
 RadioEdit radioSetWifi(uint8_t slot, const char *ssid, const char *password) {

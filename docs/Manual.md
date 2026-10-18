@@ -606,6 +606,12 @@ In the editor **−** and **+** step the value; hold them to repeat, and after a
 
 **SigmaStudio.** The page says that your program runs; the knob strip shows the pots going to the DSP's ADC inputs.
 
+### WiFi control
+
+**WiFi control.** The panel also lets the PC application work over WiFi, so the board needs no USB cable. It joins the networks the board keeps for its radio (network 1 first, then network 2) and takes the application on TCP port 7000, as **audio-dsp-lab.local** or at its address on your network. To set it up, open **WiFi networks …** in the PC application while it is connected by USB: the **Front panel** section shows whether the panel is online and at which address; **Use for connecting** puts **Network: <address>** in the port list. From then on choose that entry under **Board on** and **Connect**. The panel stays usable meanwhile; its LED turns blue while a PC works through it. Changing the networks in the dialog makes the panel join again.
+
+Anyone on your network can reach the board this way, as anyone with the USB cable can; the WiFi passwords themselves never leave the board over the network.
+
 ### When the panel does not connect
 
 | Symptom | Likely cause | Fix |
@@ -615,6 +621,9 @@ In the editor **−** and **+** step the value; hold them to repeat, and after a
 | The link drops now and then | GPIO37 floats while the panel restarts | Fit the 10 kΩ pull-up from GPIO37 to 3.3 V |
 | Touches land beside their target | Another CYD's touch calibration | Tap the corners and adjust `Config.h` (see the front panel guide) |
 | Colours swapped or the picture upside down | The two-USB CYD with its ST7789 display | Build the panel firmware with `DISPLAY_ST7789` set to 1 |
+| Settings shows "WiFi: none" | No network stored on the board | Enter one in **WiFi networks …** (it serves the radio too) |
+| Settings shows "WiFi: failed" | Neither network answers, or a 5 GHz-only network | The panel tries again every 30 s; use a 2.4 GHz network |
+| "Network: …" does not connect | The panel's address changed, or the PC is on another network | Read its address in Settings or the WiFi dialog; try audio-dsp-lab.local |
 
 ## Troubleshooting
 

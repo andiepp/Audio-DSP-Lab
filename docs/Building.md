@@ -71,14 +71,14 @@ The loop alone talks to the DSP and the serial port; the radio and the synthesiz
 
 ### The panel firmware
 
-`firmware/AudioDspLabPanel` builds for the board **ESP32 Dev Module** (`esp32:esp32:esp32`, default partition scheme) with **LVGL 9.2.2** from `firmware/libraries/lvgl`, configured by `firmware/libraries/lv_conf.h` (LVGL finds it as `../../lv_conf.h` from its `src` folder). The repository carries LVGL's sources without the fonts the panel does not use (it keeps Montserrat 12 to 28) and without its ThorVG vector engine.
+`firmware/AudioDspLabPanel` builds for the board **ESP32 Dev Module** with the partition scheme **Huge APP** (`esp32:esp32:esp32:PartitionScheme=huge_app`; with WiFi it outgrows the default 1.3 MB) with **LVGL 9.2.2** from `firmware/libraries/lvgl`, configured by `firmware/libraries/lv_conf.h` (LVGL finds it as `../../lv_conf.h` from its `src` folder). The repository carries LVGL's sources without the fonts the panel does not use (it keeps Montserrat 12 to 28) and without its ThorVG vector engine.
 
 ```
-arduino-cli compile --fqbn esp32:esp32:esp32 --libraries firmware/libraries firmware/AudioDspLabPanel
-arduino-cli upload  --fqbn esp32:esp32:esp32 -p COM18 firmware/AudioDspLabPanel
+arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app --libraries firmware/libraries firmware/AudioDspLabPanel
+arduino-cli upload  --fqbn esp32:esp32:esp32:PartitionScheme=huge_app -p COM18 firmware/AudioDspLabPanel
 ```
 
-It uses about 48 % of the application partition. LVGL 9.2's `lvgl.h` leaves its MIPI display drivers out, so `Display.cpp` includes the ILI9341 and ST7789 headers itself; LVGL's draw buffers must be 4-byte aligned. The panel speaks the protocol of [Protocol.md](Protocol.md) on its UART2 (RX GPIO35, TX GPIO22, 115200) to the board's panel port.
+It uses about 43 % of the 3 MB application partition; LVGL takes its memory from the C heap, as WiFi needs the DRAM a static pool would take. LVGL 9.2's `lvgl.h` leaves its MIPI display drivers out, so `Display.cpp` includes the ILI9341 and ST7789 headers itself; LVGL's draw buffers must be 4-byte aligned. The panel speaks the protocol of [Protocol.md](Protocol.md) on its UART2 (RX GPIO35, TX GPIO22, 115200) to the board's panel port.
 
 ### Partition and NVS
 

@@ -1,5 +1,6 @@
 #include "Link.h"
 #include "Config.h"
+#include "Wireless.h"
 
 Board board;
 
@@ -7,6 +8,9 @@ enum RequestKind : uint8_t {
   REQ_SYNC, REQ_INFO, REQ_EVENTS, REQ_STATUS, REQ_POTCTL, REQ_PARAMS, REQ_POTS,
   REQ_SET, REQ_APP, REQ_SET_POTCTL, REQ_CHECK,
   REQ_RADIO, REQ_STATIONS, REQ_SWEEP, REQ_POINTS, REQ_STARTUP,
+  REQ_REMOTE,               // the PC's request: its answer goes back to the PC
+  REQ_SECRETS,              // the board's WiFi networks, for the panel to join
+  REQ_PANEL,                // the panel's network state, told to the board
 };
 
 struct Request {
@@ -27,6 +31,8 @@ static uint32_t syncCount = 0;
 static String syncWord;
 static uint32_t syncSentAt = 0;
 static uint32_t heardAt = 0;            // the last line from the board
+static bool remoteEvents = false;       // the PC on the network asked for events
+static uint32_t reportedNetwork = 0xFFFFFFFF;
 
 static void changed() {
   board.version++;
@@ -109,6 +115,8 @@ static void linked() {
   enqueue("potctl", REQ_POTCTL);
   enqueue("params", REQ_PARAMS);
   enqueue("pots", REQ_POTS);
+  enqueue("wifi secrets", REQ_SECRETS);
+  reportedNetwork = 0xFFFFFFFF;           // the board hears of the network again
   changed();
 }
 
@@ -163,6 +171,22 @@ static void readPoint(const std::vector<String> &w, size_t from) {
 
 static void answered(bool ok, const std::vector<String> &w) {
   waiting = false;
+  if (current.kind == REQ_REMOTE) {
+    // the PC has its answer; the panel follows what it changed
+    if (ok && w.size() >= 2) {
+      std::vector<String> asked = words(current.line.c_str());
+      if (asked.size() >= 3 && asked[0] == "set") {
+        const int index = linkFindParam(asked[1].c_str());
+        if (index >= 0 && !board.params[index].dirty && !board.params[index].inFlight) board.params[index].value = w[1];
+      } else if (asked.size() >= 2 && asked[0] == "potctl") {
+        board.potControl = w[1] == "on";
+      } else if (asked.size() >= 2 && asked[0] == "startup") {
+        board.startupRestores = w[1] == "on";
+      }
+      changed();
+    }
+    return;
+  }
   if (!ok) {
     // err <code> <message>: shown, and the value read again where one was set
     board.message = w.size() >= 2 ? w[1] : String("failed");
@@ -206,8 +230,24 @@ static void answered(bool ok, const std::vector<String> &w) {
         Param &param = board.params[current.param];
         param.inFlight = false;
         if (!param.dirty) param.value = first;
+        // the board tells only the other port; the PC hears it from the panel
+        if (remoteEvents) networkSend((String("! value ") + param.name + " " + first).c_str());
       }
       break;
+    case REQ_SECRETS: {
+      // * <slot> "<ssid>" "<password>"
+      String ssids[2], passwords[2];
+      for (const String &data : dataLines) {
+        std::vector<String> d = words(data.c_str());
+        const int slot = d.size() >= 3 ? d[0].toInt() : -1;
+        if (slot == 0 || slot == 1) {
+          ssids[slot] = d[1];
+          passwords[slot] = d[2];
+        }
+      }
+      networkConfigure(ssids, passwords);
+      break;
+    }
     case REQ_APP:
       // ok <app> <state>: the new application's parameters
       if (w.size() >= 3) {
@@ -258,7 +298,10 @@ static void answered(bool ok, const std::vector<String> &w) {
 static void event(const std::vector<String> &w) {
   if (w.size() < 2) return;
   const String &name = w[1];
-  if (name == "ready") {
+  if (name == "wifi") {
+    // the networks changed on the board: join what it keeps now
+    enqueue("wifi secrets", REQ_SECRETS);
+  } else if (name == "ready") {
     // the board started again: its events are off, its state new
     loseLink("the board restarted");
   } else if (name == "status" && w.size() >= 5) {
@@ -312,6 +355,11 @@ static void line(const char *text) {
     }
     return;
   }
+  // the PC on the network: the answers to its requests, and the events it asked for
+  const bool forPc = waiting && current.kind == REQ_REMOTE && strncmp(text, "! ", 2) != 0;
+  if (forPc || (strncmp(text, "! ", 2) == 0 && (remoteEvents || strncmp(text, "! ready", 7) == 0))) {
+    networkSend(text);
+  }
   if (strncmp(text, "! ", 2) == 0) {
     event(words(text));
   } else if (strncmp(text, "* ", 2) == 0) {
@@ -363,7 +411,7 @@ void linkPoll() {
     return;
   }
   if (waiting) {
-    const uint32_t limit = current.kind == REQ_APP ? LINK_SLOW_ANSWER_MS : LINK_ANSWER_MS;
+    const uint32_t limit = current.kind == REQ_APP || current.kind == REQ_REMOTE ? LINK_SLOW_ANSWER_MS : LINK_ANSWER_MS;
     if (now - sentAt > limit) loseLink("no answer");
     return;
   }
@@ -377,6 +425,13 @@ void linkPoll() {
       return;
     }
   }
+  // the board hears of the panel's network when it changes
+  if (networkVersion() != reportedNetwork) {
+    reportedNetwork = networkVersion();
+    send({ String("panel ") + networkState() + " " + networkAddress() + " " + (networkClientConnected() ? 1 : 0),
+           REQ_PANEL, -1 });
+    return;
+  }
   if (!queue.empty()) {
     Request next = queue.front();
     queue.erase(queue.begin());
@@ -384,6 +439,40 @@ void linkPoll() {
     return;
   }
   if (now - heardAt > LINK_IDLE_ECHO_MS) send({ "echo check", REQ_CHECK, -1 });
+}
+
+void linkRemoteLine(const String &text) {
+  if (!board.linked) {
+    networkSend("err failed the panel has no link to the board");
+    return;
+  }
+  // events are the panel's to give: its own stay on, whatever the PC wants
+  std::vector<String> w = words(text.c_str());
+  if (w.size() >= 1 && w[0].equalsIgnoreCase("events")) {
+    if (w.size() == 2) remoteEvents = w[1].equalsIgnoreCase("on");
+    networkSend(remoteEvents ? "ok on" : "ok off");
+    return;
+  }
+  // what the board gives the panel's cable alone stays on it: the WiFi
+  // passwords, and the panel's own network register
+  // (the board takes any case: "WIFI Secrets" is the same request)
+  if (w.size() >= 2 && ((w[0].equalsIgnoreCase("wifi") && w[1].equalsIgnoreCase("secrets")) ||
+                        w[0].equalsIgnoreCase("panel"))) {
+    networkSend("err bad-argument not over the network");
+    return;
+  }
+  enqueue(text, REQ_REMOTE);
+}
+
+void linkRemoteConnected(bool connected) {
+  remoteEvents = false;
+  if (!connected) {
+    // what the PC asked and did not get answered is nobody's now
+    for (size_t i = queue.size(); i-- > 0;) {
+      if (queue[i].kind == REQ_REMOTE) queue.erase(queue.begin() + i);
+    }
+  }
+  Serial.printf("network: PC %s\n", connected ? "connected" : "gone");
 }
 
 int linkFindParam(const char *name) {

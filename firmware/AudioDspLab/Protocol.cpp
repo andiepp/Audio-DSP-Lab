@@ -703,7 +703,24 @@ static void cmdRadio() {
 }
 
 // wifi | wifi <slot> "<ssid>" ["<password>"] | wifi <slot> clear
+static bool wifiChanged = false;           // "! wifi" goes out with the next events
+
+// the networks with their passwords, for the front panel to join the same
+// WiFi: on the panel port only, a cable inside the box; never on USB
+static void wifiSecrets() {
+  if (out != &ports[1]) return fail(ERR_BAD_ARGUMENT);
+  for (uint8_t i = 0; i < RADIO_WIFI_NETWORKS; i++) {
+    char ssid[2 * RADIO_SSID_MAX + 4];
+    char password[2 * RADIO_PASSWORD_MAX + 4];
+    quote(ssid, sizeof(ssid), radioWifiSsid(i));
+    quote(password, sizeof(password), radioWifiPassword(i));
+    dataf("%u %s %s", i, ssid, password);
+  }
+  ok();
+}
+
 static void cmdWifi() {
+  if (tokenCount == 2 && is(1, "secrets")) return wifiSecrets();
   if (tokenCount == 1) {
     for (uint8_t i = 0; i < RADIO_WIFI_NETWORKS; i++) {
       char ssid[2 * RADIO_SSID_MAX + 4];
@@ -718,10 +735,40 @@ static void cmdWifi() {
   }
   long slot;
   if (!parseLong(arg(1), 0, RADIO_WIFI_NETWORKS - 1, slot)) return fail(ERR_BAD_ARGUMENT);
-  if (tokenCount == 3 && is(2, "clear")) return result(editResult(radioSetWifi((uint8_t)slot, "", "")));
-  if (tokenCount != 3 && tokenCount != 4) return fail(ERR_BAD_ARGUMENT);
-  if (tokens[2][0] == '\0') return fail(ERR_BAD_ARGUMENT);
-  result(editResult(radioSetWifi((uint8_t)slot, tokens[2], tokenCount == 4 ? tokens[3] : "")));
+  uint8_t error;
+  if (tokenCount == 3 && is(2, "clear")) {
+    error = editResult(radioSetWifi((uint8_t)slot, "", ""));
+  } else {
+    if (tokenCount != 3 && tokenCount != 4) return fail(ERR_BAD_ARGUMENT);
+    if (tokens[2][0] == '\0') return fail(ERR_BAD_ARGUMENT);
+    error = editResult(radioSetWifi((uint8_t)slot, tokens[2], tokenCount == 4 ? tokens[3] : ""));
+  }
+  if (error == ERR_NONE) wifiChanged = true;
+  result(error);
+}
+
+// --- the front panel's network --------------------------------------------------------
+
+// what the panel reports of its own network: set from the panel port,
+// read from any (the PC application shows it)
+static char panelState[16] = "none";
+static char panelAddress[48] = "-";
+static uint8_t panelClients = 0;
+static bool panelChanged = false;
+
+static void cmdPanel() {
+  if (tokenCount == 4) {
+    if (out != &ports[1]) return fail(ERR_BAD_ARGUMENT);
+    long clients;
+    if (!parseLong(arg(3), 0, 9, clients)) return fail(ERR_BAD_ARGUMENT);
+    strncpy(panelState, tokens[1], sizeof(panelState) - 1);
+    strncpy(panelAddress, tokens[2], sizeof(panelAddress) - 1);
+    panelClients = (uint8_t)clients;
+    panelChanged = true;
+  } else if (tokenCount != 1) {
+    return fail(ERR_BAD_ARGUMENT);
+  }
+  okf("%s %s %u", panelState, panelAddress, panelClients);
 }
 
 // --- response analyzer ---------------------------------------------------------------
@@ -946,6 +993,7 @@ static const Command commands[] = {
   { "station",   cmdStation,    "station <slot> name|url \"<text>\" | station <slot>|all default" },
   { "radio",     cmdRadio,      "radio" },
   { "wifi",      cmdWifi,       "wifi [<slot> \"<ssid>\" [\"<password>\"] | <slot> clear]" },
+  { "panel",     cmdPanel,      "panel: the front panel's network state, address, clients" },
   { "sweep",     cmdSweep,      "sweep [start|stop]" },
   { "points",    cmdPoints,     "points [<from>]" },
   { "reference", cmdReference,  "reference [keep]" },
@@ -1147,6 +1195,14 @@ static void events() {
   eventsCheckedAt = now;
   broadcasting = true;
   statusEvents();
+  if (wifiChanged) {
+    wifiChanged = false;
+    eventf("wifi");
+  }
+  if (panelChanged) {
+    panelChanged = false;
+    eventf("panel %s %s %u", panelState, panelAddress, panelClients);
+  }
   if (!appInServiceMode()) {
     for (uint8_t i = 0; i < portCount; i++) valueEvents(ports[i], now);
     potEvents(now);

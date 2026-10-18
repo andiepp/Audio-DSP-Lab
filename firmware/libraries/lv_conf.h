@@ -1,6 +1,7 @@
 /* Audio-DSP-Lab: LVGL 9.2.2's configuration for the panel firmware
  * (firmware/AudioDspLabPanel), made from lv_conf_template.h. Changed:
- * enabled; 72 KB heap; 20 ms refresh; Montserrat 12/14/16/20/24/28;
+ * enabled; the C heap for its memory (WiFi needs the DRAM a static pool
+ * would take); 20 ms refresh; Montserrat 12/14/16/20/24/28;
  * the default theme dark; the ILI9341 and ST7789 drivers (the
  * ESP32-2432S028R carries one or the other). LVGL finds this file as
  * ../../lv_conf.h from its src folder. */
@@ -46,7 +47,7 @@
  * - LV_STDLIB_RTTHREAD:    RT-Thread implementation
  * - LV_STDLIB_CUSTOM:      Implement the functions externally
  */
-#define LV_USE_STDLIB_MALLOC    LV_STDLIB_BUILTIN
+#define LV_USE_STDLIB_MALLOC    LV_STDLIB_CLIB   /* the heap: a 72 KB static pool and WiFi do not fit DRAM together */
 #define LV_USE_STDLIB_STRING    LV_STDLIB_BUILTIN
 #define LV_USE_STDLIB_SPRINTF   LV_STDLIB_BUILTIN
 

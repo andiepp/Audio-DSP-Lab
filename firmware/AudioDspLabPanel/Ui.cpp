@@ -3,6 +3,7 @@
 #include "Display.h"
 #include "Link.h"
 #include "Curves.h"
+#include "Wireless.h"
 #include <lvgl.h>
 #include <math.h>
 #include <algorithm>
@@ -492,7 +493,9 @@ static void refreshSettings() {
   // two lines: the page has room for no more
   String info = String("Panel " PANEL_VERSION ", board firmware ") + board.firmware +
                 (board.kit == "esp32-pico-kit-1" ? " on ESP32-PICO-KIT-1" : board.kit.length() > 0 ? " on ESP32-PICO-KIT V4" : "") +
-                "\nLink: " + (board.linked ? "connected, 115200 baud" : "not connected");
+                "\nLink: " + (board.linked ? "connected" : "not connected") + ", WiFi: " + networkState() +
+                (strcmp(networkState(), "online") == 0
+                   ? String(" ") + networkAddress() + (networkClientConnected() ? ", PC" : "") : String());
   lv_label_set_text(settingsInfo, info.c_str());
 }
 
@@ -969,7 +972,10 @@ static void refresh() {
   }
   lv_obj_set_style_bg_color(linkDot, lv_color_hex(board.linked ? COLOUR_ACCENT : COLOUR_DANGER), 0);
   // the LED: red without a link, amber while a synthesizer note sounds
-  ledSet(!board.linked ? LED_RED : board.gate && board.application == "synthesizer" ? LED_AMBER : LED_GREEN);
+  // and blue while a PC works through the panel's network
+  ledSet(!board.linked ? LED_RED
+         : board.gate && board.application == "synthesizer" ? LED_AMBER
+         : networkClientConnected() ? LED_BLUE : LED_GREEN);
 
   // the top bar
   if (page == PAGE_HOME) {

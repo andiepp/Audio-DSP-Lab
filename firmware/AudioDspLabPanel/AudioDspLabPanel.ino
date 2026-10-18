@@ -5,9 +5,10 @@
 //  ("CYD"). It speaks the board's protocol over a cable to the board's
 //  panel port (docs/Protocol.md), side by side with the PC application.
 //
-//  Build: Arduino ESP32 core 3.3.10, board "ESP32 Dev Module"
-//  (esp32:esp32:esp32), libraries from firmware/libraries (LVGL 9.2.2,
-//  configured by firmware/libraries/lv_conf.h).
+//  Build: Arduino ESP32 core 3.3.10, board "ESP32 Dev Module", partition
+//  scheme "Huge APP" (esp32:esp32:esp32:PartitionScheme=huge_app: WiFi
+//  does not fit the default 1.3 MB), libraries from firmware/libraries
+//  (LVGL 9.2.2, configured by firmware/libraries/lv_conf.h).
 //
 //  The USB port carries a log at 115200: the link's state and every
 //  touch's raw and screen position (for the calibration in Config.h).
@@ -19,6 +20,7 @@
 #include "Config.h"
 #include "Display.h"
 #include "Link.h"
+#include "Wireless.h"
 #include "Ui.h"
 
 void setup() {
@@ -28,6 +30,7 @@ void setup() {
   Serial.println("display up");
   uiBegin();
   linkBegin();
+  networkBegin();
   Serial.println("link started");
 }
 
@@ -55,6 +58,7 @@ static void readCommands() {
 void loop() {
   readCommands();
   linkPoll();
+  networkPoll();
   uiPoll();
   displayPoll();
   delay(2);

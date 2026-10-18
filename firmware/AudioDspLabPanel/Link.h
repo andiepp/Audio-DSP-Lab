@@ -79,4 +79,8 @@ void linkSweep(bool start);                          // starts or stops a sweep
 void linkReadSettings();                             // pot control and the power-up choice, read again
 void linkSetStartup(bool restores);
 
+// the PC on the network (Network.cpp): its lines in, and whether it is there
+void linkRemoteLine(const String &line);
+void linkRemoteConnected(bool connected);
+
 #endif

@@ -266,6 +266,7 @@ public sealed class SimulatedBoard : ILineTransport
             case "station": EditStation(args); break;
             case "radio": Ok($"{(application == Applications.Radio ? radioState : "idle")} {radioRate} {ProtocolText.Quote(title)}"); break;
             case "wifi": Wifi(args); break;
+            case "panel": Ok("none - 0"); break;      // no front panel on a simulated board
             case "sweep": Sweep(args); break;
             case "points": Points(args); break;
             case "reference": Reference(args); break;

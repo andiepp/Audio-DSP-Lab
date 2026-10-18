@@ -73,6 +73,7 @@ RadioState radioState();
 // whether it has a password (the password itself is never read back)
 const char *radioWifiSsid(uint8_t slot);
 bool radioWifiHasPassword(uint8_t slot);
+const char *radioWifiPassword(uint8_t slot);   // for the panel port only (Protocol.cpp)
 // sets a slot (an empty SSID clears it); the radio tries again at once
 RadioEdit radioSetWifi(uint8_t slot, const char *ssid, const char *password);
 // the slot the radio is connected through, -1 when not connected

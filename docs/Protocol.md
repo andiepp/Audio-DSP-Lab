@@ -49,6 +49,18 @@ A panel that starts or restarts while the board runs may leave noise in front of
 
 The synthesizer's MIDI port receives on GPIO38 only; GPIO4 belongs to the panel port.
 
+### Over WiFi, through the panel
+
+The front panel (docs/Panel.md) can pass a PC's requests on: it joins the board's WiFi networks and takes one PC on **TCP port 7000** (announced as `audio-dsp-lab.local`, mDNS service `_adl._tcp`). The lines are the same as on USB. The panel shares its port: the PC's requests wait their turn with the panel's own, each answer goes back to whoever asked, and events reach the PC if it sent `events on` (the panel answers that itself and keeps its own events). Values the panel sets reach the PC as `! value`, and values the PC sets reach the panel's screens. A second PC that connects takes the place of the first.
+
+Two requests are for the panel's cable alone and are refused over the network: `wifi secrets` and `panel` with arguments.
+
+| Request | Response | Notes |
+| --- | --- | --- |
+| `wifi secrets` | `* <slot> "<ssid>" "<password>"` for slots 0 and 1, then `ok` | **panel port only**: the panel joins the board's networks with them; refused on USB and over the network |
+| `panel` | `ok <state> <address> <clients>` | the panel's network as it reported it: state `none`, `connecting`, `online`, `failed`; address or `-`; clients 0 or 1 |
+| `panel <state> <address> <clients>` | as `panel` | panel port only: the panel reports its network |
+
 ## Lines
 
 | Direction | Form | Meaning |
@@ -213,6 +225,8 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | `! value <name> <value>` | a parameter changed without a `set` on this port: a pot turned it, the generator's frequency followed a new P2 range, or the other port set it. At most 20 per second for each parameter. |
 | `! pots <p1> <p2> <p3> <p4>` | a pot moved by 80 counts (2 %) or more; at most 10 per second |
 | `! radio <state> <sample-rate>` | the radio's connection or sample rate changed |
+| `! wifi` | the WiFi networks were changed (the panel reads them again) |
+| `! panel <state> <address> <clients>` | the front panel's network changed |
 | `! title "<text>"` | the stream title changed |
 | `! point <index> <hz> <left> <right> <rel-left> <rel-right>` | the analyzer measured a point |
 | `! sweep <state> <measured> <total> <reference-points>` | the sweep progressed or ended, or a reference was kept |

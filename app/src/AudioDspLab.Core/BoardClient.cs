@@ -202,6 +202,17 @@ public sealed class BoardClient : IDisposable
     public Task ClearWifiAsync(int slot, CancellationToken cancellationToken = default) =>
         SendAsync(Invariant($"wifi {slot} clear"), cancellationToken);
 
+    /// <summary>The front panel's network, as the panel told the board.</summary>
+    public async Task<PanelStatus> GetPanelAsync(CancellationToken cancellationToken = default)
+    {
+        BoardResponse response = await SendAsync("panel", cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<string> values = response.Values;
+        return new PanelStatus(
+            values.Count > 0 ? values[0] : "none",
+            values.Count > 1 && values[1] != ProtocolText.None ? values[1] : string.Empty,
+            values.Count > 2 ? ProtocolText.ParseInteger(values[2]) : 0);
+    }
+
     // --- response analyzer --------------------------------------------------------
 
     public async Task<SweepStatus> GetSweepAsync(CancellationToken cancellationToken = default) =>

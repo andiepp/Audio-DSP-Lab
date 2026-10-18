@@ -26,6 +26,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 {
     public const string SimulatorPort = "Simulator (demo)";
 
+    /// <summary>The port list's entry for the board through its front panel over WiFi: this, then the address.</summary>
+    public const string NetworkPortPrefix = "Network: ";
+
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(250);
 
     private readonly SynchronizationContext ui;
@@ -454,8 +457,28 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             Ports.Add(port);
         }
 
+        if (!string.IsNullOrWhiteSpace(preferences.PanelAddress))
+        {
+            Ports.Add(NetworkPortPrefix + preferences.PanelAddress);
+        }
+
         Ports.Add(SimulatorPort);
         SelectedPort = keep is not null && Ports.Contains(keep) ? keep : Ports.FirstOrDefault();
+    }
+
+    /// <summary>The front panel's address for the port list, as the WiFi dialog last set it.</summary>
+    public string? PanelAddress => preferences.PanelAddress;
+
+    /// <summary>Puts the front panel's address in the port list (and chooses it while not connected).</summary>
+    public void UsePanelAddress(string address)
+    {
+        preferences.PanelAddress = address.Trim();
+        preferences.Save();
+        string? selected = selectedPort;
+        RefreshPorts();
+        SelectedPort = IsConnected && selected is not null && Ports.Contains(selected)
+            ? selected
+            : NetworkPortPrefix + preferences.PanelAddress;
     }
 
     /// <summary>Connects to the port remembered from last time, if it is there.</summary>
@@ -510,6 +533,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             Fail(exception switch
             {
                 UnauthorizedAccessException => $"{port} is in use by another program (Arduino's serial monitor, SigmaStudio, another Audio-DSP-Lab?).",
+                System.Net.Sockets.SocketException or IOException when port.StartsWith(NetworkPortPrefix, StringComparison.Ordinal) =>
+                    $"The front panel at {port[NetworkPortPrefix.Length..]} does not answer: {exception.Message}",
                 FileNotFoundException or IOException when !port.Equals(SimulatorPort, StringComparison.Ordinal) =>
                     $"{port} cannot be opened: {exception.Message}",
                 _ => exception.Message
@@ -749,7 +774,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         };
 
     private static ILineTransport CreateTransport(string port) =>
-        port == SimulatorPort ? new SimulatedBoard(demo: true) : new SerialLineTransport(port);
+        port == SimulatorPort ? new SimulatedBoard(demo: true)
+        : port.StartsWith(NetworkPortPrefix, StringComparison.Ordinal) ? new TcpLineTransport(port[NetworkPortPrefix.Length..])
+        : new SerialLineTransport(port);
 
     private void Post(Action action) => ui.Post(_ => action(), null);
 
@@ -1180,6 +1207,9 @@ public sealed class AppPreferences
     /// <summary>The theme's name (Themes.ThemeResources), or null for the default.</summary>
     public string? Theme { get; set; }
 
+    /// <summary>The front panel's network address ("192.168.0.205", "audio-dsp-lab.local"), or null.</summary>
+    public string? PanelAddress { get; set; }
+
     public static AppPreferences Load()
     {
         var preferences = new AppPreferences();
@@ -1195,6 +1225,10 @@ public sealed class AppPreferences
                 {
                     preferences.Theme = line[6..].Trim();
                 }
+                else if (line.StartsWith("panel=", StringComparison.Ordinal))
+                {
+                    preferences.PanelAddress = line[6..].Trim();
+                }
             }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -1209,7 +1243,7 @@ public sealed class AppPreferences
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, $"port={LastPort}\ntheme={Theme}\n");
+            File.WriteAllText(FilePath, $"port={LastPort}\ntheme={Theme}\npanel={PanelAddress}\n");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {

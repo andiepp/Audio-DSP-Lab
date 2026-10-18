@@ -133,6 +133,16 @@ public sealed record WifiNetwork(int Slot, string Ssid, bool HasPassword)
 /// <summary>Which network the radio is on, and its address; Slot null while not connected.</summary>
 public sealed record WifiConnection(int? Slot, string Address);
 
+/// <summary>
+/// What the front panel reports of its network (<c>panel</c>): its state
+/// (<c>none</c>, <c>connecting</c>, <c>online</c>, <c>failed</c>), its address,
+/// and whether a PC works through it.
+/// </summary>
+public sealed record PanelStatus(string State, string Address, int Clients)
+{
+    public bool IsOnline => State == "online";
+}
+
 /// <summary>The analyzer's sweep (<c>sweep</c>, <c>! sweep</c>).</summary>
 public sealed record SweepStatus(string State, int Measured, int Total, int ReferencePoints)
 {

@@ -261,12 +261,36 @@ public sealed class WifiRow : ObservableObject
 /// <summary>The networks the radio may use, kept on the board.</summary>
 public sealed class WifiEditorViewModel : DialogViewModel
 {
+    private readonly Action<string>? usePanelAddress;
     private string connectionText = string.Empty;
+    private string panelText = string.Empty;
+    private string panelAddress;
 
-    public WifiEditorViewModel(BoardClient client)
+    /// <param name="panelAddress">The front panel's address the application knows, if any.</param>
+    /// <param name="usePanelAddress">Puts an address in the port list ("Network: ...").</param>
+    public WifiEditorViewModel(BoardClient client, string? panelAddress = null, Action<string>? usePanelAddress = null)
         : base(client)
     {
+        this.panelAddress = panelAddress ?? string.Empty;
+        this.usePanelAddress = usePanelAddress;
+        UsePanelCommand = new RelayCommand(UsePanel, () => this.usePanelAddress is not null && this.panelAddress.Trim().Length > 0);
     }
+
+    /// <summary>What the front panel reports of its network.</summary>
+    public string PanelText
+    {
+        get => panelText;
+        private set => SetProperty(ref panelText, value);
+    }
+
+    /// <summary>The address to reach the front panel at: what it reports, its .local name, or one the router keeps for it.</summary>
+    public string PanelAddress
+    {
+        get => panelAddress;
+        set => SetProperty(ref panelAddress, value ?? string.Empty);
+    }
+
+    public ICommand UsePanelCommand { get; }
 
     public ObservableCollection<WifiRow> Rows { get; } = [];
 
@@ -313,6 +337,32 @@ public sealed class WifiEditorViewModel : DialogViewModel
         ConnectionText = connection.Slot is int slot
             ? $"The radio is connected through network {slot + 1}, address {connection.Address}."
             : "The radio is not connected (it connects while the radio application runs).";
+
+        try
+        {
+            PanelStatus panel = await Client.GetPanelAsync().ConfigureAwait(true);
+            PanelText = panel.State switch
+            {
+                "online" => $"The front panel is online at {panel.Address}{(panel.Clients > 0 ? ", and a PC works through it" : string.Empty)}.",
+                "connecting" => "The front panel is joining the WiFi.",
+                "failed" => "The front panel cannot join either network.",
+                _ => "No front panel reports a network: none is fitted, or no network is stored.",
+            };
+            if (panel.IsOnline && PanelAddress.Trim().Length == 0)
+            {
+                PanelAddress = panel.Address;
+            }
+        }
+        catch (BoardErrorException)
+        {
+            PanelText = "This board's firmware has no front panel port; update it for WiFi control.";
+        }
+    }
+
+    private void UsePanel()
+    {
+        usePanelAddress?.Invoke(PanelAddress.Trim());
+        PanelText = $"\"{MainViewModel.NetworkPortPrefix}{PanelAddress.Trim()}\" is in the port list: choose it under Board on, then Connect.";
     }
 
     protected override string Explain() =>

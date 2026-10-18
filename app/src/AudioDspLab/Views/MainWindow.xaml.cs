@@ -86,7 +86,7 @@ public partial class MainWindow : Window
     {
         if (viewModel.Client is { } client)
         {
-            new WifiWindow(new WifiEditorViewModel(client)) { Owner = this }.ShowDialog();
+            new WifiWindow(new WifiEditorViewModel(client, viewModel.PanelAddress, viewModel.UsePanelAddress)) { Owner = this }.ShowDialog();
         }
     }
 

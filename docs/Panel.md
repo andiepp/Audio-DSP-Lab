@@ -60,10 +60,15 @@ The panel sends only the newest value while you hold a key, so it never falls be
 
 **Side by side with the PC.** Values the PC sets appear on the panel, and the other way round. Other settings (pot control, stations, WiFi networks) the panel reads when it needs them. WiFi networks and station URLs are entered on the PC.
 
+**WiFi control.** The panel also lets the PC application work over WiFi, so the board needs no USB cable. It joins the networks the board keeps for its radio (network 1 first, then network 2) and takes the application on TCP port 7000, as **audio-dsp-lab.local** or at its address on your network. To set it up, open **WiFi networks …** in the PC application while it is connected by USB: the **Front panel** section shows whether the panel is online and at which address; **Use for connecting** puts **Network: <address>** in the port list. From then on choose that entry under **Board on** and **Connect**. The panel stays usable meanwhile; its LED turns blue while a PC works through it. Changing the networks in the dialog makes the panel join again.
+
+Anyone on your network can reach the board this way, as anyone with the USB cable can; the WiFi passwords themselves never leave the board over the network.
+
 ## For developers
 
-- **Source:** `firmware/AudioDspLabPanel`, an Arduino sketch for the ESP32 core 3.3.10, board **ESP32 Dev Module** (`esp32:esp32:esp32`), with **LVGL 9.2.2** from `firmware/libraries` (configured by `firmware/libraries/lv_conf.h`). `Display.cpp` drives the display through LVGL's ILI9341/ST7789 driver and reads the XPT2046 touch controller; `Link.cpp` is the protocol client; `Ui.cpp` the screens.
-- **Build:** `arduino-cli compile --fqbn esp32:esp32:esp32 --libraries firmware/libraries firmware/AudioDspLabPanel`.
+- **Source:** `firmware/AudioDspLabPanel`, an Arduino sketch for the ESP32 core 3.3.10, board **ESP32 Dev Module** (`esp32:esp32:esp32`) with the partition scheme **Huge APP** (`PartitionScheme=huge_app`: with WiFi the firmware outgrows the default 1.3 MB), with **LVGL 9.2.2** from `firmware/libraries` (configured by `firmware/libraries/lv_conf.h`). `Display.cpp` drives the display through LVGL's ILI9341/ST7789 driver and reads the XPT2046 touch controller; `Link.cpp` is the protocol client; `Ui.cpp` the screens.
+- **Build:** `arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app --libraries firmware/libraries firmware/AudioDspLabPanel`.
+- **Network:** `Wireless.cpp` joins the WiFi and serves TCP port 7000; `Link.cpp` shares the cable between the PC and the screens. LVGL takes its memory from the C heap (`lv_conf.h`): a static pool and WiFi do not fit the ESP32's DRAM together.
 - **Log:** the CYD's USB port (115200 baud) logs the link's state and every touch: its raw readings and the screen position they map to. The touch calibration, the raw values at the screen's edges, is in `Config.h`; tap the corners and compare if touches land beside their target on your CYD.
 - **The display's orientation and colour order** are set in `displayBegin()`: 270° and RGB order suit the tested CYD.
 - **Commands and screenshots:** the USB port takes a command per line: `page home|app|settings`, `section osc|filter|env|lfo|perf|all`, `edit <parameter>`, `close`, and `shot`, which draws the screen again and sends its pixels. `tools/Capture-PanelScreen.ps1 -Port COM18 -Path screen.png -Command 'page settings'` turns them into a PNG (enlarged twice, at 192 dpi); the manual's pictures of the panel are made so.

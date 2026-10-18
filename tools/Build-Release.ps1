@@ -88,7 +88,7 @@ Copy-Item (Join-Path $PSScriptRoot 'Flash-Firmware.ps1'), (Join-Path $PSScriptRo
 
 Step 'Panel firmware'
 $panelOut = Join-Path $build 'panel-raw'
-& $cli compile --fqbn 'esp32:esp32:esp32' --libraries (Join-Path $root 'firmware\libraries') --warnings default `
+& $cli compile --fqbn 'esp32:esp32:esp32:PartitionScheme=huge_app' --libraries (Join-Path $root 'firmware\libraries') --warnings default `
     --output-dir $panelOut (Join-Path $root 'firmware\AudioDspLabPanel')
 if ($LASTEXITCODE -ne 0 -and -not (Test-Path (Join-Path $panelOut 'AudioDspLabPanel.ino.merged.bin'))) {
     throw "The panel firmware did not compile (exit code $LASTEXITCODE)."

@@ -157,8 +157,10 @@ Audio-DSP-Lab $version
 1. Flash the firmware: firmware\Flash-Firmware.cmd (see docs\Installation).
 2. Start AudioDspLab.exe, choose the board's COM port, Connect.
    Without a board: choose "Simulator (demo)".
+3. Optional, the front panel (an ESP32-2432S028R "CYD" on the board's panel
+   port, also for WiFi control): firmware\Flash-Panel.cmd (see docs\Panel).
 
-Documentation: docs\Manual, docs\Installation, docs\Protocol
+Documentation: docs\Manual, docs\Installation, docs\Panel, docs\Protocol
 Project: https://github.com/andiepp/Audio-DSP-Lab
 "@ | Set-Content (Join-Path $package 'README.txt') -Encoding utf8
 

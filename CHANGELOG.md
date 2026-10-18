@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## 1.1 — front panel and WiFi control
 
-- A second protocol port for a front panel (an ESP32 CYD display board): UART2 on GPIO37 (RX) and GPIO4 (TX) at 115200 baud. The PC application and the panel can work side by side; a value one sets reaches the other as an event. The synthesizer's MIDI port no longer claims GPIO4.
-- A front panel on an ESP32-2432S028R ("CYD") display board: the home screen, each application's parameters as tiles with a value editor, the output switch, and a knob strip in the knob colours whose knobs open the value their pot plays; the equalizer's curve, station keys with names and the stream title for the radio, Start/Stop, progress and a plot for the analyzer's sweep, section keys with the filter's and the envelopes' graphs for the synthesizer, and a settings screen (pot control, power-up, brightness).
-- WiFi control through the front panel: the panel joins the board's WiFi networks (`wifi secrets`, panel port only) and takes the PC application on TCP port 7000 (`audio-dsp-lab.local`); the application's port list offers "Network: <address>", set up in the WiFi dialog's new Front panel section. The board's new `panel` request and `! wifi` / `! panel` events serve it. The panel firmware now builds with the Huge APP partition scheme.
-- The panel's Response plot has a measurement cursor: touch or drag on it for the nearest point's frequency and both levels. It connects and reconnects by itself (docs/Panel.md). `Flash-Panel.cmd` flashes it; the release carries its image.
+Firmware 1.1, protocol 1 (new requests and events only), application 1.1, panel firmware 1.1.
+
+- **A front panel** on an ESP32-2432S028R ("CYD") display board, on a three-wire cable to the board (docs/Panel.md): the home screen and a settings screen (pot control, power-up, brightness); each application's parameters as tiles with a value editor; the output switch; a knob strip in the knob colours whose knobs open the value their pot plays; the equalizer's curve; station keys with names and the stream title for the radio; Start/Stop, progress, a plot and a measurement cursor for the analyzer; section keys with the filter's and the envelopes' graphs for the synthesizer. It connects and reconnects by itself and follows changes made by the pots, the PC application and scripts live. `Flash-Panel.cmd` flashes it; the release carries its image.
+- **WiFi control through the panel:** the panel joins the board's WiFi networks and takes the PC application on TCP port 7000 (`audio-dsp-lab.local`). The application's port list offers "Network: <address>", set up in the WiFi dialog's new Front panel section.
+- **The board's panel port:** a second protocol port on UART2 (GPIO37 RX, GPIO4 TX, 115200 baud); a value one port sets reaches the other as an event. New: `wifi secrets` (panel port only), the `panel` request, and the `! wifi` and `! panel` events. The synthesizer's MIDI port no longer claims GPIO4.
+- **The manual** has a chapter on the front panel, with screenshots taken from the panel itself (`tools/Capture-PanelScreen.ps1`).
 
 ## 1.0 — first public release
 

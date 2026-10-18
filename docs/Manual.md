@@ -2,7 +2,7 @@
 
 As of 2026-10-18.
 
-Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, a frequency response analyzer, a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.0 and application 1.0, and the optional front panel.
+Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, a frequency response analyzer, a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.1 and application 1.1, and the optional front panel (panel firmware 1.1).
 
 ![Audio-DSP-Lab: the PC sets values over USB, the board does the audio](images/overview.png)
 
@@ -376,7 +376,7 @@ The window follows what you do in the console: after a request that changes some
 
 ```
 > info
-ok Audio-DSP-Lab 1.0 1 esp32-pico-kit
+ok Audio-DSP-Lab 1.1 1 esp32-pico-kit
 > status
 ok sigmastudio running none
 > apps

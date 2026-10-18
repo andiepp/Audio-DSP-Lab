@@ -1,6 +1,6 @@
 # Installation guide
 
-As of 2026-10-17, for firmware 1.0 and application 1.0.
+As of 2026-10-18, for firmware 1.1 and application 1.1.
 
 This guide takes you from an Elektor Audio-DSP-FX board to a running Audio-DSP-Lab: prepare the board, flash the firmware, install the application, connect. Plan about 20 minutes.
 
@@ -112,6 +112,10 @@ Connect the keyboard's 5-pin DIN MIDI Out to K5 with a DIN-to-3.5 mm cable of **
 ## 8. Optional: SigmaStudio
 
 For your own DSP programs, install Analog Devices **SigmaStudio 4.7** and connect the **USBi** to the board's I2C header. Select **SigmaStudio** in the application (or let the board start in it): the DSP then runs your program from the EEPROM and you can download and write the EEPROM at any time. See [SigmaStudio.md](SigmaStudio.md).
+
+## 9. Optional: the front panel
+
+A touch panel on an ESP32-2432S028R ("CYD") display board runs the applications without a PC and lets the PC application work over WiFi. Three wires connect it to the board (CYD GPIO22 to the board's GPIO37, CYD GPIO35 to GPIO4, and GND); `firmware\Flash-Panel.cmd` writes its firmware over the CYD's own USB port. Wiring, power and use: [the front panel guide](Panel.md).
 
 ## Updating
 

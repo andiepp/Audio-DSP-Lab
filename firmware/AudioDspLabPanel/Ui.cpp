@@ -106,6 +106,29 @@ static int repeats = 0;
 
 // --- text ------------------------------------------------------------------------------
 
+// the fonts carry ASCII only: text from the board (stream titles, station
+// names, UTF-8) spelled with it, "Zwischentoene" for "Zwischentöne"
+static String readable(const String &text) {
+  static const char *const latin[64] = {
+    "A", "A", "A", "A", "Ae", "A", "AE", "C", "E", "E", "E", "E", "I", "I", "I", "I",
+    "D", "N", "O", "O", "O", "O", "Oe", "x", "O", "U", "U", "U", "Ue", "Y", "Th", "ss",
+    "a", "a", "a", "a", "ae", "a", "ae", "c", "e", "e", "e", "e", "i", "i", "i", "i",
+    "d", "n", "o", "o", "o", "o", "oe", ":", "o", "u", "u", "u", "ue", "y", "th", "y",
+  };
+  String result;
+  for (unsigned i = 0; i < text.length(); i++) {
+    const uint8_t c = (uint8_t)text[i];
+    if (c < 0x80) {
+      result += (char)c;
+    } else if (c == 0xC3 && i + 1 < text.length() && ((uint8_t)text[i + 1] & 0xC0) == 0x80) {
+      result += latin[((uint8_t)text[++i]) & 0x3F];         // U+00C0 .. U+00FF
+    } else if ((c & 0xC0) == 0xC0) {
+      result += '?';                                        // another character: its lead byte
+    }                                                       // its continuation bytes: dropped
+  }
+  return result;
+}
+
 static String pretty(const String &name) {
   String text = name;
   text.replace("-", " ");
@@ -428,7 +451,7 @@ static void onBrightness(lv_event_t *e) {
 static lv_obj_t *settingLine(const char *text, const char *hint) {
   lv_obj_t *line = lv_obj_create(content);
   plainBox(line, COLOUR_CARD);
-  lv_obj_set_size(line, lv_pct(100), hint != nullptr ? 46 : 36);
+  lv_obj_set_size(line, lv_pct(100), hint != nullptr ? 44 : 34);
   lv_obj_set_style_radius(line, 6, 0);
   lv_obj_t *name = label(line, text, &lv_font_montserrat_14, COLOUR_TEXT);
   lv_obj_align(name, hint != nullptr ? LV_ALIGN_TOP_LEFT : LV_ALIGN_LEFT_MID, 8, hint != nullptr ? 5 : 0);
@@ -466,9 +489,9 @@ static void refreshSettings() {
   if (settingsInfo == nullptr) return;
   setChecked(settingsPotSwitch, board.potControl);
   setChecked(startupSwitch, board.startupRestores);
-  String info = String(PANEL_NAME " " PANEL_VERSION "\n") +
-                "Board: Audio-DSP-Lab " + board.firmware +
-                (board.kit == "esp32-pico-kit-1" ? ", ESP32-PICO-KIT-1" : board.kit.length() > 0 ? ", ESP32-PICO-KIT V4" : "") +
+  // two lines: the page has room for no more
+  String info = String("Panel " PANEL_VERSION ", board firmware ") + board.firmware +
+                (board.kit == "esp32-pico-kit-1" ? " on ESP32-PICO-KIT-1" : board.kit.length() > 0 ? " on ESP32-PICO-KIT V4" : "") +
                 "\nLink: " + (board.linked ? "connected, 115200 baud" : "not connected");
   lv_label_set_text(settingsInfo, info.c_str());
 }
@@ -529,7 +552,7 @@ static void buildRadioHeader() {
   stationKeys.clear();
   for (int slot = 0; slot < 8; slot++) {
     const String name = slot < (int)board.stations.size() && board.stations[slot].length() > 0
-                          ? board.stations[slot] : String(slot + 1);
+                          ? readable(board.stations[slot]) : String(slot + 1);
     lv_obj_t *key = button(keys, name.c_str(), 73, 34);
     lv_obj_t *text = lv_obj_get_child(key, 0);
     lv_obj_set_style_text_font(text, &lv_font_montserrat_12, 0);
@@ -555,8 +578,8 @@ static void refreshRadio() {
   const int index = linkFindParam("station");
   const int slot = index >= 0 ? board.params[index].value.toInt() : -1;
   const String name = slot >= 0 && slot < (int)board.stations.size() ? board.stations[slot] : String();
-  lv_label_set_text(radioStation, name.length() > 0 ? name.c_str() : "Radio");
-  lv_label_set_text(radioTitle, board.title.c_str());
+  lv_label_set_text(radioStation, name.length() > 0 ? readable(name).c_str() : "Radio");
+  lv_label_set_text(radioTitle, readable(board.title).c_str());
   String state = radioWords(board.radioState);
   if (board.radioState == "playing" && board.radioRate > 0) state += String(", ") + (board.radioRate / 1000.0f) + " kHz";
   lv_label_set_text(radioState, state.c_str());
@@ -1137,4 +1160,32 @@ void uiPoll() {
     seenVersion = board.version;
     refresh();
   }
+}
+
+// commands on the USB port, for screenshots and tests: "page home|app|settings",
+// "section osc|filter|env|lfo|perf|all", "edit <parameter>", "close"
+void uiCommand(const String &line) {
+  if (line.startsWith("page ")) {
+    const String name = line.substring(5);
+    editorClose();
+    page = name == "settings" ? PAGE_SETTINGS : name == "app" ? PAGE_APPLICATION : PAGE_HOME;
+    if (page == PAGE_SETTINGS) linkReadSettings();
+  } else if (line.startsWith("section ")) {
+    const String name = line.substring(8);
+    for (int i = 0; i < sectionCount; i++) {
+      String title = sectionTitles[i];
+      title.toLowerCase();
+      if (title == name) section = (Section)i;
+    }
+  } else if (line.startsWith("edit ")) {
+    uiPoll();
+    const int index = linkFindParam(line.substring(5).c_str());
+    if (index >= 0) editorOpen(index);
+  } else if (line == "close") {
+    editorClose();
+  } else {
+    Serial.printf("? %s\n", line.c_str());
+    return;
+  }
+  Serial.printf("ok %s\n", line.c_str());
 }

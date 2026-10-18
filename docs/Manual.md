@@ -1,8 +1,8 @@
 # Manual
 
-As of 2026-10-17.
+As of 2026-10-18.
 
-Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, a frequency response analyzer, a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.0 and application 1.0.
+Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, a frequency response analyzer, a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.0 and application 1.0, and the optional front panel.
 
 ![Audio-DSP-Lab: the PC sets values over USB, the board does the audio](images/overview.png)
 
@@ -12,6 +12,7 @@ Audio-DSP-Lab has two parts:
 
 - **The firmware** runs on the board's ESP32. It writes each application's DSP program into the ADAU1701's EEPROM, computes filter coefficients, reads the pots and MIDI, streams the radio and makes the generator's signal and the synthesizer's sound. It talks to the PC over the board's USB port with a simple text protocol.
 - **The application** (`AudioDspLab.exe`) is the PC's front panel. It shows one page per application, sets every value, and shows what the board reports, including the changes you make with the board's pots.
+- **The front panel** (optional) is a small touch display on a cable to the board, an ESP32 "CYD": it runs the applications without a PC. See [The front panel](#the-front-panel).
 
 The board keeps working without the PC: once an application runs, you can close the window and keep playing. The board can also start an application by itself at power-up.
 
@@ -552,6 +553,68 @@ with Board("COM5") as board:
 ### A serial terminal
 
 Any serial terminal works too: 921600 baud, 8N1, **DTR and RTS off** (asserting them resets the ESP32), line end LF. Type `events on` to see the board's events.
+
+## The front panel
+
+The board can have a front panel of its own: an **ESP32-2432S028R** display board, sold as the "CYD" (cheap yellow display), 2.8 inches, 320 × 240 pixels, with a resistive touch screen. It sits on a three-wire cable to the board's panel port and runs every application without a PC: choose an application, switch the output, set any value, start a sweep, change the radio station. The panel and the PC application work side by side; what one changes, the other shows.
+
+Wiring, power and flashing are in [the front panel guide](Panel.md). In short: CYD GPIO22 to the board's GPIO37, CYD GPIO35 to the board's GPIO4, GND to GND, and `Flash-Panel.cmd` writes the panel firmware.
+
+### Home and settings
+
+![Home: the six applications, the running one in teal, Pot control, and the knob strip](images/panel/home.png)
+
+The panel connects by itself: "Connecting to the board" until the board answers, then the home screen. The six keys start an application and open its page; the running one is teal. **Pot control** switches whether the board's pots set values.
+
+Every screen has the same frame. The top bar shows the page's name, a dot that is teal while the link stands (red without it), and, on an application's page, the **Output** switch and the house key back home. The **knob strip** at the bottom names what each pot plays now, in the knob colours: P1 blue, P2 green, P3 yellow, P4 red. Tap a knob there to set that value on the panel. The CYD's LED is green while the link stands, red without it, and amber while a synthesizer note sounds.
+
+![Settings: pot control, the power-up choice, brightness, versions and link](images/panel/settings.png)
+
+The gear key on the home screen opens the **settings**: Pot control; **At power-up: last application**, the board's power-up choice (off: the SigmaStudio mode, see [Power-up](#power-up)); the display's **Brightness**, which the panel keeps; and the versions of the panel and the board's firmware with the state of the link.
+
+### Values
+
+![The generator's page: a tile per parameter, a dot for the pot that plays it](images/panel/generator.png)
+
+An application's page shows its parameters as tiles, two to a row, each with its value; a coloured dot marks the ones a pot plays. A page longer than the screen scrolls when you drag it; the bar at the right edge shows where you are. A tap on a tile changes its value: a switch toggles at once, a choice opens a key for each choice, and a number opens the editor.
+
+![The editor: minus and plus, the step, x10 and the slider](images/panel/editor.png)
+
+In the editor **−** and **+** step the value; hold them to repeat, and after a few repeats the steps grow tenfold. The step shown below the value suits the value: a percent of it for wide ranges such as a frequency, a fixed step otherwise; **x10** makes it ten times larger. The slider covers the whole range, logarithmically for frequencies. **Done** closes the editor. While you hold a key, the panel sends only the newest value, so it never falls behind.
+
+### The applications' pages
+
+![The equalizer: the response of the three bands, the gains and the volume](images/panel/equalizer.png)
+
+**Equalizer.** The response of the three bands, ±15 dB from 20 Hz to 20 kHz, a dot at each band's frequency, computed as the board computes its filters. The gains and the volume come first; the band frequencies follow when you scroll.
+
+![The radio: the station, its stream title, the station keys and the volume](images/panel/radio.png)
+
+**Radio.** The station playing, its stream title running below it, and the connection: playing with its sample rate, connecting, or no network. The eight station keys carry the stations' names; the volume is the tile below them, and bass, middle and treble are on the pots and in the knob strip. Station names and URLs, and WiFi networks, are entered in the PC application. The panel's font has no accents: "Zwischentöne" reads "Zwischentoene".
+
+![Response: the last sweep, Start sweep in the plot's corner, the sweep's settings](images/panel/response.png)
+
+**Response.** The plot of the last sweep, the left channel teal and the right blue, from 20 Hz to 20 kHz, scaled to the 60 dB below its loudest point. **Start sweep** in the plot's corner starts a sweep and switches the output on; it reads **Stop** while the sweep runs, and the points measured stand beside it. The start and stop frequencies, the points per decade and the level are the tiles below.
+
+![The synthesizer's filter section: the response at the cutoff, dashed at the contour's peak](images/panel/synth-filter.png)
+
+**Synth.** Keys choose a section of the synthesizer's 48 parameters: **Osc** (the three oscillators and the noise), **Filter**, **Env** (the loudness envelope), **LFO** (both LFOs, PWM and the filter's LFO), **Perf** (glide, bend, velocity, volume, the MIDI channel), or **All**. **Filter** draws the filter's response at middle C, solid at the cutoff and dashed where the contour takes it at its peak.
+
+![The synthesizer's envelope section: loudness solid, the filter's contour dashed](images/panel/synth-envelope.png)
+
+**Env** draws the loudness envelope, solid, and the filter's contour, dashed, from the key down through a held stretch to the end of the release, at one time scale.
+
+**SigmaStudio.** The page says that your program runs; the knob strip shows the pots going to the DSP's ADC inputs.
+
+### When the panel does not connect
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| "Connecting to the board" stays | The board's firmware has no panel port (older than this release) | Flash the board's firmware from this release |
+| | TX and RX swapped, or GND missing | CYD GPIO22 to the board's GPIO37, CYD GPIO35 to GPIO4, GND to GND |
+| The link drops now and then | GPIO37 floats while the panel restarts | Fit the 10 kΩ pull-up from GPIO37 to 3.3 V |
+| Touches land beside their target | Another CYD's touch calibration | Tap the corners and adjust `Config.h` (see the front panel guide) |
+| Colours swapped or the picture upside down | The two-USB CYD with its ST7789 display | Build the panel firmware with `DISPLAY_ST7789` set to 1 |
 
 ## Troubleshooting
 

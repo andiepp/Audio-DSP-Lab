@@ -14,4 +14,7 @@
 void uiBegin();
 void uiPoll();
 
+#include <Arduino.h>
+void uiCommand(const String &line);   // a command from the USB port (screenshots, tests)
+
 #endif

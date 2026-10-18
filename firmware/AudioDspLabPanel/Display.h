@@ -13,6 +13,7 @@
 
 void displayBegin();      // LVGL, the display, the touch, the LED
 void displayPoll();       // LVGL's timers: call often
+void displayCapture();    // the screen's pixels over USB (a screenshot)
 
 // the backlight, 10 .. 100 %, kept in the panel's flash
 void displaySetBrightness(int percent);

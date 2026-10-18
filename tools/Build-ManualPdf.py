@@ -226,10 +226,23 @@ def make_code(lines):
     return t
 
 
+def image_dpi(full):
+    """The resolution an image declares, or None (then it takes the full width)."""
+    try:
+        from PIL import Image as PilImage
+        with PilImage.open(full) as picture:
+            dpi = picture.info.get('dpi')
+        return float(dpi[0]) if dpi and dpi[0] > 1 else None
+    except Exception:
+        return None
+
+
 def make_image(path, alt):
     full = os.path.join(BASE, path)
     iw, ih = ImageReader(full).getSize()
-    w = FRAME_W
+    # an image with its resolution set (the panel's screenshots) keeps its size
+    dpi = image_dpi(full)
+    w = min(FRAME_W, iw / dpi * 72) if dpi else FRAME_W
     h = w * ih / iw
     img = Image(full, width=w, height=h)
     return KeepTogether([Spacer(1, 4), img, Paragraph(alt, caption)])

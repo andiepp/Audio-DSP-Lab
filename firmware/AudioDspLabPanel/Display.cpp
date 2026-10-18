@@ -34,16 +34,45 @@ static void displayWrite(const uint8_t *cmd, size_t cmdSize, const uint8_t *para
   displaySpi.endTransaction();
 }
 
+// the window the next pixels go to, as LVGL's driver sets it (column and
+// page address set, in the turned coordinates the controller works in)
+static uint16_t windowX1, windowX2, windowY1, windowY2;
+static bool capturing = false;
+
 static void sendCommand(lv_display_t *, const uint8_t *cmd, size_t cmdSize, const uint8_t *param, size_t paramSize) {
+  if (cmdSize == 1 && paramSize == 4 && (cmd[0] == 0x2A || cmd[0] == 0x2B)) {
+    const uint16_t from = (param[0] << 8) | param[1];
+    const uint16_t to = (param[2] << 8) | param[3];
+    if (cmd[0] == 0x2A) { windowX1 = from; windowX2 = to; }
+    else { windowY1 = from; windowY2 = to; }
+  }
   displayWrite(cmd, cmdSize, param, paramSize);
 }
 
 // LVGL renders RGB565 little-endian; the controller takes the high byte
-// first over its 8-bit bus
+// first over its 8-bit bus. While capturing, the same bytes go to the USB
+// port too, after a line naming their window.
 static void sendColour(lv_display_t *display, const uint8_t *cmd, size_t cmdSize, uint8_t *param, size_t paramSize) {
   lv_draw_sw_rgb565_swap(param, paramSize / 2);
   displayWrite(cmd, cmdSize, param, paramSize);
+  if (capturing) {
+    Serial.printf("~area %u %u %u %u\n", windowX1, windowY1, windowX2, windowY2);
+    Serial.write(param, paramSize);
+  }
   lv_display_flush_ready(display);
+}
+
+// the whole screen drawn again, its pixels sent over USB as well
+// (tools/Capture-PanelScreen.ps1 makes a PNG of them)
+void displayCapture() {
+  Serial.flush();
+  Serial.printf("~shot %d %d\n", DISPLAY_WIDTH, DISPLAY_HEIGHT);
+  capturing = true;
+  lv_obj_invalidate(lv_screen_active());
+  lv_obj_invalidate(lv_layer_top());
+  lv_refr_now(nullptr);
+  capturing = false;
+  Serial.print("~end\n");
 }
 
 // --- touch ----------------------------------------------------------------------------

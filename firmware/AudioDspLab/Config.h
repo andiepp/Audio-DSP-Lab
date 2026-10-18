@@ -25,6 +25,7 @@
 
 // --- serial protocol (docs/Protocol.md) ---------------------------------------
 #define PROTOCOL_BAUD_RATE            921600
+#define PROTOCOL_PANEL_BAUD_RATE      115200  // the panel port: a cable, not USB
 #define PROTOCOL_LINE_MAX             320     // one request, without its line end
 #define PROTOCOL_RX_BUFFER            1024
 #define PROTOCOL_TX_BUFFER            2048
@@ -51,7 +52,9 @@
 #define PIN_DAC_MUX0                  5       // 74HC4053 select X: DAC X (GPIO25) to ADC2 or ADC1
 #define PIN_DAC_MUX1                  15      // 74HC4053 select Y: DAC Y (GPIO26) to ADC0 or ADC3
 #define PIN_MIDI_IN                   38      // K5 -> opto-coupler IC3 (synthesizer only)
-#define PIN_MIDI_OUT                  4       // R36 not fitted: leads nowhere
+#define PIN_MIDI_OUT                  4       // R36 not fitted: leads nowhere (now the panel port's TX)
+#define PIN_PANEL_RX                  37      // panel port (UART2) RX: module pin 24, input-only, not connected on the board
+#define PIN_PANEL_TX                  4       // panel port (UART2) TX: the R36 pad (MIDI out, not fitted)
 
 // --- I2C devices --------------------------------------------------------------
 #define I2C_CLOCK_HZ                  400000

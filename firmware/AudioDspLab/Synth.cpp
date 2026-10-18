@@ -489,10 +489,12 @@ bool synthBegin() {
 
   if (!audioOutStart()) return false;
 
-  // both pins named: UART1's default pins on the ESP32 are GPIO9 and 10,
-  // the firmware's I2C bus. GPIO4 (MIDI out) leads nowhere without R36.
+  // the RX pin named: UART1's default pins on the ESP32 are GPIO9 and 10,
+  // the firmware's I2C bus; with a pin named the core takes no defaults and
+  // leaves TX unattached. GPIO4 (MIDI out, leading nowhere without R36) is
+  // the panel port's TX.
   Serial1.setRxBufferSize(MIDI_RX_BUFFER);
-  Serial1.begin(MIDI_BAUD_RATE, SERIAL_8N1, PIN_MIDI_IN, PIN_MIDI_OUT);
+  Serial1.begin(MIDI_BAUD_RATE, SERIAL_8N1, PIN_MIDI_IN, -1);   // receive only: GPIO4 is the panel port's TX
   Serial1.onReceiveError(onUartError);
   midiOpen = true;
 

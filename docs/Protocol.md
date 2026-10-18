@@ -7,6 +7,7 @@ The board speaks a line-based text protocol on its USB serial port. You can use 
 ## Contents
 
 - [Port settings](#port-settings)
+- [The panel port](#the-panel-port)
 - [Lines](#lines)
 - [Values](#values)
 - [Errors](#errors)
@@ -28,6 +29,25 @@ The board speaks a line-based text protocol on its USB serial port. You can use 
 Only one program can own the port at a time: the application, a terminal or a script.
 
 After a reset the ESP32's boot ROM prints a few lines at 115200 baud, which look like garbage at 921600. Then the firmware sends `! ready ...`. A host ignores every line that does not start with `ok`, `err`, `* ` or `! `.
+
+## The panel port
+
+A second port speaks the same protocol over a cable, for a front panel such as an ESP32 "CYD" display board: the board keeps running without a PC, and the panel and the PC application can work side by side.
+
+| Setting | Value |
+| --- | --- |
+| Board side | UART2: RX on **GPIO37** (module pin 24, not connected on the board), TX on **GPIO4** (the pad of R36, "MIDI out", not fitted) |
+| Wiring | panel TX to GPIO37, panel RX to GPIO4, and GND; 3.3 V logic on both sides |
+| Baud rate | 115200, 8N1, no flow control |
+| Pull-up | 10 kΩ from GPIO37 to 3.3 V recommended: GPIO37 is input-only and has none of its own, so the line floats while the panel is off or restarting |
+
+Both ports are equal. Each has its own requests, its own `events on` and its own responses; the board answers each request on the port it came from, one request at a time. Events go to every port with events on, and a value one port sets reaches the other as a `! value` event, so both show the same. The port that set it has its `ok` and gets no echo. `! ready` goes to both ports.
+
+Settings other than parameters (pot control, the power-up choice, stations, WiFi) are not reported across: a host that shows them reads them again when it needs them.
+
+A panel that starts or restarts while the board runs may leave noise in front of its first request; it starts with `echo <word>`, as the PC application does, and repeats it until the answer comes back.
+
+The synthesizer's MIDI port receives on GPIO38 only; GPIO4 belongs to the panel port.
 
 ## Lines
 
@@ -190,7 +210,7 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | --- | --- |
 | `! ready Audio-DSP-Lab <firmware> <protocol>` | the board has started (power-up, reset, `reset`) |
 | `! status <application> <state> <last-error>` | the application, its state or its last error changed |
-| `! value <name> <value>` | a parameter changed without a `set`: a pot turned it, or the generator's frequency followed a new P2 range. At most 20 per second for each parameter. |
+| `! value <name> <value>` | a parameter changed without a `set` on this port: a pot turned it, the generator's frequency followed a new P2 range, or the other port set it. At most 20 per second for each parameter. |
 | `! pots <p1> <p2> <p3> <p4>` | a pot moved by 80 counts (2 %) or more; at most 10 per second |
 | `! radio <state> <sample-rate>` | the radio's connection or sample rate changed |
 | `! title "<text>"` | the stream title changed |

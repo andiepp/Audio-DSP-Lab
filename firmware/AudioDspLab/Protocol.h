@@ -1,17 +1,20 @@
 // ****************************************************************************
 // ***                     S E R I A L   P R O T O C O L                    ***
 // ****************************************************************************
-//  Text lines on the USB serial port (921600 8N1), specified in
-//  docs/Protocol.md:
+//  Text lines on the USB serial port (921600 8N1) and on the panel port
+//  (UART2: RX GPIO37, TX GPIO4, 115200 8N1, for a front panel such as a
+//  CYD display), specified in docs/Protocol.md:
 //
 //    request    <command> [arguments]                   host -> board
 //    response   zero or more "* ..." data lines, then
 //               "ok [values]" or "err <code> <message>" board -> host
 //    event      "! <event> [values]"                     board -> host
 //
-//  The board answers requests in the order they came, one response each.
-//  Events are written only between responses, and only while "events on"
-//  is set, except "! ready", which every start sends.
+//  The board answers requests in the order they came, one response each,
+//  on the port that asked. Events are written only between responses, to
+//  each port that set "events on", except "! ready", which every start
+//  sends on both. A value one port sets is reported to the other as an
+//  event, so both hosts show the same.
 //
 //  Only the loop calls these; nothing else writes to the port.
 // ----------------------------------------------------------------------------

@@ -24,19 +24,55 @@
 #define EVENT_CHECK_MS                20
 
 // ----------------------------------------------------------------------------
+//  Ports
+// ----------------------------------------------------------------------------
+
+// The USB port and the panel port (a second UART for a front panel such as
+// a CYD display) speak the same protocol, each with its own request line,
+// its own "events on" and its own queue of value events. A response goes
+// to the port that asked; an event goes to every port with events on.
+struct Port {
+  HardwareSerial &serial;
+  char line[PROTOCOL_LINE_MAX + 1];
+  uint16_t lineLength;
+  bool lineOverflow;
+  bool eventsOn;
+  uint64_t pendingValues;                    // bit = parameter index
+  uint32_t valuesSentAt;
+};
+
+static Port ports[] = {
+  { Serial, {}, 0, false, false, 0, 0 },
+  { Serial2, {}, 0, false, false, 0, 0 },
+};
+static const uint8_t portCount = sizeof(ports) / sizeof(ports[0]);
+static Port *out = &ports[0];               // the port whose request is answered
+static bool broadcasting = false;           // events: to every port with events on
+
+// ----------------------------------------------------------------------------
 //  Output
 // ----------------------------------------------------------------------------
+
+static void writeTo(Port &port, const char *prefix, const char *text) {
+  port.serial.print(prefix);
+  port.serial.print(text);
+  port.serial.print('\n');
+}
 
 static void writeLine(const char *prefix, const char *format, va_list args) {
   char text[OUTPUT_LINE_MAX];
   vsnprintf(text, sizeof(text), format, args);
-  Serial.print(prefix);
-  Serial.print(text);
-  Serial.print('\n');
+  if (!broadcasting) {
+    writeTo(*out, prefix, text);
+    return;
+  }
+  for (uint8_t i = 0; i < portCount; i++) {
+    if (ports[i].eventsOn) writeTo(ports[i], prefix, text);
+  }
 }
 
 static void ok() {
-  Serial.print("ok\n");
+  out->serial.print("ok\n");
 }
 
 static void okf(const char *format, ...) {
@@ -100,7 +136,7 @@ static const char *errorText(uint8_t code) {
 }
 
 static void fail(uint8_t code) {
-  Serial.printf("err %s %s\n", errorWord(code), errorText(code));
+  out->serial.printf("err %s %s\n", errorWord(code), errorText(code));
 }
 
 // ok, or the error the module reported
@@ -358,12 +394,8 @@ static void formatLevel(char *out, size_t size, int32_t value) {
 //  Requests
 // ----------------------------------------------------------------------------
 
-static char line[PROTOCOL_LINE_MAX + 1];
-static uint16_t lineLength = 0;
-static bool lineOverflow = false;
 static char *tokens[MAX_TOKENS];
 static uint8_t tokenCount = 0;
-static bool eventsOn = false;
 
 // splits the line in place: words separated by spaces, or "quoted text"
 // with \" and \\ inside; false on an open quote or too many words
@@ -435,15 +467,16 @@ static void cmdInfo() {
 }
 
 static void syncEvents();
+static void reportToOtherPorts(uint8_t paramId);
 
 static void cmdEvents() {
   if (tokenCount > 1) {
     bool on;
     if (!switchArgument(on)) return fail(ERR_BAD_ARGUMENT);
-    if (on && !eventsOn) syncEvents();
-    eventsOn = on;
+    if (on && !out->eventsOn) syncEvents();
+    out->eventsOn = on;
   }
-  okf("%s", onOff(eventsOn));
+  okf("%s", onOff(out->eventsOn));
 }
 
 static void cmdStatus() {
@@ -518,7 +551,7 @@ static void cmdPots() {
 
 static void cmdReset() {
   ok();
-  Serial.flush();
+  out->serial.flush();
   delay(50);
   ESP.restart();
 }
@@ -616,11 +649,12 @@ static void cmdSet() {
     char minimum[24], maximum[24];
     formatFixed(minimum, sizeof(minimum), def->minimum, decimals);
     formatFixed(maximum, sizeof(maximum), def->maximum, decimals);
-    Serial.printf("err out-of-range %s %s..%s %s\n", tokens[1], minimum, maximum,
+    out->serial.printf("err out-of-range %s %s..%s %s\n", tokens[1], minimum, maximum,
                   info != nullptr ? info->unit : "");
     return;
   }
   if (error != ERR_NONE) return fail(error);
+  reportToOtherPorts(paramId);
   int32_t current = requested;
   appParamGet(paramId, current);
   char value[40];
@@ -931,7 +965,7 @@ static void cmdHelp() {
 }
 
 static void dispatch() {
-  if (!tokenize(line)) return fail(ERR_BAD_ARGUMENT);
+  if (!tokenize(out->line)) return fail(ERR_BAD_ARGUMENT);
   if (tokenCount == 0) return;              // an empty line asks nothing
   for (const Command &command : commands) {
     if (strcasecmp(command.name, tokens[0]) == 0) {
@@ -950,8 +984,6 @@ static uint32_t eventsCheckedAt = 0;
 static uint8_t seenApp = 0xFF;
 static uint8_t seenState = 0xFF;
 static uint8_t seenError = 0xFF;
-static volatile uint64_t pendingValues = 0;      // bit = parameter index
-static uint32_t valuesSentAt = 0;
 static uint16_t seenPots[POT_COUNT];
 static uint32_t potsSentAt = 0;
 static uint8_t seenRadioState = 0xFF;
@@ -963,20 +995,41 @@ static uint16_t seenReference = 0;
 static char seenVoice[64];
 static uint32_t voiceSentAt = 0;
 
-static void onParamChanged(uint8_t paramId, int32_t) {
-  if (!eventsOn) return;
+static uint64_t paramBit(uint8_t paramId) {
   for (uint8_t i = 0; i < appParamCount() && i < 64; i++) {
-    if (appParamAt(i)->id == paramId) pendingValues |= (1ULL << i);
+    if (appParamAt(i)->id == paramId) return 1ULL << i;
+  }
+  return 0;
+}
+
+// a pot changed a value: every port with events on hears of it
+static void onParamChanged(uint8_t paramId, int32_t) {
+  const uint64_t bit = paramBit(paramId);
+  for (uint8_t i = 0; i < portCount; i++) {
+    if (ports[i].eventsOn) ports[i].pendingValues |= bit;
+  }
+}
+
+// a port set a value: the other ports hear of it; the one that set it has
+// its answer, and an echo could undo a newer value it is about to send
+static void reportToOtherPorts(uint8_t paramId) {
+  const uint64_t bit = paramBit(paramId);
+  for (uint8_t i = 0; i < portCount; i++) {
+    if (&ports[i] != out && ports[i].eventsOn) ports[i].pendingValues |= bit;
   }
 }
 
 // the trackers take what is there now: "events on" reports changes, not
-// the state the PC is about to read anyway
+// the state the host is about to read anyway. While another port already
+// follows events, the trackers stay as they are, so it misses nothing.
 static void syncEvents() {
+  out->pendingValues = 0;
+  for (uint8_t i = 0; i < portCount; i++) {
+    if (ports[i].eventsOn) return;
+  }
   seenApp = appActive();
   seenState = appState();
   seenError = appLastError();
-  pendingValues = 0;
   for (uint8_t i = 0; i < POT_COUNT; i++) seenPots[i] = potRaw(i);
   seenRadioState = radioState();
   seenRate = radioSampleRate();
@@ -994,7 +1047,7 @@ static void statusEvents() {
   const uint8_t error = appLastError();
   if (app == seenApp && state == seenState && error == seenError) return;
   if (app != seenApp) {
-    pendingValues = 0;                       // another application, other parameters
+    for (uint8_t i = 0; i < portCount; i++) ports[i].pendingValues = 0;   // other parameters now
     seenPoints = 0;
     seenTitle[0] = '\0';
     seenVoice[0] = '\0';
@@ -1005,11 +1058,15 @@ static void statusEvents() {
   eventf("status %s %s %s", appWord(app), stateWord((AppState)state), errorWord(error));
 }
 
-static void valueEvents(uint32_t now) {
-  if (pendingValues == 0 || now - valuesSentAt < PROTOCOL_VALUE_EVENT_MS) return;
-  valuesSentAt = now;
-  const uint64_t pending = pendingValues;
-  pendingValues = 0;
+// each port's own queue, to that port alone
+static void valueEvents(Port &port, uint32_t now) {
+  if (!port.eventsOn || port.pendingValues == 0 || now - port.valuesSentAt < PROTOCOL_VALUE_EVENT_MS) return;
+  port.valuesSentAt = now;
+  const uint64_t pending = port.pendingValues;
+  port.pendingValues = 0;
+  Port *asked = out;
+  out = &port;
+  broadcasting = false;
   const uint8_t app = appActive();
   for (uint8_t i = 0; i < appParamCount() && i < 64; i++) {
     if ((pending & (1ULL << i)) == 0) continue;
@@ -1022,6 +1079,8 @@ static void valueEvents(uint32_t now) {
     if (info != nullptr) eventf("value %s %s", info->name, value);
     else eventf("value p%u %s", def->id, value);
   }
+  out = asked;
+  broadcasting = true;
 }
 
 static void potEvents(uint32_t now) {
@@ -1086,13 +1145,16 @@ static void events() {
   const uint32_t now = millis();
   if (now - eventsCheckedAt < EVENT_CHECK_MS) return;
   eventsCheckedAt = now;
+  broadcasting = true;
   statusEvents();
-  if (appInServiceMode()) return;
-  valueEvents(now);
-  potEvents(now);
-  radioEvents();
-  sweepEvents();
-  voiceEvents(now);
+  if (!appInServiceMode()) {
+    for (uint8_t i = 0; i < portCount; i++) valueEvents(ports[i], now);
+    potEvents(now);
+    radioEvents();
+    sweepEvents();
+    voiceEvents(now);
+  }
+  broadcasting = false;
 }
 
 // ----------------------------------------------------------------------------
@@ -1105,32 +1167,52 @@ void protocolInit() {
   Serial.setRxBufferSize(PROTOCOL_RX_BUFFER);
   Serial.setTxBufferSize(PROTOCOL_TX_BUFFER);
   Serial.begin(PROTOCOL_BAUD_RATE);
+  // the panel port: GPIO37 is input-only and has no pull-up of its own (the
+  // panel's idle line, or 10k to 3.3 V, holds it high); GPIO4 led nowhere
+  Serial2.setRxBufferSize(PROTOCOL_RX_BUFFER);
+  Serial2.setTxBufferSize(PROTOCOL_TX_BUFFER);
+  Serial2.begin(PROTOCOL_PANEL_BAUD_RATE, SERIAL_8N1, PIN_PANEL_RX, PIN_PANEL_TX);
   appOnParamChanged(onParamChanged);
 }
 
 void protocolReady() {
   // a fresh line first: the ESP32's boot ROM may have left text on the port
-  Serial.print('\n');
-  eventf("ready %s %d.%d %d", FIRMWARE_NAME, FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, PROTOCOL_VERSION);
+  for (uint8_t i = 0; i < portCount; i++) {
+    ports[i].serial.print('\n');
+    out = &ports[i];
+    eventf("ready %s %d.%d %d", FIRMWARE_NAME, FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, PROTOCOL_VERSION);
+  }
+  out = &ports[0];
+}
+
+static void readRequests(Port &port) {
+  out = &port;
+  while (port.serial.available() > 0) {
+    const int c = port.serial.read();
+    if (c == '\r') continue;
+    if (c == '\n') {
+      if (port.lineOverflow) {
+        fail(ERR_LINE_TOO_LONG);
+      } else {
+        port.line[port.lineLength] = '\0';
+        dispatch();
+      }
+      port.lineLength = 0;
+      port.lineOverflow = false;
+      continue;
+    }
+    if (port.lineLength < PROTOCOL_LINE_MAX) port.line[port.lineLength++] = (char)c;
+    else port.lineOverflow = true;
+  }
 }
 
 void protocolPoll() {
-  while (Serial.available() > 0) {
-    const int c = Serial.read();
-    if (c == '\r') continue;
-    if (c == '\n') {
-      if (lineOverflow) {
-        fail(ERR_LINE_TOO_LONG);
-      } else {
-        line[lineLength] = '\0';
-        dispatch();
-      }
-      lineLength = 0;
-      lineOverflow = false;
-      continue;
+  for (uint8_t i = 0; i < portCount; i++) readRequests(ports[i]);
+  out = &ports[0];
+  for (uint8_t i = 0; i < portCount; i++) {
+    if (ports[i].eventsOn) {
+      events();
+      break;
     }
-    if (lineLength < PROTOCOL_LINE_MAX) line[lineLength++] = (char)c;
-    else lineOverflow = true;
   }
-  if (eventsOn) events();
 }

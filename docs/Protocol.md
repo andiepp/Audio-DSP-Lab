@@ -110,6 +110,8 @@ The board keeps numbers in hundredths. A request with more decimals is rounded, 
 | `no-sweep` | there is no complete sweep to keep as the reference |
 | `store-failed` | the ESP32's flash (NVS) refused the write |
 | `no-clock` | no clock arrives on the DSP's serial output (MP10, MP11) |
+| `busy` | the distortion measurement uses the serial output (`diag capture`, `diag record`) |
+| `no-memory` | not enough free memory for the distortion measurement |
 
 ## Commands
 
@@ -185,6 +187,13 @@ The station that plays is the radio's parameter `station`. The radio tries netwo
 | `reference` | `* <index> <hz> <left> <right>` per point, `ok` | |
 | `reference keep` | `ok` | the last complete sweep becomes the reference (kept in flash) |
 | `level` | `ok <left> <right>` | the input levels at the tone playing now, in dBFS |
+| `thd` | `ok <state> <results> <hz> <level-L> <thd-L> <thdn-L> <level-R> <thd-R> <thdn-R>` | the distortion measurement: state `idle`, `running`, `failed` (the serial output lost its clocks); the latest result, `-` before the first |
+| `thd start` | as `thd` | measures continuously, a result about every 1.2 s; switches the output on, stops a sweep, puts the tone on the nearest FFT bin (multiples of 5.859 Hz) |
+| `thd stop` | as `thd` | the tone goes back to `tone`; the last result is kept |
+| `harmonics` | `* <n> <hz> <dBc-L> <dBc-R>` per harmonic, `ok` | H2 to H10 of the latest result, as far as they lie below 20 kHz |
+| `spectrum [<points>]` | `* <index> <hz> <dB-L> <dB-R>` per point, `ok` | the latest result's spectrum, 20 Hz to 24 kHz on a logarithmic axis, in 256 points or 16, 32, 64, 128 (each the strongest of its group); per point the strongest FFT bin as a sine's peak in dBFS |
+
+The distortion measurement takes the line input as the DSP sends it to its serial output: 8192 frames per channel (0.17 s), a Blackman-Harris window, an FFT, the power of 4 captures averaged. The fundamental is the strongest bin from 20 Hz to 20 kHz; its level is its peak in dBFS. `thd` is the harmonics H2 to H10 below 20 kHz against the fundamental, `thdn` everything from 20 Hz to 20 kHz but the fundamental, both in dB (as a percentage: 100 x 10^(dB/20)). The tone sits on a bin of the FFT, so it does not leak into its neighbours. A sweep and the distortion measurement exclude each other: each stops the other.
 
 ### Synthesizer
 
@@ -216,6 +225,7 @@ The station that plays is the radio's parameter `station`. The radio tries netwo
 | `diag heap` | `ok <free> <largest-block> <lowest-free>`: the ESP32's heap in bytes: free now, the largest block one allocation can get, the lowest free since the start |
 | `diag clocks` | `ok <lrclk-hz> <bclk-hz> <data-edges> <data-high>`: the DSP's serial output clocks (MP10 on GPIO13, MP11 on GPIO19), counted with the ESP32's pulse counter (the program images give about 48000 and 3072000; the DSP's sample rate shows its MCLK), the rising edges a second on the data pin (MP6 on GPIO32; 0 while the program sends nothing there) and the share of readings that found it high, in % |
 | `diag capture [<frames>]` | `ok <rate> <frames> <rms-L> <peak-L> <hz-L> <rms-R> <peak-R> <hz-R> <first-word> <dc-L> <dc-R>`: the DSP's serial output (MP6 on GPIO32) as the ESP32's second I2S port receives it, 9728 frames (0.2 s) or 256 to 48000: the frame rate timed by the ESP32's clock, per channel the RMS without the DC and the peak from it in dBFS (a full-scale sine: -3.01 RMS, 0 peak; -200 for silence) and the frequency of the crossings of the DC, the first left slot as received, and per channel the DC as a fraction of full scale; `err no-clock` without clocks. It uses no I2C, so it also works in service mode |
+| `diag thd-test` | `ok <hz> <level-L> <thd-L> <thdn-L> <H2-L> <H3-L> <level-R> <thd-R> <thdn-R> <H2-R> <H3-R>`: the distortion analysis on a synthetic signal, -20 dBFS at 1001.95 Hz with H3 at -60 dBc on the left and H2 at -80 dBc on the right; the answer gives those back |
 | `diag record [<frames>]` | `* <frame> ...` 16 frames a line, each the left and right sample as 6 hex digits (24 bits, two's complement), then `ok <rate> <frames>`: 4096 contiguous frames (or 256 to 4096, rounded up to a multiple of 256) of the serial output |
 
 Addresses and words may be written in hexadecimal with `0x`.
@@ -236,6 +246,7 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | `! title "<text>"` | the stream title changed |
 | `! point <index> <hz> <left> <right> <rel-left> <rel-right>` | the analyzer measured a point |
 | `! sweep <state> <measured> <total> <reference-points>` | the sweep progressed or ended, or a reference was kept |
+| `! thd <state> <results> <hz> <level-L> <thd-L> <thdn-L> <level-R> <thd-R> <thdn-R>` | the distortion measurement has a new result, or its state changed; as `thd` |
 | `! voice <note> <gate> <held> <channel> <mod-strip> <stage>` | the synthesizer's voice changed; at most 20 per second |
 
 ## Parameters per application

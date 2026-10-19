@@ -8,6 +8,7 @@
 #include "Radio.h"
 #include "Analyzer.h"
 #include "DacMux.h"
+#include "Distortion.h"
 #include "StudioBackup.h"
 #include "Synth.h"
 #include "Generator.h"
@@ -366,8 +367,9 @@ static bool respSetting(int32_t) {
   return true;
 }
 
+// while the distortion measurement runs, the tone sits on a bin's centre
 static bool respTone(int32_t value) {
-  return analyzerSetTone(value);
+  return analyzerSetTone(distortionState() == DISTORTION_RUNNING ? distortionSnap(value) : value);
 }
 
 static const ParamDef responseParams[] = {

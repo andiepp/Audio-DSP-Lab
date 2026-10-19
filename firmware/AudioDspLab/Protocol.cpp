@@ -8,6 +8,7 @@
 #include "Dsp.h"
 #include "Radio.h"
 #include "Analyzer.h"
+#include "Distortion.h"
 #include "DacMux.h"
 #include "StudioBackup.h"
 #include "Eeprom24.h"
@@ -115,6 +116,8 @@ static const char *errorWord(uint8_t code) {
     case ERR_WRONG_APPLICATION:   return "wrong-application";
     case ERR_NO_SWEEP:            return "no-sweep";
     case ERR_STORE_FAILED:        return "store-failed";
+    case ERR_BUSY:                return "busy";
+    case ERR_NO_MEMORY:           return "no-memory";
     case ERR_NO_CLOCK:            return "no-clock";
     default:                      return "failed";
   }
@@ -135,6 +138,8 @@ static const char *errorText(uint8_t code) {
     case ERR_WRONG_APPLICATION:   return "not available in the running application";
     case ERR_NO_SWEEP:            return "no complete sweep to keep";
     case ERR_STORE_FAILED:        return "storing in flash failed";
+    case ERR_BUSY:                return "the distortion measurement uses the serial output";
+    case ERR_NO_MEMORY:           return "not enough free memory";
     case ERR_NO_CLOCK:            return "no clock on the DSP's serial output (MP10, MP11)";
     default:                      return "failed";
   }
@@ -778,6 +783,14 @@ static void cmdPanel() {
 
 // --- response analyzer ---------------------------------------------------------------
 
+// the distortion measurement ends and the tone goes back to the one set
+static void stopDistortion() {
+  if (distortionState() == DISTORTION_IDLE && !distortionBusy()) return;
+  distortionStop();
+  int32_t tone;
+  if (appRunning(APP_RESPONSE) && appParamGet(RESP_TONE, tone) == ERR_NONE) analyzerSetTone(tone);
+}
+
 static void sweepStatus() {
   okf("%s %u %u %u", sweepWord(analyzerState()), analyzerPointCount(), analyzerPointTotal(),
       analyzerReferenceCount());
@@ -793,6 +806,7 @@ static void cmdSweep() {
     appParamGet(RESP_STOP, stop);
     appParamGet(RESP_POINTS_PER_DECADE, perDecade);
     if (stop <= start) return fail(ERR_OUT_OF_RANGE);
+    stopDistortion();
     uint8_t error = appParamSet(RESP_OUTPUT, 1);
     if (error == ERR_NONE) error = analyzerStartSweep(start, stop, perDecade);
     if (error != ERR_NONE) return fail(error);
@@ -824,6 +838,103 @@ static void cmdPoints() {
   if (tokenCount > 2) return fail(ERR_BAD_ARGUMENT);
   AnalyzerPoint point;
   for (uint16_t i = (uint16_t)from; i < analyzerPointCount() && analyzerPoint(i, point); i++) pointLine(false, i, point);
+  ok();
+}
+
+// --- distortion measurement ---------------------------------------------------
+
+static DistortionResult thdResult;          // static: 2 KB, too much for the stack
+
+static const char *thdWord(DistortionState state) {
+  switch (state) {
+    case DISTORTION_RUNNING: return "running";
+    case DISTORTION_FAILED:  return "failed";
+    default:                 return "idle";
+  }
+}
+
+// a level in dB with two decimals, or '-'
+static void formatDb(char *out, size_t size, float value) {
+  if (isnan(value)) snprintf(out, size, "-");
+  else snprintf(out, size, "%.2f", value);
+}
+
+// <state> <count> <hz> <level-L> <thd-L> <thdn-L> <level-R> <thd-R> <thdn-R>
+static void thdText(char *text, size_t size) {
+  const char *state = thdWord(distortionState());
+  if (!distortionResult(thdResult)) {
+    snprintf(text, size, "%s 0 - - - - - - -", state);
+    return;
+  }
+  char v[6][16];
+  for (int c = 0; c < 2; c++) {
+    formatDb(v[3 * c], sizeof(v[0]), thdResult.channel[c].levelDb);
+    formatDb(v[3 * c + 1], sizeof(v[0]), thdResult.channel[c].thdDb);
+    formatDb(v[3 * c + 2], sizeof(v[0]), thdResult.channel[c].thdnDb);
+  }
+  snprintf(text, size, "%s %lu %.2f %s %s %s %s %s %s", state, (unsigned long)thdResult.count,
+           thdResult.hertz, v[0], v[1], v[2], v[3], v[4], v[5]);
+}
+
+static void thdStatus() {
+  char text[160];
+  thdText(text, sizeof(text));
+  okf("%s", text);
+}
+
+static void cmdThd() {
+  if (tokenCount == 1) return thdStatus();
+  if (tokenCount != 2) return fail(ERR_BAD_ARGUMENT);
+  if (!runningApp(APP_RESPONSE)) return;
+  if (is(1, "start")) {
+    analyzerStopSweep();
+    uint8_t error = appParamSet(RESP_OUTPUT, 1);
+    if (error == ERR_NONE) error = distortionStart();
+    if (error != ERR_NONE) return fail(error);
+    // the tone on a bin's centre: it falls on its bin exactly
+    int32_t tone;
+    if (appParamGet(RESP_TONE, tone) == ERR_NONE) analyzerSetTone(distortionSnap(tone));
+    return thdStatus();
+  }
+  if (is(1, "stop")) {
+    stopDistortion();
+    return thdStatus();
+  }
+  fail(ERR_BAD_ARGUMENT);
+}
+
+static void cmdHarmonics() {
+  if (tokenCount != 1) return fail(ERR_BAD_ARGUMENT);
+  if (distortionResult(thdResult)) {
+    for (int h = 2; h <= DISTORTION_HARMONIC_LAST; h++) {
+      if (isnan(thdResult.channel[0].harmonicDb[h])) break;
+      char l[16], r[16];
+      formatDb(l, sizeof(l), thdResult.channel[0].harmonicDb[h]);
+      formatDb(r, sizeof(r), thdResult.channel[1].harmonicDb[h]);
+      dataf("%d %.2f %s %s", h, h * thdResult.hertz, l, r);
+    }
+  }
+  ok();
+}
+
+// the spectrum in `points` points (16 .. 256, a power of two): each the
+// strongest of its group
+static void cmdSpectrum() {
+  long points = DISTORTION_SPECTRUM_POINTS;
+  if (tokenCount == 2 && !parseLong(tokens[1], 16, DISTORTION_SPECTRUM_POINTS, points)) return fail(ERR_BAD_ARGUMENT);
+  if (tokenCount > 2 || (points & (points - 1)) != 0) return fail(ERR_BAD_ARGUMENT);
+  if (distortionResult(thdResult)) {
+    const int group = DISTORTION_SPECTRUM_POINTS / points;
+    for (int i = 0; i < points; i++) {
+      float l = -1000, r = -1000;
+      for (int j = i * group; j < (i + 1) * group; j++) {
+        l = max(l, thdResult.spectrumDb[0][j]);
+        r = max(r, thdResult.spectrumDb[1][j]);
+      }
+      const float hz = sqrtf(distortionSpectrumHertz(i * group) * distortionSpectrumHertz((i + 1) * group - 1));
+      dataf("%d %.1f %.2f %.2f", i, hz, l, r);
+    }
+  }
   ok();
 }
 
@@ -997,6 +1108,21 @@ static void cmdDiag() {
   // the rate timed against the ESP32's clock, the frames taken, per channel
   // RMS and peak in dBFS and the frequency of its zero crossings, and the
   // first left slot as it came (no I2C: works in service mode too)
+  if (is(1, "thd-test") && tokenCount == 2) {
+    const uint8_t error = distortionSelfTest(thdResult);
+    if (error != ERR_NONE) return fail(error);
+    char v[10][16];
+    for (int c = 0; c < 2; c++) {
+      formatDb(v[5 * c], sizeof(v[0]), thdResult.channel[c].levelDb);
+      formatDb(v[5 * c + 1], sizeof(v[0]), thdResult.channel[c].thdDb);
+      formatDb(v[5 * c + 2], sizeof(v[0]), thdResult.channel[c].thdnDb);
+      formatDb(v[5 * c + 3], sizeof(v[0]), thdResult.channel[c].harmonicDb[2]);
+      formatDb(v[5 * c + 4], sizeof(v[0]), thdResult.channel[c].harmonicDb[3]);
+    }
+    return okf("%.2f %s %s %s %s %s %s %s %s %s %s", thdResult.hertz, v[0], v[1], v[2], v[3], v[4], v[5], v[6],
+               v[7], v[8], v[9]);
+  }
+  if ((is(1, "capture") || is(1, "record")) && distortionBusy()) return fail(ERR_BUSY);
   if (is(1, "capture") && (tokenCount == 2 || tokenCount == 3)) {
     long frames = CAPTURE_DEFAULT_FRAMES;
     if (tokenCount == 3 && !parseLong(tokens[2], CAPTURE_MIN_FRAMES, CAPTURE_MAX_FRAMES, frames)) {
@@ -1080,13 +1206,16 @@ static const Command commands[] = {
   { "sweep",     cmdSweep,      "sweep [start|stop]" },
   { "points",    cmdPoints,     "points [<from>]" },
   { "reference", cmdReference,  "reference [keep]" },
+  { "thd",       cmdThd,        "thd [start|stop]" },
+  { "harmonics", cmdHarmonics,  "harmonics" },
+  { "spectrum",  cmdSpectrum,   "spectrum [<points>]" },
   { "level",     cmdLevel,      "level" },
   { "voice",     cmdVoice,      "voice" },
   { "midi",      cmdMidi,       "midi" },
   { "load",      cmdLoad,       "load" },
   { "aux",       cmdAux,        "aux" },
   { "backup",    cmdBackup,     "backup" },
-  { "diag",      cmdDiag,       "diag boot|dsp|dspset|eeprom|scan|tone|meter|raw|heap|capture|clocks ..." },
+  { "diag",      cmdDiag,       "diag boot|dsp|dspset|eeprom|scan|tone|meter|raw|heap|capture|record|clocks|thd-test ..." },
   { "reset",     cmdReset,      "reset" },
 };
 
@@ -1121,6 +1250,8 @@ static uint8_t seenRadioState = 0xFF;
 static uint32_t seenRate = 0;
 static char seenTitle[RADIO_TEXT_LENGTH];
 static uint8_t seenSweepState = 0xFF;
+static uint8_t seenThdState = DISTORTION_IDLE;
+static uint32_t seenThdCount = 0;
 static uint16_t seenPoints = 0;
 static uint16_t seenReference = 0;
 static char seenVoice[64];
@@ -1166,6 +1297,8 @@ static void syncEvents() {
   seenRate = radioSampleRate();
   radioStreamTitle(seenTitle, sizeof(seenTitle));
   seenSweepState = analyzerState();
+  seenThdState = distortionState();
+  seenThdCount = distortionCount();
   seenPoints = analyzerPointCount();
   seenReference = analyzerReferenceCount();
   seenVoice[0] = '\0';
@@ -1262,6 +1395,18 @@ static void sweepEvents() {
   eventf("sweep %s %u %u %u", sweepWord((SweepState)state), count, analyzerPointTotal(), reference);
 }
 
+static void thdEvents() {
+  if (!appRunning(APP_RESPONSE)) return;
+  const uint8_t state = distortionState();
+  const uint32_t count = distortionCount();
+  if (state == seenThdState && count == seenThdCount) return;
+  seenThdState = state;
+  seenThdCount = count;
+  char text[160];
+  thdText(text, sizeof(text));
+  eventf("thd %s", text);
+}
+
 static void voiceEvents(uint32_t now) {
   if (!appRunning(APP_SYNTH) || now - voiceSentAt < PROTOCOL_VOICE_EVENT_MS) return;
   char voice[64];
@@ -1291,6 +1436,7 @@ static void events() {
     potEvents(now);
     radioEvents();
     sweepEvents();
+    thdEvents();
     voiceEvents(now);
   }
   broadcasting = false;

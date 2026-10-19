@@ -13,6 +13,7 @@ The **compiled firmware** also contains the following works. Whoever distributes
 | Helix MP3 and AAC decoders, inside codec-helix | RealNetworks, Inc. | RealNetworks Public Source License 1.0 (RPSL), or the RealNetworks Community Source License (RCSL) | `firmware/libraries/codec-helix-main/src/libhelix-mp3`, `.../libhelix-aac` (licences: `RPSL.txt`, `RCSL.txt`, `LICENSE.txt`) |
 | Arduino core for the ESP32 3.3.10 | Espressif Systems and contributors | GNU LGPL v2.1 | installed with the Arduino IDE's Boards Manager; github.com/espressif/arduino-esp32 |
 | ESP-IDF 5 components (FreeRTOS, lwIP, WiFi, NVS, drivers) | Espressif Systems and contributors | Apache 2.0, MIT and others, per component | linked through the Arduino core; github.com/espressif/esp-idf |
+| esp-dsp (the FFT of the distortion measurement) | Espressif Systems | Apache 2.0 | linked through the Arduino core; github.com/espressif/esp-dsp |
 
 Their source code is in this repository (`firmware/libraries`) or at the addresses above.
 

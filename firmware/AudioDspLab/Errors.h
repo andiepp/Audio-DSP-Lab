@@ -27,6 +27,8 @@ enum ErrorCode : uint8_t {
   ERR_NO_SWEEP              = 0x17, // no complete sweep to keep as the reference
   ERR_STORE_FAILED          = 0x18, // NVS refused a write
   ERR_NO_CLOCK              = 0x19, // no clock on the DSP's serial output
+  ERR_BUSY                  = 0x1A, // the serial output capture is in use (the distortion measurement)
+  ERR_NO_MEMORY             = 0x1B, // not enough free heap for the measurement
 };
 
 #endif

@@ -2,6 +2,7 @@
 #include "Config.h"
 #include "Errors.h"
 #include "Dsp.h"
+#include "Distortion.h"
 #include <Arduino.h>
 #include <Preferences.h>
 #include <math.h>
@@ -179,6 +180,7 @@ bool analyzerBegin(int32_t centiHz) {
 }
 
 void analyzerEnd() {
+  distortionStop();
   if (sweepState == SWEEP_RUNNING) sweepState = SWEEP_STOPPED;
   phase = PHASE_NONE;
 }

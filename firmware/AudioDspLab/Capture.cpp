@@ -101,13 +101,18 @@ static bool readChunk(i2s_chan_handle_t rx, uint32_t timeoutMs) {
   return i2s_channel_read(rx, chunk, sizeof(chunk), &got, timeoutMs) == ESP_OK && got == sizeof(chunk);
 }
 
-bool captureMeasure(uint32_t frames, CaptureResult &result, int32_t *keep) {
-  result = CaptureResult();
-  i2s_chan_handle_t rx = NULL;
+// the second port as a slave, enabled, its first full chunk received and
+// what the DMA buffered meanwhile dropped: the next chunk read has just
+// come in. False (and the port deleted) without clocks
+static bool openRx(i2s_chan_handle_t &rx) {
+  rx = NULL;
   i2s_chan_config_t channelConfig = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_1, I2S_ROLE_SLAVE);
   channelConfig.dma_desc_num = 4;
   channelConfig.dma_frame_num = CAPTURE_CHUNK_FRAMES;
-  if (i2s_new_channel(&channelConfig, NULL, &rx) != ESP_OK) return false;
+  if (i2s_new_channel(&channelConfig, NULL, &rx) != ESP_OK) {
+    rx = NULL;
+    return false;
+  }
 
   i2s_std_config_t config = {
     .clk_cfg  = I2S_STD_CLK_DEFAULT_CONFIG(DSP_SERIAL_OUT_RATE),
@@ -128,53 +133,85 @@ bool captureMeasure(uint32_t frames, CaptureResult &result, int32_t *keep) {
   config.clk_cfg.clk_src = I2S_CLK_SRC_PLL_160M;
   config.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_512;
 
-  bool clocked = false;
-  if (i2s_channel_init_std_mode(rx, &config) == ESP_OK && i2s_channel_enable(rx) == ESP_OK) {
-    clocked = readChunk(rx, CAPTURE_CLOCK_TIMEOUT_MS);
-    // what the DMA buffered meanwhile goes; the timing starts with a chunk
-    // that has just come in
-    while (clocked && readChunk(rx, 0)) {}
-    clocked = clocked && readChunk(rx, CAPTURE_CLOCK_TIMEOUT_MS);
-    const uint32_t startedAt = micros();
-    uint32_t lastAt = startedAt;
-    const uint32_t chunks = (frames + CAPTURE_CHUNK_FRAMES - 1) / CAPTURE_CHUNK_FRAMES;
-    uint32_t done = 0;
-    Stats left = {}, right = {};
-    while (clocked && done < chunks) {
-      if (!readChunk(rx, CAPTURE_CLOCK_TIMEOUT_MS)) {
-        clocked = false;
-        break;
-      }
-      lastAt = micros();
-      if (done == 0) {
-        result.firstWord = (uint32_t)chunk[0];
-        int64_t sumLeft = 0, sumRight = 0;
-        for (int i = 0; i < CAPTURE_CHUNK_FRAMES; i++) {
-          sumLeft += chunk[2 * i] >> 8;
-          sumRight += chunk[2 * i + 1] >> 8;
-        }
-        left.offset = (int32_t)(sumLeft / CAPTURE_CHUNK_FRAMES);
-        right.offset = (int32_t)(sumRight / CAPTURE_CHUNK_FRAMES);
-      }
-      // 24 bits, MSB first, at the top of each 32-bit slot
-      for (int i = 0; i < CAPTURE_CHUNK_FRAMES; i++) {
-        take(left, chunk[2 * i] >> 8);
-        take(right, chunk[2 * i + 1] >> 8);
-      }
-      if (keep != nullptr) {
-        int32_t *to = keep + 2 * CAPTURE_CHUNK_FRAMES * done;
-        for (int i = 0; i < 2 * CAPTURE_CHUNK_FRAMES; i++) to[i] = chunk[i] >> 8;
-      }
-      done++;
-    }
-    if (clocked && lastAt != startedAt) {
-      result.frames = done * CAPTURE_CHUNK_FRAMES;
-      result.rate = result.frames * 1e6f / (lastAt - startedAt);
-      finish(left, result.frames, result.rate, result.left);
-      finish(right, result.frames, result.rate, result.right);
-    }
-    i2s_channel_disable(rx);
+  if (i2s_channel_init_std_mode(rx, &config) != ESP_OK || i2s_channel_enable(rx) != ESP_OK) {
+    i2s_del_channel(rx);
+    rx = NULL;
+    return false;
   }
+  bool clocked = readChunk(rx, CAPTURE_CLOCK_TIMEOUT_MS);
+  while (clocked && readChunk(rx, 0)) {}
+  if (!clocked) {
+    i2s_channel_disable(rx);
+    i2s_del_channel(rx);
+    rx = NULL;
+  }
+  return clocked;
+}
+
+static void closeRx(i2s_chan_handle_t rx) {
+  i2s_channel_disable(rx);
   i2s_del_channel(rx);
+}
+
+bool captureMeasure(uint32_t frames, CaptureResult &result, int32_t *keep) {
+  result = CaptureResult();
+  i2s_chan_handle_t rx;
+  if (!openRx(rx)) return false;
+  bool clocked = readChunk(rx, CAPTURE_CLOCK_TIMEOUT_MS);
+  const uint32_t startedAt = micros();
+  uint32_t lastAt = startedAt;
+  const uint32_t chunks = (frames + CAPTURE_CHUNK_FRAMES - 1) / CAPTURE_CHUNK_FRAMES;
+  uint32_t done = 0;
+  Stats left = {}, right = {};
+  while (clocked && done < chunks) {
+    if (!readChunk(rx, CAPTURE_CLOCK_TIMEOUT_MS)) {
+      clocked = false;
+      break;
+    }
+    lastAt = micros();
+    if (done == 0) {
+      result.firstWord = (uint32_t)chunk[0];
+      int64_t sumLeft = 0, sumRight = 0;
+      for (int i = 0; i < CAPTURE_CHUNK_FRAMES; i++) {
+        sumLeft += chunk[2 * i] >> 8;
+        sumRight += chunk[2 * i + 1] >> 8;
+      }
+      left.offset = (int32_t)(sumLeft / CAPTURE_CHUNK_FRAMES);
+      right.offset = (int32_t)(sumRight / CAPTURE_CHUNK_FRAMES);
+    }
+    // 24 bits, MSB first, at the top of each 32-bit slot
+    for (int i = 0; i < CAPTURE_CHUNK_FRAMES; i++) {
+      take(left, chunk[2 * i] >> 8);
+      take(right, chunk[2 * i + 1] >> 8);
+    }
+    if (keep != nullptr) {
+      int32_t *to = keep + 2 * CAPTURE_CHUNK_FRAMES * done;
+      for (int i = 0; i < 2 * CAPTURE_CHUNK_FRAMES; i++) to[i] = chunk[i] >> 8;
+    }
+    done++;
+  }
+  if (clocked && lastAt != startedAt) {
+    result.frames = done * CAPTURE_CHUNK_FRAMES;
+    result.rate = result.frames * 1e6f / (lastAt - startedAt);
+    finish(left, result.frames, result.rate, result.left);
+    finish(right, result.frames, result.rate, result.right);
+  }
+  closeRx(rx);
   return clocked && result.frames > 0;
+}
+
+bool captureSamples(uint32_t frames, float *left, float *right) {
+  i2s_chan_handle_t rx;
+  if (!openRx(rx)) return false;
+  const float scale = 1.0f / (8388608.0f * 256.0f);   // the 32-bit slot to full scale
+  bool clocked = true;
+  for (uint32_t done = 0; clocked && done < frames; done += CAPTURE_CHUNK_FRAMES) {
+    clocked = readChunk(rx, CAPTURE_CLOCK_TIMEOUT_MS);
+    for (int i = 0; clocked && i < CAPTURE_CHUNK_FRAMES; i++) {
+      left[done + i] = (chunk[2 * i] & ~0xFF) * scale;
+      right[done + i] = (chunk[2 * i + 1] & ~0xFF) * scale;
+    }
+  }
+  closeRx(rx);
+  return clocked;
 }

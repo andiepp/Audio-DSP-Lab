@@ -471,11 +471,11 @@
                     <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Margin="0,0,16,0">
                         <TextBlock Foreground="{StaticResource AudioLabDimText}" VerticalAlignment="Center" Margin="0,0,8,0" Text="Measure" />
                         <RadioButton x:Name="ResponseModeChoice" GroupName="AnalyzerMode" Foreground="{DynamicResource AudioLabText}" VerticalContentAlignment="Center"
-                                     Margin="0,0,10,0" Content="Frequency response" FontWeight="Bold"
+                                     Margin="0,0,10,0" Content="Frequency Response" FontWeight="Bold"
                                      IsChecked="{Binding IsResponseMode, Mode=OneWay}"
                                      Command="{Binding ShowModeCommand}" CommandParameter="response" />
                         <RadioButton x:Name="DistortionModeChoice" GroupName="AnalyzerMode" Foreground="{DynamicResource AudioLabText}" VerticalContentAlignment="Center"
-                                     Content="Distortion" FontWeight="Bold"
+                                     Content="THD" FontWeight="Bold"
                                      IsChecked="{Binding IsDistortionMode, Mode=OneWay}"
                                      Command="{Binding ShowModeCommand}" CommandParameter="distortion" />
                     </StackPanel>
@@ -593,7 +593,7 @@
                     <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,4,0,0">
                         <DockPanel>
                             <TextBlock Style="{StaticResource HintStyle}" Text="The tone on K3/K4 against what returns on K2, about every 1.6 s" />
-                            <TextBlock Style="{StaticResource AudioLabHeaderStyle}" Text="Distortion" />
+                            <TextBlock Style="{StaticResource AudioLabHeaderStyle}" Text="THD" />
                         </DockPanel>
                     </Border>
                     <UniformGrid Columns="4" Margin="2,0,2,0">

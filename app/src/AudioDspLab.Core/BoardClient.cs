@@ -40,7 +40,7 @@ public sealed class BoardClient : IDisposable
 
     public event Action<SynthVoice>? VoiceChanged;
 
-    /// <summary>The distortion measurement has a new result, or its state changed.</summary>
+    /// <summary>The THD measurement has a new result, or its state changed.</summary>
     public event Action<DistortionStatus>? DistortionChanged;
 
     public event Action<Exception>? Disconnected;
@@ -216,7 +216,7 @@ public sealed class BoardClient : IDisposable
             values.Count > 2 ? ProtocolText.ParseInteger(values[2]) : 0);
     }
 
-    // --- response analyzer --------------------------------------------------------
+    // --- analysis: Frequency Response and THD -------------------------------------
 
     public async Task<SweepStatus> GetSweepAsync(CancellationToken cancellationToken = default) =>
         SweepStatus.Parse((await SendAsync("sweep", cancellationToken).ConfigureAwait(false)).Values);

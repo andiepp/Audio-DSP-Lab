@@ -7,7 +7,7 @@ using AudioDspLab.Themes;
 namespace AudioDspLab.Controls;
 
 /// <summary>
-/// Draws the distortion measurement's spectrum on a logarithmic frequency
+/// Draws the THD measurement's spectrum on a logarithmic frequency
 /// axis, 20 Hz to 24 kHz, from -140 to 0 dBFS: left in gold, right in cyan
 /// (the sweep chart's colours), a mark over the fundamental and each
 /// harmonic with its order. Hovering shows the nearest point.

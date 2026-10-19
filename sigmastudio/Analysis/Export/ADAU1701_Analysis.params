@@ -258,7 +258,7 @@ Parameter Data :
 
 
 Parameter data for: IC 1 (Hexadecimal format starting at parameter address 0)
-See also ADAU1701_Response.hex file
+See also ADAU1701_Analysis.hex file
 0x00 , 	0x00 , 	0x00 , 	0xFF , 	
 0x00 , 	0x05 , 	0x55 , 	0x55 , 	
 0x00 , 	0x80 , 	0x00 , 	0x00 , 	

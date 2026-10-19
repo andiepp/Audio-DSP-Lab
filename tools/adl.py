@@ -206,7 +206,7 @@ class Board:
         return [dict(zip(keys, words)) for words in self.request("params").data]
 
     def sweep(self, start=None, stop=None, points_per_decade=None, timeout=120):
-        """Runs a sweep of the response analyzer and returns its points."""
+        """Runs a sweep of the analysis application's Frequency Response and returns its points."""
         for name, value in (("start", start), ("stop", stop), ("points-per-decade", points_per_decade)):
             if value is not None:
                 self.set(name, value)

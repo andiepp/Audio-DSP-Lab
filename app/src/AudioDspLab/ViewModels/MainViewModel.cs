@@ -249,7 +249,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string SignalHeading =>
         IsSigmaStudioSelected ? "SigmaStudio"
         : IsSynthSelected ? "Synthesizer"
-        : IsEqualizerPageShown || IsAnalyzerSelected ? "Response"
+        : IsAnalyzerSelected ? "Analysis"
+        : IsEqualizerPageShown ? "Response"
         : "Signal";
 
     /// <summary>idle, loading, running, failed or service; null while unknown.</summary>
@@ -768,7 +769,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private static string ShortName(string application) =>
         application switch
         {
-            Applications.Analyzer => "Response",
+            Applications.Analyzer => "Analysis",
             Applications.Synthesizer => "Synth",
             Applications.SigmaStudio => "SigmaStudio",
             _ => Applications.DisplayName(application)

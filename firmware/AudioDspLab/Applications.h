@@ -37,17 +37,17 @@
 #include <stddef.h>
 
 #define APP_NONE                      0x00
-#define APP_RESPONSE                  0x04
+#define APP_ANALYSIS                  0x04
 #define APP_SIGMASTUDIO               0x05
 #define APP_SYNTH                     0x06
 
-// response analyzer (0x04) parameters
-#define RESP_LEVEL                    1       // 0.01 dBFS, -60 .. 0, the output's level
-#define RESP_OUTPUT                   2       // 0 off, 1 on
-#define RESP_START                    3       // 0.01 Hz, 20 Hz .. 20 kHz, the sweep's first point
-#define RESP_STOP                     4       // 0.01 Hz, the sweep's last point
-#define RESP_POINTS_PER_DECADE        5       // 1 .. 40
-#define RESP_TONE                     6       // 0.01 Hz, the tone between sweeps
+// analysis (0x04) parameters
+#define ANA_LEVEL                    1       // 0.01 dBFS, -60 .. 0, the output's level
+#define ANA_OUTPUT                   2       // 0 off, 1 on
+#define ANA_START                    3       // 0.01 Hz, 20 Hz .. 20 kHz, the sweep's first point
+#define ANA_STOP                     4       // 0.01 Hz, the sweep's last point
+#define ANA_POINTS_PER_DECADE        5       // 1 .. 40
+#define ANA_TONE                     6       // 0.01 Hz, the tone between sweeps
 
 enum AppState : uint8_t {
   APP_STATE_IDLE    = 0,    // no application selected

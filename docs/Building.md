@@ -56,7 +56,9 @@ The build takes a few minutes the first time and uses about 61 % of the applicat
 | `DacMux.cpp/.h` | SigmaStudio mode: the pots to the DSP's auxiliary ADC through the ESP32's DACs and the 74HC4053 |
 | `StudioBackup.cpp/.h` | The copy of your SigmaStudio program in the SPIFFS partition |
 | `Radio.cpp/.h` | Internet radio: WiFi, stream, MP3 decoder, I2S, stations and networks in NVS |
-| `Analyzer.cpp/.h` | Response analyzer: sweep, readback, reference |
+| `Analyzer.cpp/.h` | Analysis, Frequency Response: sweep, readback, reference |
+| `Distortion.cpp/.h` | Analysis, THD: capture, window, FFT (esp-dsp), THD, THD+N, harmonics, spectrum, in a task of its own |
+| `Capture.cpp/.h` | The DSP's serial output on the ESP32's second I2S port; `diag capture`, `diag record`, `diag clocks` |
 | `Synth.cpp/.h` | Synthesizer: MIDI, oscillators, filter, envelopes, LFOs, the audio task |
 | `DspImage*.h` | The SigmaStudio self-boot images, generated |
 

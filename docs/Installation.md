@@ -61,7 +61,7 @@ In a classic **Command Prompt** (cmd.exe) the `.\` is not needed: `Flash-Firmwar
 
 Options after the port: `-Erase` wipes the whole flash first (every stored setting goes), `-Baud 115200` helps with a slow USB hub, for example `.\Flash-Firmware.cmd COM5 -Erase`. If esptool cannot enter the boot loader, hold the **BOOT** button of the ESP32 kit while flashing starts.
 
-The flash tool keeps what the board has stored: the WiFi networks, your stations, the analyzer's reference and the copy of your SigmaStudio program.
+The flash tool keeps what the board has stored: the WiFi networks, your stations, the analysis' Frequency Response reference and the copy of your SigmaStudio program.
 
 ### Option B: in the browser, without installing anything
 

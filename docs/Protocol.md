@@ -11,7 +11,7 @@ The board speaks a line-based text protocol on its USB serial port. You can use 
 - [Lines](#lines)
 - [Values](#values)
 - [Errors](#errors)
-- [Commands](#commands): [general](#general), [applications](#applications-and-parameters), [potentiometers and settings](#potentiometers-power-up-and-service-mode), [radio](#radio), [response analyzer](#response-analyzer), [synthesizer](#synthesizer), [SigmaStudio mode](#sigmastudio-mode), [diagnostics](#diagnostics)
+- [Commands](#commands): [general](#general), [applications](#applications-and-parameters), [potentiometers and settings](#potentiometers-power-up-and-service-mode), [radio](#radio), [analysis](#analysis-frequency-response-and-thd), [synthesizer](#synthesizer), [SigmaStudio mode](#sigmastudio-mode), [diagnostics](#diagnostics)
 - [Events](#events)
 - [Parameters per application](#parameters-per-application)
 - [A session](#a-session)
@@ -110,8 +110,8 @@ The board keeps numbers in hundredths. A request with more decimals is rounded, 
 | `no-sweep` | there is no complete sweep to keep as the reference |
 | `store-failed` | the ESP32's flash (NVS) refused the write |
 | `no-clock` | no clock arrives on the DSP's serial output (MP10, MP11) |
-| `busy` | the distortion measurement uses the serial output (`diag capture`, `diag record`) |
-| `no-memory` | not enough free memory for the distortion measurement |
+| `busy` | the THD measurement uses the serial output (`diag capture`, `diag record`) |
+| `no-memory` | not enough free memory for the THD measurement |
 
 ## Commands
 
@@ -147,7 +147,7 @@ Applications:
 | `generator` | 1 | signal generator: sine, rectangle, triangle, saw, inverse saw, noise on K3 and K4 |
 | `equalizer` | 2 | three-band equalizer from the line input K2 to K3 and K4 |
 | `radio` | 3 | internet radio over WiFi, through the equalizer |
-| `analyzer` | 4 | frequency response analyzer: sine out on K3/K4, measured on K2 |
+| `analyzer` | 4 | analysis: sine out on K3/K4, measured on K2; its Frequency Response (the sweep) and its THD |
 | `sigmastudio` | 5 | your own SigmaStudio program from the EEPROM |
 | `synthesizer` | 6 | monophonic synthesizer played from MIDI on K5 |
 
@@ -176,7 +176,9 @@ Applications:
 
 The station that plays is the radio's parameter `station`. The radio tries network 0 first, then network 1. Stations and networks are kept in the ESP32's flash.
 
-### Response analyzer
+### Analysis: Frequency Response and THD
+
+The application is `analyzer`, as before; its Frequency Response is the sweep, its THD the `thd` measurement.
 
 | Request | Response | Notes |
 | --- | --- | --- |
@@ -187,13 +189,13 @@ The station that plays is the radio's parameter `station`. The radio tries netwo
 | `reference` | `* <index> <hz> <left> <right>` per point, `ok` | |
 | `reference keep` | `ok` | the last complete sweep becomes the reference (kept in flash) |
 | `level` | `ok <left> <right>` | the input levels at the tone playing now, in dBFS |
-| `thd` | `ok <state> <results> <hz> <level-L> <thd-L> <thdn-L> <level-R> <thd-R> <thdn-R>` | the distortion measurement: state `idle`, `running`, `failed` (the serial output lost its clocks); the latest result, `-` before the first |
+| `thd` | `ok <state> <results> <hz> <level-L> <thd-L> <thdn-L> <level-R> <thd-R> <thdn-R>` | the THD measurement: state `idle`, `running`, `failed` (the serial output lost its clocks); the latest result, `-` before the first |
 | `thd start` | as `thd` | measures continuously, a result about every 1.6 s; switches the output on, stops a sweep, puts the tone on the nearest FFT bin (multiples of 5.859 Hz) |
 | `thd stop` | as `thd` | the tone goes back to `tone`; the last result is kept |
 | `harmonics` | `* <n> <hz> <dBc-L> <dBc-R>` per harmonic, `ok` | H2 to H10 of the latest result, as far as they lie below 20 kHz |
 | `spectrum [<points>]` | `* <index> <hz> <dB-L> <dB-R>` per point, `ok` | the latest result's spectrum, 20 Hz to 24 kHz on a logarithmic axis, in 256 points or 16, 32, 64, 128 (each the strongest of its group); per point the strongest FFT bin as a sine's peak in dBFS |
 
-The distortion measurement takes the line input as the DSP sends it to its serial output: 8192 frames per channel (0.17 s), a Blackman-Harris window, an FFT, the power of 4 captures per channel averaged (left and right take turns). It needs about 82 KB of the ESP32's heap, in one block of 32 KB and three of 16 KB, while it runs; `diag blocks` shows what the heap offers. The fundamental is the strongest bin from 20 Hz to 20 kHz; its level is its peak in dBFS. `thd` is the harmonics H2 to H10 below 20 kHz against the fundamental, `thdn` everything from 20 Hz to 20 kHz but the fundamental, both in dB (as a percentage: 100 x 10^(dB/20)). The tone sits on a bin of the FFT, so it does not leak into its neighbours. A sweep and the distortion measurement exclude each other: each stops the other.
+The THD measurement takes the line input as the DSP sends it to its serial output: 8192 frames per channel (0.17 s), a Blackman-Harris window, an FFT, the power of 4 captures per channel averaged (left and right take turns). It needs about 82 KB of the ESP32's heap, in one block of 32 KB and three of 16 KB, while it runs; `diag blocks` shows what the heap offers. The fundamental is the strongest bin from 20 Hz to 20 kHz; its level is its peak in dBFS. `thd` is the harmonics H2 to H10 below 20 kHz against the fundamental, `thdn` everything from 20 Hz to 20 kHz but the fundamental, both in dB (as a percentage: 100 x 10^(dB/20)). The tone sits on a bin of the FFT, so it does not leak into its neighbours. A sweep and the THD measurement exclude each other: each stops the other.
 
 ### Synthesizer
 
@@ -247,7 +249,7 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | `! title "<text>"` | the stream title changed |
 | `! point <index> <hz> <left> <right> <rel-left> <rel-right>` | the analyzer measured a point |
 | `! sweep <state> <measured> <total> <reference-points>` | the sweep progressed or ended, or a reference was kept |
-| `! thd <state> <results> <hz> <level-L> <thd-L> <thdn-L> <level-R> <thd-R> <thdn-R>` | the distortion measurement has a new result, or its state changed; as `thd` |
+| `! thd <state> <results> <hz> <level-L> <thd-L> <thdn-L> <level-R> <thd-R> <thdn-R>` | the THD measurement has a new result, or its state changed; as `thd` |
 | `! voice <note> <gate> <held> <channel> <mod-strip> <stage>` | the synthesizer's voice changed; at most 20 per second |
 
 ## Parameters per application
@@ -279,7 +281,7 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | `output` | switch | | off | |
 | `station` | integer (radio only) | 0 to 7 | 0 | |
 
-### analyzer
+### analyzer (Analysis)
 
 | Name | Kind | Range | Default | Pot |
 | --- | --- | --- | --- | --- |

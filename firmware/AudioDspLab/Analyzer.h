@@ -1,10 +1,11 @@
 // ****************************************************************************
-// ***                  R E S P O N S E   A N A L Y Z E R                   ***
+// ***       A N A L Y S I S :   F R E Q U E N C Y   R E S P O N S E        ***
 // ****************************************************************************
-//  Application 0x04: a sine on K3 and K4; on each channel of the
-//  line input K2 a band-pass tracking the sine, the absolute value and a
-//  smoothing low-pass, whose output the firmware reads back through the DSP's
-//  data capture registers. A level is the sine's peak in dBFS.
+//  Application 0x04, its Frequency Response: a sine on K3 and K4; on
+//  each channel of the line input K2 a band-pass tracking the sine, the
+//  absolute value and a smoothing low-pass, whose output the firmware
+//  reads back through the DSP's data capture registers. A level is the
+//  sine's peak in dBFS.
 //
 //  A sweep steps through points spaced evenly on a logarithmic axis; at
 //  each it sets the sine and both filters, waits until they settled and

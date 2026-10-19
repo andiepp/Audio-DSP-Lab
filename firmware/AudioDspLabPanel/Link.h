@@ -58,12 +58,21 @@ struct Board {
   String title;                 // the stream title
   std::vector<String> stations; // the eight slots' names
   uint32_t stationsVersion = 0;
-  // the response analyzer
+  // the analysis: its Frequency Response
   String sweepState;            // "idle", "running", "done", ...
   int sweepMeasured = 0;
   int sweepTotal = 0;
   std::vector<SweepPoint> points;
   uint32_t pointsVersion = 0;
+  // its THD: the latest result (NAN for '-') and its spectrum
+  String thdState;              // "idle", "running", "failed"
+  int thdResults = 0;
+  float thdHertz = NAN;
+  float thdLevel[2] = { NAN, NAN };   // the fundamental's peak, dBFS
+  float thd[2] = { NAN, NAN };        // dB
+  float thdn[2] = { NAN, NAN };
+  std::vector<SweepPoint> spectrum;   // 64 points: per point the strongest bin, dBFS
+  uint32_t spectrumVersion = 0;
 };
 
 extern Board board;
@@ -76,6 +85,7 @@ void linkSetParam(int index, const String &value);   // coalesced
 void linkSelectApplication(const char *name);
 void linkSetPotControl(bool on);
 void linkSweep(bool start);                          // starts or stops a sweep
+void linkDistortion(bool start);                     // starts or stops the THD measurement
 void linkReadSettings();                             // pot control and the power-up choice, read again
 void linkSetStartup(bool restores);
 

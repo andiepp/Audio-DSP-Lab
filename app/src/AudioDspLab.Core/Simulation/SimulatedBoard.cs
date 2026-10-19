@@ -349,7 +349,7 @@ public sealed class SimulatedBoard : ILineTransport
         Data("generator 1 \"Signal generator\"");
         Data("equalizer 2 \"Equalizer\"");
         Data("radio 3 \"Internet radio\"");
-        Data("analyzer 4 \"Response analyzer\"");
+        Data("analyzer 4 \"Analysis\"");
         Data("sigmastudio 5 \"SigmaStudio mode\"");
         Data("synthesizer 6 \"Synthesizer\"");
         Ok();

@@ -6,10 +6,10 @@ using AudioDspLab.Protocol;
 namespace AudioDspLab.ViewModels;
 
 /// <summary>
-/// The response analyzer: a sine on K3/K4 stepped through a sweep, the
-/// levels on K2 measured at each point, against a reference if one is kept;
-/// or, in its distortion mode, the tone's THD and THD+N on K2 with the
-/// harmonics and the spectrum, measured continuously by the board.
+/// The analysis application. Its Frequency Response: a sine on K3/K4
+/// stepped through a sweep, the levels on K2 measured at each point, against
+/// a reference if one is kept. Its THD: the tone's THD and THD+N on K2 with
+/// the harmonics and the spectrum, measured continuously by the board.
 /// </summary>
 public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
 {
@@ -86,7 +86,7 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
 
     public ICommand StopDistortionCommand { get; }
 
-    /// <summary>The page shows the distortion measurement instead of the sweep.</summary>
+    /// <summary>The page shows the THD measurement instead of the Frequency Response.</summary>
     public bool IsDistortionMode
     {
         get => isDistortionMode;
@@ -276,13 +276,13 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
                 await ApplyDistortionAsync(client, await client.StartDistortionAsync().ConfigureAwait(true)).ConfigureAwait(true);
                 Output.Apply(await client.GetAsync("output").ConfigureAwait(true), fromBoard: false);
                 ApplySweep(await client.GetSweepAsync().ConfigureAwait(true));
-            }, "Distortion measurement started.")
+            }, "THD measurement started.")
             : Task.CompletedTask;
 
     public Task StopDistortionAsync() =>
         CanStopDistortion
             ? Run(async client => await ApplyDistortionAsync(client, await client.StopDistortionAsync().ConfigureAwait(true))
-                .ConfigureAwait(true), "Distortion measurement stopped.")
+                .ConfigureAwait(true), "THD measurement stopped.")
             : Task.CompletedTask;
 
     /// <summary>

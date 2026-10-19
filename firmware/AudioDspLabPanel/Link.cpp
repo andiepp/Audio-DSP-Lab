@@ -10,7 +10,7 @@ Board board;
 enum RequestKind : uint8_t {
   REQ_SYNC, REQ_INFO, REQ_EVENTS, REQ_STATUS, REQ_POTCTL, REQ_PARAMS, REQ_POTS,
   REQ_SET, REQ_APP, REQ_SET_POTCTL, REQ_CHECK,
-  REQ_RADIO, REQ_STATIONS, REQ_SWEEP, REQ_POINTS, REQ_STARTUP,
+  REQ_RADIO, REQ_STATIONS, REQ_SWEEP, REQ_POINTS, REQ_STARTUP, REQ_THD, REQ_SPECTRUM,
   REQ_REMOTE,               // the PC's request: its answer goes back to the PC
   REQ_SECRETS,              // the board's WiFi networks, for the panel to join
   REQ_PANEL,                // the panel's network state, told to the board
@@ -25,6 +25,9 @@ struct Request {
 static std::vector<Request> queue;
 static bool waiting = false;            // a request is in flight
 static Request current;
+// the THD result whose spectrum was read last, and a spectrum on its way
+static int shownResults = -1;
+static bool spectrumAsked = false;
 static uint32_t sentAt = 0;
 static std::vector<String> dataLines;
 static char lineBuffer[LINK_LINE_MAX + 1];
@@ -183,6 +186,8 @@ static void readParams() {
   } else if (board.application == "analyzer") {
     enqueue("sweep", REQ_SWEEP);
     enqueue("points", REQ_POINTS);
+    shownResults = -1;
+    enqueue("thd", REQ_THD);
   }
 }
 
@@ -203,6 +208,35 @@ static void readPoint(const std::vector<String> &w, size_t from) {
   if (index < (int)board.points.size()) board.points[index] = point;
   else if (index == (int)board.points.size()) board.points.push_back(point);
   board.pointsVersion++;
+}
+
+// a number, or NAN for '-'
+static float number(const String &word) {
+  return word == "-" ? NAN : word.toFloat();
+}
+
+// <state> <results> <hz> <level-L> <thd-L> <thdn-L> <level-R> <thd-R> <thdn-R>,
+// from w[from] on; a result not yet drawn brings its spectrum along
+static void readThd(const std::vector<String> &w, size_t from) {
+  if (w.size() < from + 2) return;
+  board.thdState = w[from];
+  board.thdResults = w[from + 1].toInt();
+  if (w.size() >= from + 9) {
+    board.thdHertz = number(w[from + 2]);
+    for (int c = 0; c < 2; c++) {
+      board.thdLevel[c] = number(w[from + 3 + 3 * c]);
+      board.thd[c] = number(w[from + 4 + 3 * c]);
+      board.thdn[c] = number(w[from + 5 + 3 * c]);
+    }
+  }
+  if (board.thdResults == 0) {
+    board.spectrum.clear();
+    board.spectrumVersion++;
+    shownResults = 0;
+  } else if (board.thdResults != shownResults && !spectrumAsked) {
+    spectrumAsked = true;
+    enqueue("spectrum 64", REQ_SPECTRUM);
+  }
 }
 
 static void answered(bool ok, const std::vector<String> &w) {
@@ -323,6 +357,21 @@ static void answered(bool ok, const std::vector<String> &w) {
       for (const String &line : dataLines) readPoint(words(line.c_str()), 0);
       board.pointsVersion++;
       break;
+    case REQ_THD:
+      readThd(w, 1);
+      break;
+    case REQ_SPECTRUM: {
+      // * <index> <hz> <dB-L> <dB-R>
+      spectrumAsked = false;
+      shownResults = board.thdResults;
+      board.spectrum.clear();
+      for (const String &line : dataLines) {
+        std::vector<String> d = words(line.c_str());
+        if (d.size() >= 4) board.spectrum.push_back({ d[1].toFloat(), d[2].toFloat(), d[3].toFloat() });
+      }
+      board.spectrumVersion++;
+      break;
+    }
     default:
       break;
   }
@@ -374,6 +423,9 @@ static void event(const std::vector<String> &w) {
     changed();
   } else if (name == "point") {
     readPoint(w, 2);
+    changed();
+  } else if (name == "thd") {
+    readThd(w, 2);
     changed();
   }
 }
@@ -553,6 +605,12 @@ void linkSweep(bool start) {
     board.pointsVersion++;
   }
   enqueue(start ? "sweep start" : "sweep stop", REQ_SWEEP);
+  changed();
+}
+
+void linkDistortion(bool start) {
+  if (!board.linked) return;
+  enqueue(start ? "thd start" : "thd stop", REQ_THD);
   changed();
 }
 

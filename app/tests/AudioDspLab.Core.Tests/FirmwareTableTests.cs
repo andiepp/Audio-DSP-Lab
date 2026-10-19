@@ -18,7 +18,7 @@ public partial class FirmwareTableTests
         { AudioDspLab.Applications.Generator, "generatorInfo", "generatorParams", "generatorPots" },
         { AudioDspLab.Applications.Equalizer, "equalizerInfo", "equalizerParams", "equalizerPots" },
         { AudioDspLab.Applications.Radio, "equalizerInfo", "radioParams", "equalizerPots" },
-        { AudioDspLab.Applications.Analyzer, "analyzerInfo", "responseParams", "responsePots" },
+        { AudioDspLab.Applications.Analyzer, "analyzerInfo", "analysisParams", "analysisPots" },
         { AudioDspLab.Applications.Synthesizer, "synthInfo", "synthParams", "synthPots" },
     };
 

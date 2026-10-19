@@ -19,7 +19,7 @@
 
 #include "DspImageEqualizer.h"
 #include "DspImageRadio.h"
-#include "DspImageResponse.h"
+#include "DspImageAnalysis.h"
 
 #define MAX_PARAMS                    56      // the synthesizer has 48
 #define POT_PICKUP_THRESHOLD          80      // counts of 4095 (~2 %)
@@ -339,8 +339,8 @@ static const ParamDef radioParams[] = {
 };
 
 // ----------------------------------------------------------------------------
-//  Application 0x04 - response analyzer
-//  SigmaStudio project sigmastudio/Response: the generator's sine and
+//  Application 0x04 - analysis: Frequency Response and THD
+//  SigmaStudio project sigmastudio/Analysis: the generator's sine and
 //  slewed gain on K3 and K4; per input channel a band-pass, the absolute
 //  value, a smoothing low-pass and a readback. Sweeps, filters, readings
 //  and the reference are the analyzer's (Analyzer.cpp); the parameters
@@ -348,40 +348,40 @@ static const ParamDef radioParams[] = {
 //  Parameter RAM: Amplitude target 3 (5.23 linear gain), step 4 (default).
 // ----------------------------------------------------------------------------
 
-#define RESP_ADDR_AMPLITUDE_TARGET    3
+#define ANA_ADDR_AMPLITUDE_TARGET    3
 
-static bool respGain(int32_t level, int32_t output) {
-  return dspSafeloadOne(RESP_ADDR_AMPLITUDE_TARGET, output ? levelToGain(level) : 0.0f);
+static bool anaGain(int32_t level, int32_t output) {
+  return dspSafeloadOne(ANA_ADDR_AMPLITUDE_TARGET, output ? levelToGain(level) : 0.0f);
 }
 
-static bool respLevel(int32_t value) {
-  return respGain(value, currentValue(RESP_OUTPUT));
+static bool anaLevel(int32_t value) {
+  return anaGain(value, currentValue(ANA_OUTPUT));
 }
 
-static bool respOutput(int32_t value) {
-  return respGain(currentValue(RESP_LEVEL), value);
+static bool anaOutput(int32_t value) {
+  return anaGain(currentValue(ANA_LEVEL), value);
 }
 
 // the sweep's settings take effect when a sweep starts
-static bool respSetting(int32_t) {
+static bool anaSetting(int32_t) {
   return true;
 }
 
-// while the distortion measurement runs, the tone sits on a bin's centre
-static bool respTone(int32_t value) {
+// while the THD measurement runs, the tone sits on a bin's centre
+static bool anaTone(int32_t value) {
   return analyzerSetTone(distortionState() == DISTORTION_RUNNING ? distortionSnap(value) : value);
 }
 
-static const ParamDef responseParams[] = {
-  { RESP_LEVEL,             -6000, 0,       -2000,   respLevel,   false },
-  { RESP_OUTPUT,            0,     1,       0,       respOutput,  true },
-  { RESP_START,             2000,  2000000, 2000,    respSetting, false },
-  { RESP_STOP,              2000,  2000000, 2000000, respSetting, false },
-  { RESP_POINTS_PER_DECADE, 1,     40,      10,      respSetting, false },
-  { RESP_TONE,              2000,  2000000, 100000,  respTone,    false },
+static const ParamDef analysisParams[] = {
+  { ANA_LEVEL,             -6000, 0,       -2000,   anaLevel,   false },
+  { ANA_OUTPUT,            0,     1,       0,       anaOutput,  true },
+  { ANA_START,             2000,  2000000, 2000,    anaSetting, false },
+  { ANA_STOP,              2000,  2000000, 2000000, anaSetting, false },
+  { ANA_POINTS_PER_DECADE, 1,     40,      10,      anaSetting, false },
+  { ANA_TONE,              2000,  2000000, 100000,  anaTone,    false },
 };
-static const PotMap responsePots[] = {
-  { 1, RESP_LEVEL, potToAmplitude },
+static const PotMap analysisPots[] = {
+  { 1, ANA_LEVEL, potToAmplitude },
 };
 
 // ----------------------------------------------------------------------------
@@ -600,8 +600,8 @@ static const AppDef applications[] = {
     equalizerParams, 8, equalizerPots, 4, nullptr, nullptr },
   { 0x03, "Internet radio", DspImageRadio, DspImageRadioLength,
     radioParams, 9, equalizerPots, 4, radioTakeClock, radioReleaseClock },
-  { APP_RESPONSE, "Response analyzer", DspImageResponse, DspImageResponseLength,
-    responseParams, 6, responsePots, 1, nullptr, nullptr },
+  { APP_ANALYSIS, "Analysis", DspImageAnalysis, DspImageAnalysisLength,
+    analysisParams, 6, analysisPots, 1, nullptr, nullptr },
   // no image, no parameters: the DSP runs what SigmaStudio wrote (see start)
   { APP_SIGMASTUDIO, "SigmaStudio mode", nullptr, 0,
     nullptr, 0, nullptr, 0, nullptr, nullptr },
@@ -726,7 +726,7 @@ static uint8_t start(const AppDef *app, bool resume) {
   takeBusBack();
   // a sweep stops with its application; the SigmaStudio mode gives the
   // pots and the EEPROM back
-  if (active != nullptr && active->id == APP_RESPONSE) analyzerEnd();
+  if (active != nullptr && active->id == APP_ANALYSIS) analyzerEnd();
   bool leavingStudio = active != nullptr && active->id == APP_SIGMASTUDIO;
   if (leavingStudio) {
     dacMuxEnd();
@@ -793,7 +793,7 @@ static uint8_t start(const AppDef *app, bool resume) {
   for (uint8_t i = 0; i < app->paramCount && i < MAX_PARAMS; i++) {
     if (!app->params[i].apply(values[i])) return fail(ERR_DSP_WRITE_FAILED);
   }
-  if (app->id == APP_RESPONSE && !analyzerBegin(currentValue(RESP_TONE))) {
+  if (app->id == APP_ANALYSIS && !analyzerBegin(currentValue(ANA_TONE))) {
     return fail(ERR_DSP_WRITE_FAILED);
   }
   if ((app->id == APP_SYNTH || app->begin == genTakeClock) && !synFlatBands()) {
@@ -878,7 +878,7 @@ static void followRadioRate() {
 
 void appsPoll() {
   if (active != nullptr && state == APP_STATE_RUNNING && active->begin == radioTakeClock) followRadioRate();
-  if (active != nullptr && state == APP_STATE_RUNNING && active->id == APP_RESPONSE) analyzerPoll();
+  if (active != nullptr && state == APP_STATE_RUNNING && active->id == APP_ANALYSIS) analyzerPoll();
   if (active != nullptr && state == APP_STATE_RUNNING && active->id == APP_SYNTH) synthPoll();
   bool sampled = potsPoll();
   // the SigmaStudio mode forwards the pots always, whatever pot control says
@@ -964,7 +964,7 @@ uint8_t appParamSet(uint8_t paramId, int32_t value) {
 uint8_t appServiceMode(bool enable) {
   if (enable) {
     if (state == APP_STATE_SERVICE) return ERR_NONE;
-    if (active != nullptr && active->id == APP_RESPONSE) analyzerEnd();
+    if (active != nullptr && active->id == APP_ANALYSIS) analyzerEnd();
     if (active != nullptr && active->id == APP_SIGMASTUDIO) dacMuxEnd();
     // SigmaStudio gets the firmware's 48 kHz clock: an application that took
     // the clock (the radio) lets it go; leaving service mode restarts it

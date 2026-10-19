@@ -7,7 +7,7 @@
 //  with 32-bit slots, so the DSP drives both clocks. The images' register
 //  settings make the DSP's port a master at the sample rate, 48 kHz, with
 //  64 BCLK a frame (diag clocks: about 48,000 Hz and 3.07 MHz, timed by the
-//  ESP32's own clock). The ground for the distortion measurement: the line input's
+//  ESP32's own clock). The ground for the THD measurement: the line input's
 //  samples, as the DSP sends them.
 //
 //  It touches no I2C, so it works in SigmaStudio's service mode too, with
@@ -47,7 +47,7 @@ bool captureMeasure(uint32_t frames, CaptureResult &result, int32_t *keep = null
 // receives `frames` contiguous frames (a multiple of CAPTURE_CHUNK_FRAMES)
 // as samples of full scale 1.0, a channel left out where its array is
 // nullptr; false without clocks. Not reentrant: one
-// capture at a time (the distortion measurement's task, or a diag request)
+// capture at a time (the THD measurement's task, or a diag request)
 bool captureSamples(uint32_t frames, float *left, float *right);
 
 // the serial output's clocks, counted on their pins (-1 if the counter

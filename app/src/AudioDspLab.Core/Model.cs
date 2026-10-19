@@ -23,7 +23,7 @@ public static class Applications
             Generator => "Generator",
             Equalizer => "Equalizer",
             Radio => "Radio",
-            Analyzer => "Response analyzer",
+            Analyzer => "Analysis",
             SigmaStudio => "SigmaStudio mode",
             Synthesizer => "Synthesizer",
             None or null => "none",
@@ -158,7 +158,7 @@ public sealed record SweepStatus(string State, int Measured, int Total, int Refe
 }
 
 /// <summary>
-/// The distortion measurement (<c>thd</c>, <c>! thd</c>): its state, the
+/// The THD measurement (<c>thd</c>, <c>! thd</c>): its state, the
 /// results so far and the latest result, null before the first.
 /// </summary>
 public sealed record DistortionStatus(

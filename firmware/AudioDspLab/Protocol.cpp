@@ -138,7 +138,7 @@ static const char *errorText(uint8_t code) {
     case ERR_WRONG_APPLICATION:   return "not available in the running application";
     case ERR_NO_SWEEP:            return "no complete sweep to keep";
     case ERR_STORE_FAILED:        return "storing in flash failed";
-    case ERR_BUSY:                return "the distortion measurement uses the serial output";
+    case ERR_BUSY:                return "the THD measurement uses the serial output";
     case ERR_NO_MEMORY:           return "not enough free memory";
     case ERR_NO_CLOCK:            return "no clock on the DSP's serial output (MP10, MP11)";
     default:                      return "failed";
@@ -478,6 +478,7 @@ static void cmdInfo() {
 
 static void syncEvents();
 static void reportToOtherPorts(uint8_t paramId);
+static void onParamChanged(uint8_t paramId, int32_t value);
 
 static void cmdEvents() {
   if (tokenCount > 1) {
@@ -781,14 +782,14 @@ static void cmdPanel() {
   okf("%s %s %u", panelState, panelAddress, panelClients);
 }
 
-// --- response analyzer ---------------------------------------------------------------
+// --- analysis: Frequency Response -------------------------------------------------------
 
-// the distortion measurement ends and the tone goes back to the one set
+// the THD measurement ends and the tone goes back to the one set
 static void stopDistortion() {
   if (distortionState() == DISTORTION_IDLE && !distortionBusy()) return;
   distortionStop();
   int32_t tone;
-  if (appRunning(APP_RESPONSE) && appParamGet(RESP_TONE, tone) == ERR_NONE) analyzerSetTone(tone);
+  if (appRunning(APP_ANALYSIS) && appParamGet(ANA_TONE, tone) == ERR_NONE) analyzerSetTone(tone);
 }
 
 static void sweepStatus() {
@@ -799,15 +800,16 @@ static void sweepStatus() {
 static void cmdSweep() {
   if (tokenCount == 1) return sweepStatus();
   if (tokenCount != 2) return fail(ERR_BAD_ARGUMENT);
-  if (!runningApp(APP_RESPONSE)) return;
+  if (!runningApp(APP_ANALYSIS)) return;
   if (is(1, "start")) {
     int32_t start, stop, perDecade;
-    appParamGet(RESP_START, start);
-    appParamGet(RESP_STOP, stop);
-    appParamGet(RESP_POINTS_PER_DECADE, perDecade);
+    appParamGet(ANA_START, start);
+    appParamGet(ANA_STOP, stop);
+    appParamGet(ANA_POINTS_PER_DECADE, perDecade);
     if (stop <= start) return fail(ERR_OUT_OF_RANGE);
     stopDistortion();
-    uint8_t error = appParamSet(RESP_OUTPUT, 1);
+    uint8_t error = appParamSet(ANA_OUTPUT, 1);
+    if (error == ERR_NONE) onParamChanged(ANA_OUTPUT, 1);   // every port hears the output go on
     if (error == ERR_NONE) error = analyzerStartSweep(start, stop, perDecade);
     if (error != ERR_NONE) return fail(error);
     return sweepStatus();
@@ -841,7 +843,7 @@ static void cmdPoints() {
   ok();
 }
 
-// --- distortion measurement ---------------------------------------------------
+// --- analysis: THD ------------------------------------------------------------
 
 static DistortionResult thdResult;          // static: 2 KB, too much for the stack
 
@@ -885,15 +887,16 @@ static void thdStatus() {
 static void cmdThd() {
   if (tokenCount == 1) return thdStatus();
   if (tokenCount != 2) return fail(ERR_BAD_ARGUMENT);
-  if (!runningApp(APP_RESPONSE)) return;
+  if (!runningApp(APP_ANALYSIS)) return;
   if (is(1, "start")) {
     analyzerStopSweep();
-    uint8_t error = appParamSet(RESP_OUTPUT, 1);
+    uint8_t error = appParamSet(ANA_OUTPUT, 1);
+    if (error == ERR_NONE) onParamChanged(ANA_OUTPUT, 1);   // every port hears the output go on
     if (error == ERR_NONE) error = distortionStart();
     if (error != ERR_NONE) return fail(error);
     // the tone on a bin's centre: it falls on its bin exactly
     int32_t tone;
-    if (appParamGet(RESP_TONE, tone) == ERR_NONE) analyzerSetTone(distortionSnap(tone));
+    if (appParamGet(ANA_TONE, tone) == ERR_NONE) analyzerSetTone(distortionSnap(tone));
     return thdStatus();
   }
   if (is(1, "stop")) {
@@ -940,7 +943,7 @@ static void cmdSpectrum() {
 
 static void cmdReference() {
   if (tokenCount == 2 && is(1, "keep")) {
-    if (!runningApp(APP_RESPONSE)) return;
+    if (!runningApp(APP_ANALYSIS)) return;
     return result(analyzerKeepReference());
   }
   if (tokenCount != 1) return fail(ERR_BAD_ARGUMENT);
@@ -956,7 +959,7 @@ static void cmdReference() {
 }
 
 static void cmdLevel() {
-  if (!runningApp(APP_RESPONSE)) return;
+  if (!runningApp(APP_ANALYSIS)) return;
   int32_t left, right;
   if (!analyzerMeasure(left, right)) return fail(ERR_DSP_NOT_RESPONDING);
   char l[16], r[16];
@@ -1183,7 +1186,7 @@ static void cmdDiag() {
     return okf("%.0f %.0f %.0f %.1f", lrclk, bclk, dataEdges, dataHigh);
   }
   if (is(1, "raw") && tokenCount == 2) {
-    if (!runningApp(APP_RESPONSE)) return;
+    if (!runningApp(APP_ANALYSIS)) return;
     int32_t left, right;
     if (!analyzerReadRaw(left, right)) return fail(ERR_DSP_NOT_RESPONDING);
     return okf("%ld %ld", (long)left, (long)right);
@@ -1396,7 +1399,7 @@ static void radioEvents() {
 }
 
 static void sweepEvents() {
-  if (!appRunning(APP_RESPONSE)) return;
+  if (!appRunning(APP_ANALYSIS)) return;
   const uint16_t count = analyzerPointCount();
   if (count < seenPoints) seenPoints = 0;  // a new sweep began
   AnalyzerPoint point;
@@ -1412,7 +1415,7 @@ static void sweepEvents() {
 }
 
 static void thdEvents() {
-  if (!appRunning(APP_RESPONSE)) return;
+  if (!appRunning(APP_ANALYSIS)) return;
   const uint8_t state = distortionState();
   const uint32_t count = distortionCount();
   if (state == seenThdState && count == seenThdCount) return;

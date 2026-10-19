@@ -30,7 +30,7 @@ static const ParamInfo equalizerInfo[] = {
   { 9, "station",           KIND_INTEGER, 0, "",     nullptr },
 };
 
-// application 0x04 - response analyzer
+// application 0x04 - analysis: Frequency Response and THD
 static const ParamInfo analyzerInfo[] = {
   { 1, "level",             KIND_NUMBER,  2, "dBFS", nullptr },
   { 2, "output",            KIND_SWITCH,  0, "",     nullptr },
@@ -105,7 +105,7 @@ static const AppTable tables[] = {
   { 0x01,            "generator",   generatorInfo, COUNT(generatorInfo) },
   { 0x02,            "equalizer",   equalizerInfo, COUNT(equalizerInfo) - 1 },  // without the station
   { 0x03,            "radio",       equalizerInfo, COUNT(equalizerInfo) },
-  { APP_RESPONSE,    "analyzer",    analyzerInfo,  COUNT(analyzerInfo) },
+  { APP_ANALYSIS,    "analyzer",    analyzerInfo,  COUNT(analyzerInfo) },
   { APP_SIGMASTUDIO, "sigmastudio", nullptr,       0 },
   { APP_SYNTH,       "synthesizer", synthInfo,     COUNT(synthInfo) },
 };

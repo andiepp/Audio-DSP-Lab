@@ -8,8 +8,8 @@
 #include <math.h>
 
 // ----------------------------------------------------------------------------
-//  SigmaStudio project sigmastudio/Response, export of 2026-10-19 13:37.
-//  Parameter RAM (Export/ADAU1701_Response_IC_1_PARAM.h):
+//  SigmaStudio project sigmastudio/Analysis, export of 2026-10-19 13:37.
+//  Parameter RAM (Export/ADAU1701_Analysis_IC_1_PARAM.h):
 //    Sine increment 1 (5.23, f / (DSP_CORE_RATE / 2), as the generator's)
 //    'General (2nd order)' double precision cells, B0 B1 B2 A1 A2, the A
 //    coefficients stored negated: BandR 5, BandL 10, SmoothL 15, SmoothR 20

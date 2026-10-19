@@ -2,7 +2,7 @@
 
 As of 2026-10-18.
 
-Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, a frequency response analyzer, a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.1 and application 1.1, and the optional front panel (panel firmware 1.1).
+Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.1 and application 1.1, and the optional front panel (panel firmware 1.1).
 
 ![Audio-DSP-Lab: the PC sets values over USB, the board does the audio](images/overview.png)
 
@@ -21,7 +21,7 @@ The board keeps working without the PC: once an application runs, you can close 
 | Generator | Sine, rectangle, triangle, saw, inverse saw or noise, 20 Hz to 20 kHz, with a width for rectangle and triangle | out K3, K4 |
 | Equalizer | Bass, middle, treble and volume on the line input | in K2, out K3, K4 |
 | Radio | Eight MP3 internet stations over WiFi, through the equalizer | out K3, K4 |
-| Response | Sweeps a sine through a device under test and plots its response | out K3, K4, in K2 |
+| Analysis | Frequency Response: sweeps a sine through a device under test and plots its response. THD: its harmonic distortion, THD+N and spectrum | out K3, K4, in K2 |
 | SigmaStudio | Runs your own SigmaStudio program from the EEPROM | as your program |
 | Synthesizer | A monophonic synthesizer played from a MIDI keyboard | MIDI in K5, out K3, K4 |
 
@@ -147,15 +147,19 @@ The radio plays MP3 streams over plain HTTP. Streams that are only offered over 
 | No network | No network set, or neither network answers (retried every 30 s) |
 | Stream error | The station did not deliver (retried every 5 s) |
 
-### Response
+### Analysis
 
-Measures a device's frequency response: a sine leaves on K3/K4, passes the device under test and returns on K2, and the board reads the level of both channels at each frequency.
+Measures a device under test: a sine leaves on K3/K4, passes the device and returns on K2. The application has two parts, chosen with **Measure** above the plot: **Frequency Response** and **THD**. Both use the same tone, output level and output switch.
+
+#### Frequency Response
+
+The board reads the level of both channels at each frequency of a sweep.
 
 1. Connect K3 straight to K2 with a cable, run a sweep, tick **Replace the reference** and press **Keep as reference**.
 2. Put the device between K3 (or K4) and K2 and press **Start sweep**. The curve grows point by point.
 3. Choose **Relative to reference** to see the device's own response, without the board's.
 
-![The response page: a sweep of a low-pass](images/screenshots/analyzer.png)
+![The analysis page, Frequency Response: a sweep of a low-pass](images/screenshots/analyzer.png)
 
 | Control | Range | Default |
 | --- | --- | --- |
@@ -165,6 +169,18 @@ Measures a device's frequency response: a sine leaves on K3/K4, passes the devic
 | Tone between sweeps | 20 Hz to 20 kHz | 1 kHz |
 
 A full sweep at 10 points per decade takes about 10 s; the line under the points per decade gives the estimate. Between sweeps the board plays the tone and the window shows the input levels twice a second. The reference is kept in the board and survives power cycles. Mind the common ground between K3 and K2; the measurement's floor is about −110 dBFS.
+
+#### THD
+
+The board takes the spectrum of what returns on K2 and computes the tone's harmonic distortion: per channel 8192 samples (0.17 s) through an FFT, four captures averaged, a new result about every 1.6 s.
+
+1. Choose **Measure: THD** and press **Start measuring**. The output switches on, and the tone moves to the nearest frequency the FFT holds exactly (a multiple of 5.86 Hz: 1000 Hz plays as 1001.95 Hz), so it leaks into no neighbouring frequencies.
+2. Read, per channel: **THD**, the harmonics H2 to H10 below 20 kHz against the tone; **THD+N**, everything from 20 Hz to 20 kHz but the tone; both in % with dB beneath. Below them each harmonic in dBc, and above them the spectrum from 20 Hz to 24 kHz with the tone marked 1 and its harmonics 2 to 10. Hover over the spectrum to read a point.
+3. Change the tone and the output level while it measures; **Stop** ends it, and so does a sweep.
+
+![The analysis page, THD: the spectrum with the harmonics marked, THD and THD+N per channel](images/screenshots/thd.png)
+
+What the board measures of itself, a cable from K3 to K2: at an output level of −20 dB (−27 dBFS at the input) THD+N about 0.05 %, the harmonics below the noise; at 0 dB (−7 dBFS) THD about 0.016 % and THD+N about 0.017 %, H2 −81 and H3 −78 dBc. Measure the cable first: a device's figures mean something down to these. A level near the input's full scale gives the lowest THD+N, until the converters' own distortion rises.
 
 ### SigmaStudio mode
 
@@ -188,7 +204,7 @@ The pots set values only while **Pot control** is on, and it is off at every pow
 | --- | --- | --- | --- | --- |
 | Generator | Waveform | Frequency | Width | Amplitude |
 | Equalizer, Radio | Bass gain | Middle gain | Treble gain | Volume |
-| Response | – | Output level | – | – |
+| Analysis | – | Output level | – | – |
 | SigmaStudio | ADC0 | ADC1 | ADC2 | ADC3 |
 | Synthesizer | Oscillator 1 width | Cutoff | Emphasis | Volume |
 
@@ -212,7 +228,7 @@ The **Power-up** key chooses what the board starts when it is switched on. The c
 | **SigmaStudio mode** (the default) | SigmaStudio mode, whatever ran before |
 | **Last application** | The application you selected last, with its defaults |
 
-- With **Last application**, the radio and the synthesizer come up sounding: their output is switched on, at the default volume of −20 dB. The generator and the response analyzer stay off, since they may drive a device under test.
+- With **Last application**, the radio and the synthesizer come up sounding: their output is switched on, at the default volume of −20 dB. The generator and the analysis stay off, since they may drive a device under test.
 - Service mode is never restored, and Pot control is off at every power-up.
 - Before another application's program replaces yours at power-up, the firmware keeps a copy of your SigmaStudio program. If the chosen application cannot start, the board starts SigmaStudio mode instead and the window shows the error.
 - **Last application** lets the board play the radio, or wait for the keyboard, as soon as it is powered, with no PC at all: a USB power supply is enough.
@@ -383,7 +399,7 @@ ok sigmastudio running none
 * generator 1 "Signal generator"
 * equalizer 2 "Equalizer"
 * radio 3 "Internet radio"
-* analyzer 4 "Response analyzer"
+* analyzer 4 "Analysis"
 * sigmastudio 5 "SigmaStudio mode"
 * synthesizer 6 "Synthesizer"
 ok
@@ -592,9 +608,13 @@ In the editor **−** and **+** step the value; hold them to repeat, and after a
 
 **Radio.** The station playing, its stream title running below it, and the connection: playing with its sample rate, connecting, or no network. The eight station keys carry the stations' names; the volume is the tile below them, and bass, middle and treble are on the pots and in the knob strip. Station names and URLs, and WiFi networks, are entered in the PC application. The panel's font has no accents: "Zwischentöne" reads "Zwischentoene".
 
-![Response: the last sweep with the cursor on one of its points, Start sweep in the plot's corner](images/panel/response.png)
+![Analysis, Frequency Response: the last sweep with the cursor on one of its points, Start sweep in the plot's corner](images/panel/analysis.png)
 
-**Response.** The plot of the last sweep, the left channel teal and the right blue, from 20 Hz to 20 kHz, scaled to the 60 dB below its loudest point. **Start sweep** in the plot's corner starts a sweep and switches the output on; it reads **Stop** while the sweep runs, and the points measured stand beside it. The start and stop frequencies, the points per decade and the level are the tiles below.
+**Analysis.** **Resp** in the plot's corner shows the Frequency Response, **THD** the THD measurement; a tap switches between them. **Frequency Response:** the plot of the last sweep, the left channel teal and the right blue, from 20 Hz to 20 kHz, scaled to the 60 dB below its loudest point. **Start sweep** in the plot's corner starts a sweep and switches the output on; it reads **Stop** while the sweep runs, and the points measured stand beside it. The start and stop frequencies, the points per decade and the level are the tiles below.
+
+![Analysis, THD: the spectrum, THD and THD+N of both channels, the tone and its levels; Stop in the plot's corner](images/panel/analysis-thd.png)
+
+**THD** shows the spectrum of both channels from 0 to −140 dBFS and, in the plot's corner, THD and THD+N of the left and the right channel in %, the tone and its levels. **Start** measures continuously and switches the output on; a measurement started on the PC shows itself here.
 
 **The cursor.** Touch the plot, or move a finger along it: a line jumps to the nearest measured point, a dot marks it on each channel, and a box beside the line gives the point's frequency and both levels. The cursor stays where you leave it; during the next sweep it shows again as soon as the sweep reaches its point. (In the PC application, the mouse over the plot does the same.)
 
@@ -652,6 +672,6 @@ Anyone on your network can reach the board this way, as anyone with the USB cabl
 - **Signals from the ESP32.** The generator and the synthesizer compute their signal on the ESP32 at 48 kHz, 16 bits, and send it to the DSP over I2S; the DSP runs the radio's program for them (the equalizer, set flat, and the volume). The generator keeps its phase in 32 bits, so its frequency is exact to the 0.01 Hz set.
 - **The DSP's core rate.** The SigmaStudio projects run the ADAU1701's core twice per 48 kHz sample (96 kHz). Every frequency the firmware computes (oscillators, filters) is computed for that rate; frequencies typed into SigmaStudio's own controls for these projects act twice as high.
 - **The clock.** With JP1 on ext. MCLK the ESP32 supplies 12.288 MHz (256 × 48 kHz). The radio drives the clock from its stream's rate instead (256 × 44.1 kHz for most stations), and the equalizer's filters are recomputed for it.
-- **What the board stores** in the ESP32's flash: the WiFi networks, the stations, the analyzer's reference, the power-up choice, and the copy of your SigmaStudio program. Flashing a firmware update with the flash tool keeps them; erasing the flash removes them.
+- **What the board stores** in the ESP32's flash: the WiFi networks, the stations, the analysis' Frequency Response reference, the power-up choice, and the copy of your SigmaStudio program. Flashing a firmware update with the flash tool keeps them; erasing the flash removes them.
 - **The pots** are read by the ESP32 (12-bit, smoothed). The DSP sees them only through the ESP32's DACs in SigmaStudio mode.
 - **The ESP32 kit.** The board takes an ESP32-PICO-KIT V4 (PICO-D4) or an ESP32-PICO-KIT-1 (PICO-V3). They differ in the pin that carries I2S audio to the DSP (GPIO18 or GPIO7); the firmware detects the kit and the window shows it beside the firmware version.

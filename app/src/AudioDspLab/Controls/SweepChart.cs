@@ -8,7 +8,7 @@ using AudioDspLab.Themes;
 namespace AudioDspLab.Controls;
 
 /// <summary>
-/// Draws the response analyzer's sweep on the equalizer curve's
+/// Draws the Frequency Response's sweep on the equalizer curve's
 /// logarithmic frequency axis, 20 Hz to 20 kHz: left in gold, right in
 /// cyan, a dot at every point measured; either absolute in dBFS, with the
 /// reference dashed in grey, or relative to the reference in dB. The level

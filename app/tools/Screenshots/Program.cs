@@ -81,8 +81,8 @@ static class Program
                         // the analyzer's second mode: two results, their spectrum and harmonics
                         await vm.Analyzer.StartDistortionAsync();
                         await Task.Delay(3600);
-                        Save(window, Path.Combine(output, "distortion.png"));
-                        Console.WriteLine($"distortion: {vm.Analyzer.DistortionStateText} | {window.ActualWidth}x{window.ActualHeight}");
+                        Save(window, Path.Combine(output, "thd.png"));
+                        Console.WriteLine($"thd: {vm.Analyzer.DistortionStateText} | {window.ActualWidth}x{window.ActualHeight}");
                         await vm.Analyzer.StopDistortionAsync();
                     }
                 }

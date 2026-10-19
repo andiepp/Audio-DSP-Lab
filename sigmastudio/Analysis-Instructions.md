@@ -1,7 +1,7 @@
-# Response application — building the SigmaStudio project
+# Analysis application — building the SigmaStudio project
 
 The result is application 0x04 of
-the Audio-DSP-Lab firmware, the response analyzer: a sine on K3 and K4, and on
+the Audio-DSP-Lab firmware, the analysis: a sine on K3 and K4, and on
 each channel of the line input K2 a level the firmware reads back. The ESP32
 sets the sine, computes every filter and reads the levels over I2C; the
 project only has to provide the blocks, with the cell names below,
@@ -15,8 +15,8 @@ cable from K3 to K2.
 1. Open
    `sigmastudio\Generator\ADAU1701_Generator.dspproj`.
 2. **File > Save As**
-   `sigmastudio\Response\ADAU1701_Response.dspproj`
-   (create the folder `Response`). From here on work only in the new
+   `sigmastudio\Analysis\ADAU1701_Analysis.dspproj`
+   (create the folder `Analysis`). From here on work only in the new
    project; the Generator project must stay as it is.
 3. Hardware Configuration tab: leave it as it is.
 
@@ -105,11 +105,11 @@ Still in service mode:
 
 1. Right-click the **IC 1** block in the Hardware Configuration tab >
    **Write Latest Compilation to E2PROM**. This creates
-   `ADAU1701_Response_IC 2\E2Prom.bin` and `E2Prom.Hex` next to the
+   `ADAU1701_Analysis_IC 2\E2Prom.bin` and `E2Prom.Hex` next to the
    project — the image the firmware will carry.
 2. **Action > Export System Files** into
-   `sigmastudio\Response\Export`
-   (file name `ADAU1701_Response`). Check the folder in the dialog.
+   `sigmastudio\Analysis\Export`
+   (file name `ADAU1701_Analysis`). Check the folder in the dialog.
 3. **File > Save**, then close SigmaStudio.
 4. **Unplug the USBi from the board's I2C header.** A USBi left on the
    bus makes every EEPROM write of the firmware fail with error 0x11.
@@ -123,16 +123,16 @@ from `Export/*_IC_1_PARAM.h` into `firmware/AudioDspLab/Applications.cpp`,
 and convert the image with
 
 ```
-.\tools\Convert-E2PromImage.ps1 -Source "sigmastudio\Response\ADAU1701_Response_IC 2\E2Prom.bin" `
-    -Name DspImageResponse -Destination firmware\AudioDspLab\DspImageResponse.h
+.\tools\Convert-E2PromImage.ps1 -Source "sigmastudio\Analysis\ADAU1701_Analysis_IC 2\E2Prom.bin" `
+    -Name DspImageAnalysis -Destination firmware\AudioDspLab\DspImageAnalysis.h
 ```
 
 Remember that the DSP core runs at twice the sample rate (96 kHz):
 frequencies the firmware writes are computed for that rate.
 
-## 8. The serial output, for the distortion measurement
+## 8. The serial output, for the THD measurement
 
-The distortion measurement takes the line input's samples to the ESP32
+The THD measurement takes the line input's samples to the ESP32
 and computes their spectrum there. The DSP sends them on its serial
 output: MP6 (SDATA_OUT0) to ESP32 GPIO32, its clocks MP10 (OUTPUT_LRCLK)
 and MP11 (OUTPUT_BCLK) to GPIO13 and GPIO19. The project's register
@@ -143,7 +143,7 @@ blocks and changes nothing else. Allow about 20 minutes. The board needs
 firmware with `diag capture` (after 1.1), the USBi on the I2C header, and
 the stereo cable from K3 to K2.
 
-1. Open `sigmastudio\Response\ADAU1701_Response.dspproj`.
+1. Open `sigmastudio\Analysis\ADAU1701_Analysis.dspproj`.
 2. **Hardware Configuration tab: change nothing.** Its register and
    pin settings are what the ESP32 relies on.
 3. Add two output blocks (*IO > Output*; each carries one channel):

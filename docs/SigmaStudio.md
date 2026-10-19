@@ -49,10 +49,10 @@ Each application's DSP program is a SigmaStudio project in `sigmastudio/`. The E
 
 | Folder | Application | What the project contains | Recipe |
 | --- | --- | --- | --- |
-| `Generator` | (the Response project's basis) | Sine, square, triangle, noise sources; a 4-input switch; a slewed gain; outputs K3, K4. The generator no longer runs it: its signal comes from the ESP32 through the Radio program | [Generator-Instructions.md](../sigmastudio/Generator-Instructions.md) |
+| `Generator` | (the Analysis project's basis) | Sine, square, triangle, noise sources; a 4-input switch; a slewed gain; outputs K3, K4. The generator no longer runs it: its signal comes from the ESP32 through the Radio program | [Generator-Instructions.md](../sigmastudio/Generator-Instructions.md) |
 | `Equalizer` | Equalizer | Line input; three general biquads per channel (bass, middle, treble); slewed volume | [Equalizer-Instructions.md](../sigmastudio/Equalizer-Instructions.md) |
 | `Radio` | Radio, Synthesizer, Generator | The equalizer with its input moved to the I2S serial input | [Radio-Instructions.md](../sigmastudio/Radio-Instructions.md) |
-| `Response` | Response | The generator's sine and gain; per input channel a band-pass, absolute value, smoothing low-pass and a readback | [Response-Instructions.md](../sigmastudio/Response-Instructions.md) |
+| `Analysis` | Analysis | The generator's sine and gain; per input channel a band-pass, absolute value, smoothing low-pass and a readback (Frequency Response), and the line input to the serial output (THD) | [Analysis-Instructions.md](../sigmastudio/Analysis-Instructions.md) |
 | `SigmaStudio` | (example) | A VCO controlled by P1 | – |
 
 Each folder holds the `.dspproj`, the self-boot image (`ADAU1701_<name>_IC 2/E2Prom.bin`) and SigmaStudio's export (`Export/`), all from the same compile. The firmware carries the images as C arrays (`firmware/AudioDspLab/DspImage*.h`, made with `tools/Convert-E2PromImage.ps1`) and the parameter addresses in `firmware/AudioDspLab/Applications.cpp`.

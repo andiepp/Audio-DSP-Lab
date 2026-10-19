@@ -1,7 +1,7 @@
 // ****************************************************************************
-// ***              D I S T O R T I O N   M E A S U R E M E N T             ***
+// ***                      A N A L Y S I S :   T H D                       ***
 // ****************************************************************************
-//  Part of the response analyzer (application 0x04): its image sends both
+//  The analysis application's THD (application 0x04): its image sends both
 //  line inputs, untouched, to the DSP's serial output, which the ESP32's
 //  second I2S port receives (Capture.cpp). A task of its own takes 8192
 //  frames of both channels (0.17 s at 48 kHz), windows them (Blackman-

@@ -12,7 +12,7 @@
 //  - Six audio applications on the Elektor board, controlled from a PC over
 //    the board's USB serial port with a simple text protocol
 //    (docs/Protocol.md): signal generator, equalizer, internet radio,
-//    frequency response analyzer, SigmaStudio mode and a monophonic
+//    analysis (frequency response and THD), SigmaStudio mode and a monophonic
 //    synthesizer played over MIDI.
 //  - An application is a DSP program (written to the DSP's EEPROM when it
 //    is selected), its parameters and what the four pots do. Every

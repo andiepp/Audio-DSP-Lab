@@ -211,6 +211,7 @@ The station that plays is the radio's parameter `station`. The radio tries netwo
 | `diag tone on\|off` | `ok`: the radio plays a 1 kHz test tone instead of the stream |
 | `diag meter` | `ok <pcm-bytes> <peak> <mp3-bytes> <stage> <loops> <task-state>`: the radio task since the last call |
 | `diag raw` | `ok <left> <right>`: the analyzer's raw capture words (5.19) |
+| `diag heap` | `ok <free> <largest-block> <lowest-free>`: the ESP32's heap in bytes: free now, the largest block one allocation can get, the lowest free since the start |
 
 Addresses and words may be written in hexadecimal with `0x`.
 

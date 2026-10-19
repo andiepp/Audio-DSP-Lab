@@ -905,6 +905,12 @@ static void cmdBackup() {
 
 static void cmdDiag() {
   long address, number;
+  // the heap: free now, the largest block one allocation can get, the
+  // lowest free since the start (all in bytes)
+  if (is(1, "heap") && tokenCount == 2) {
+    return okf("%u %u %u", (unsigned)ESP.getFreeHeap(),
+               (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT), (unsigned)ESP.getMinFreeHeap());
+  }
   if (is(1, "dsp") && tokenCount == 3) {
     if (appInServiceMode() || appRunning(APP_SIGMASTUDIO)) return fail(ERR_SERVICE_MODE);
     if (!parseLong(tokens[2], 0, 0x3FF, address)) return fail(ERR_BAD_ARGUMENT);
@@ -1003,7 +1009,7 @@ static const Command commands[] = {
   { "load",      cmdLoad,       "load" },
   { "aux",       cmdAux,        "aux" },
   { "backup",    cmdBackup,     "backup" },
-  { "diag",      cmdDiag,       "diag dsp|dspset|eeprom|scan|tone|meter|raw ..." },
+  { "diag",      cmdDiag,       "diag dsp|dspset|eeprom|scan|tone|meter|raw|heap ..." },
   { "reset",     cmdReset,      "reset" },
 };
 

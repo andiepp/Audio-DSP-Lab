@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `diag heap` reports the ESP32's free heap, its largest free block and the lowest free since the start.
+
 ## 1.1 — front panel and WiFi control
 
 Firmware 1.1, protocol 1 (new requests and events only), application 1.1, panel firmware 1.1.

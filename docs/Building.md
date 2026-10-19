@@ -37,7 +37,7 @@ arduino-cli compile --fqbn esp32:esp32:pico32:PartitionScheme=min_spiffs --libra
 arduino-cli upload  --fqbn esp32:esp32:pico32:PartitionScheme=min_spiffs -p COM5 firmware/AudioDspLab
 ```
 
-The build takes a few minutes the first time and uses about 61 % of the application partition. Do not add the Elektor_AudioDSP library: its macros clash with arduino-audio-tools, and the firmware has its own DSP, EEPROM and clock drivers.
+The build takes a few minutes the first time and uses about 63 % of the application partition. Do not add the Elektor_AudioDSP library: its macros clash with arduino-audio-tools, and the firmware has its own DSP, EEPROM and clock drivers.
 
 ### Structure
 
@@ -51,18 +51,26 @@ The build takes a few minutes the first time and uses about 61 % of the applicat
 | `Applications.cpp/.h` | The applications: DSP image, parameter table (ranges in scaled integers, what a change does), pot mapping; starting, service mode, power-up |
 | `Dsp.cpp/.h` | ADAU1701 over I2C: reset, boot, safeload, readback |
 | `Eeprom24.cpp/.h` | The 24C256 EEPROM: compare, write, verify |
-| `Mclk.cpp/.h` | The DSP's master clock from the ESP32's I2S peripheral |
+| `Mclk.cpp/.h` | The DSP's master clock from the ESP32's I2S peripheral (see [The DSP's clock](#the-dsps-clock)) |
 | `Pots.cpp/.h` | The four pots, smoothed |
 | `DacMux.cpp/.h` | SigmaStudio mode: the pots to the DSP's auxiliary ADC through the ESP32's DACs and the 74HC4053 |
 | `StudioBackup.cpp/.h` | The copy of your SigmaStudio program in the SPIFFS partition |
 | `Radio.cpp/.h` | Internet radio: WiFi, stream, MP3 decoder, I2S, stations and networks in NVS |
 | `Analyzer.cpp/.h` | Analysis, Frequency Response: sweep, readback, reference |
-| `Distortion.cpp/.h` | Analysis, THD: capture, window, FFT (esp-dsp), THD, THD+N, harmonics, spectrum, in a task of its own |
+| `Distortion.cpp/.h` | Analysis, THD and Spectrum: capture, window, FFT (esp-dsp), THD, THD+N, harmonics, RMS, peaks, spectrum, in a task of its own |
 | `Capture.cpp/.h` | The DSP's serial output on the ESP32's second I2S port; `diag capture`, `diag record`, `diag clocks` |
 | `Synth.cpp/.h` | Synthesizer: MIDI, oscillators, filter, envelopes, LFOs, the audio task |
 | `DspImage*.h` | The SigmaStudio self-boot images, generated |
 
-The loop alone talks to the DSP and the serial port; the radio and the synthesizer run their audio in FreeRTOS tasks on core 0.
+The loop alone talks to the DSP and the serial port; the radio and the synthesizer run their audio in FreeRTOS tasks on core 0, and THD and Spectrum their capture and FFT in a task of their own (the serial output and its memory only).
+
+### The DSP's clock
+
+The ESP32 makes the DSP's 12.288 MHz MCLK on GPIO0 with an I2S port clocked by its audio PLL (APLL). On the ESP32 that pin carries the APLL itself, and the I2S driver sets the APLL to twice the port's own MCLK, its divider cannot go below 2. So `Mclk.cpp`, `AudioOut.cpp` and the radio ask for `DSP_MCLK_I2S_MULTIPLE` = 128 × fs to put 256 × fs on the pin. With 256 the DSP ran on 24.576 MHz, twice its rating, and its converters made sporadic errors. `diag clocks` shows the result without an oscilloscope: the DSP's serial output must run at about 48000 Hz. Do not probe GPIO0 with the pulse counter: claiming the pin as an input takes it off the clock output.
+
+### Memory
+
+THD and Spectrum need about 82 KB of heap while they run, in one block of 32 KB and three of 16 KB; after the radio has played, the heap offers about 193 KB in smaller pieces (two blocks of 32 KB, one of 16 KB). `diag heap` and `diag blocks` show what is there.
 
 ### Adding a parameter
 
@@ -84,7 +92,7 @@ It uses about 43 % of the 3 MB application partition; LVGL takes its memory from
 
 ### Partition and NVS
 
-The firmware stores in NVS: `adl-wifi` (networks), `aml-radio` (stations), `aml-startup` (power-up), `aml-ref` (analyzer reference). The copy of your SigmaStudio program lives in the raw `spiffs` partition. Flashing with the same partition scheme keeps all of it.
+The firmware stores in NVS: `adl-wifi` (networks), `aml-radio` (stations), `aml-startup` (power-up), `aml-ref` (the Frequency Response reference). The copy of your SigmaStudio program lives in the raw `spiffs` partition. Flashing with the same partition scheme keeps all of it.
 
 ## The application
 
@@ -107,7 +115,7 @@ dotnet run --project src/AudioDspLab -- --simulator
 | Project | Role |
 | --- | --- |
 | `src/AudioDspLab.Core` | Protocol text, line transport (serial port), connection with request/response matching and resynchronisation, `BoardClient` (every command as a method, every event as a .NET event), the model, and `SimulatedBoard` |
-| `src/AudioDspLab` | The WPF application: `MainViewModel`, one page view model per application, generic `ParameterViewModel`, the controls (digit dial, displays, pot knob, response curve, sweep chart), stored settings, the themes |
+| `src/AudioDspLab` | The WPF application: `MainViewModel`, one page view model per application, generic `ParameterViewModel`, the controls (digit dial, displays, pot knob, response curve, sweep chart, spectrum chart), stored settings, the themes |
 | `tests/AudioDspLab.Core.Tests` | Protocol text, the client against the simulator, and the firmware/simulator table comparison |
 | `tools/Screenshots` | Renders the manual's screenshots from the simulator in every theme: `dotnet run --project app/tools/Screenshots` writes Studio dark, the manual's theme, to `docs/images/screenshots` and Classic and Studio light to its `classic` and `studio-light` folders |
 
@@ -119,7 +127,7 @@ The application binds each page to parameters by their protocol names; ranges, u
 
 ### The simulator
 
-`SimulatedBoard` answers the protocol as firmware 1.1 does, with made-up measurements: a 5 kHz low-pass as the device under test, a radio that "plays" when a network is set, an arpeggio on the synthesizer in demo mode. The tests run against it, and the application offers it as **Simulator (demo)**.
+`SimulatedBoard` answers the protocol as firmware 1.1 does, with made-up measurements: a 5 kHz low-pass as the device under test, harmonics, mains hum and noise for THD and Spectrum, a radio that "plays" when a network is set, an arpeggio on the synthesizer in demo mode. The tests run against it, and the application offers it as **Simulator (demo)**.
 
 ## A release
 

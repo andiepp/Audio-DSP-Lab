@@ -1,6 +1,6 @@
 # Installation guide
 
-As of 2026-10-18, for firmware 1.1 and application 1.1.
+As of 2026-10-19, for firmware 1.1 and application 1.1.
 
 This guide takes you from an Elektor Audio-DSP-FX board to a running Audio-DSP-Lab: prepare the board, flash the firmware, install the application, connect. Plan about 20 minutes.
 
@@ -24,7 +24,7 @@ The firmware drives the DSP's clock and its boot. Set two jumpers:
 
 | Jumper | Setting | Why |
 | --- | --- | --- |
-| **JP1** (DSP clock) | **ext. MCLK** | The ESP32 supplies the DSP's master clock (12.288 MHz on GPIO0). On the crystal (X1) the DSP runs, but the radio, the synthesizer and the clock-dependent filters are wrong, and the firmware may report `dsp-not-responding`. |
+| **JP1** (DSP clock) | **ext. MCLK** | The ESP32 supplies the DSP's master clock (12.288 MHz on GPIO0), so the DSP and the ESP32's audio (radio, generator, synthesizer) run on one clock. On the crystal (X1) the DSP runs on a clock of its own, and the audio the ESP32 sends drifts against it. |
 | **JP2** (boot) | **Selfboot** | The DSP loads each application's program from its EEPROM. |
 
 Every application works on a board as Elektor ships it, with either ESP32 kit; no modification is needed.
@@ -84,7 +84,7 @@ There is no installer: `AudioDspLab.exe` in the unzipped folder is the whole app
 
 1. Double-click **AudioDspLab.exe**. The first time, Windows SmartScreen may warn about an unknown publisher (the program is not code-signed): choose **More info**, then **Run anyway**.
 2. Under **Board on**, choose the board's COM port and press **Connect**.
-3. The status line shows `Connected to COM5: Audio-DSP-Lab 1.0.` and the application row shows **SigmaStudio** running: the board starts in SigmaStudio mode at every power-up.
+3. The status line shows `Connected to COM5: Audio-DSP-Lab 1.1.` and the application row shows **SigmaStudio** running: the board starts in SigmaStudio mode at every power-up.
 
 The application remembers the port and connects by itself next time. It keeps its own files in `%LocalAppData%\Audio-DSP-Lab` (the stored settings and the last port). To uninstall, delete the folder you unzipped and that one.
 
@@ -96,6 +96,17 @@ The application remembers the port and connects by itself next time. It keeps it
 4. Turn the frequency's digits with the mouse wheel; press **Pot control on** and turn P1 and P2 on the board: the window follows.
 
 If **Generator** fails, see [Troubleshooting](#troubleshooting).
+
+### A first measurement (optional)
+
+A stereo cable from K3 to K2 (output to line input) lets the board measure itself:
+
+1. Press **Analysis**, wait for `running`.
+2. **Measure: Frequency Response**, **Start sweep**: the curve lies flat at about −27 dBFS from 20 Hz to 20 kHz (the loop loses about 7 dB at the output level of −20 dB). Tick **Replace the reference** and press **Keep as reference**: later sweeps of a device can subtract the board's own response.
+3. **Measure: THD**, **Start measuring**: at the output level −20 dB THD+N is about 0.05 %, at 0 dB about 0.017 % with THD about 0.016 %. These are the board's own figures, the floor for any device you measure later.
+4. **Measure: Spectrum**, with the cable out of K2 and **Output off**: the input's noise is about −97 dBFS RMS, and mains hum shows near 50 Hz.
+
+The manual's chapter "Analysis" explains the three parts.
 
 ## 6. WiFi for the radio
 
@@ -141,3 +152,5 @@ Audio-DSP-Lab does not lock the board: flash any other sketch (Elektor's demos, 
 | Every application fails with `eeprom-failed` | The USBi sits on the I2C header | Unplug it, select again |
 | No sound | Output off, or the amplifier on K4 while you listen to K3 | Press **Output on**; K3 and K4 carry the same signal |
 | Windows asks for a "BOOT" device or the board resets when connecting | A USB-serial adapter that pulses DTR/RTS | Use the ESP32 kit's own USB socket |
+| After plugging the board in it does not answer, or SigmaStudio mode shows `eeprom-failed` | A front panel with its own supply kept the unplugged board half powered through its cable (panel firmware before this release) | Press the kit's **EN** button; update the panel's firmware, or power board and panel together |
+| THD reads a fundamental of a few dozen Hz far below −60 dBFS | Nothing returns on K2: no cable, or the output off | Connect K3 to K2 (or the device under test), press **Output on** |

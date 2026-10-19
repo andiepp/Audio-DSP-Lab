@@ -1,6 +1,6 @@
 # Manual
 
-As of 2026-10-18.
+As of 2026-10-19.
 
 Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.1 and application 1.1, and the optional front panel (panel firmware 1.1).
 
@@ -8,9 +8,9 @@ Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments th
 
 ## At a glance
 
-Audio-DSP-Lab has two parts:
+Audio-DSP-Lab has three parts:
 
-- **The firmware** runs on the board's ESP32. It writes each application's DSP program into the ADAU1701's EEPROM, computes filter coefficients, reads the pots and MIDI, streams the radio and makes the generator's signal and the synthesizer's sound. It talks to the PC over the board's USB port with a simple text protocol.
+- **The firmware** runs on the board's ESP32. It writes each application's DSP program into the ADAU1701's EEPROM, computes filter coefficients, reads the pots and MIDI, streams the radio, makes the generator's signal and the synthesizer's sound, and analyses the spectrum of the line input for the analysis' THD and Spectrum. It talks to the PC over the board's USB port with a simple text protocol.
 - **The application** (`AudioDspLab.exe`) is the PC's front panel. It shows one page per application, sets every value, and shows what the board reports, including the changes you make with the board's pots.
 - **The front panel** (optional) is a small touch display on a cable to the board, an ESP32 "CYD": it runs the applications without a PC. See [The front panel](#the-front-panel).
 
@@ -512,6 +512,48 @@ ok
 
 `points` lists the last sweep again; after `reference keep` every later point also carries its levels relative to the reference.
 
+**A THD measurement.** The same cable, the output at its full level; every result arrives as an event, about every 1.6 s:
+
+```
+> set level 0
+ok 0
+> thd start
+ok running 0 - - - - - - -
+! value output on
+! thd running 1 1001.95 -7.38 -77.28 -76.58 -7.40 -75.72 -75.22
+> harmonics
+* 2 2003.9 -81.43 -77.09
+* 3 3005.85 -78.07 -80.57
+* 4 4007.8 -96.99 -93.6
+…
+ok
+> thd stop
+ok idle 2 1001.95 -7.38 -77.28 -76.58 -7.40 -75.72 -75.22
+```
+
+THD and THD+N are in dB against the tone: −77.28 dB is 0.0137 % (100 × 10^(dB/20)). The tone plays at 1001.95 Hz while THD measures, the nearest frequency the FFT holds exactly.
+
+**A spectrum.** The cable out of K2 and the output off, so the board shows its own input:
+
+```
+> set output off
+ok off
+> spectrum start
+ok running 0 - -
+! spectrum running 1 -97.53 -98.08
+> spectrum peaks
+* 1 47.1 -104.56 48.1 -104.78
+* 2 159.5 -117.18 251.2 -116.02
+* 3 254.6 -115.38 4232.5 -117.44
+* 4 4232.5 -116.51 114.9 -115.88
+* 5 415.7 -117.46 343.3 -116.13
+ok
+> spectrum stop
+ok idle 3 -97.29 -97.7
+```
+
+The RMS from 20 Hz to 20 kHz is −97.5 dBFS on the left; the strongest peak is mains hum near 50 Hz. `spectrum points 64` gives the spectrum itself, 64 points from 20 Hz to 24 kHz.
+
 **A synthesizer sound.** The "fat lead" from the starting points above, typed in:
 
 ```
@@ -578,13 +620,32 @@ with Board("COM5") as board:
             file.write(f"{point['hz']};{point['left']};{point['right']}\n")
 ```
 
+THD of a device, with `request` for the requests the client has no method of its own for:
+
+```
+import time
+from adl import Board
+
+with Board("COM5") as board:
+    board.select("analyzer")
+    board.set("level", -10)
+    board.request("thd start")          # switches the output on
+    time.sleep(8)                       # four or five results
+    state, results, hz, level_l, thd_l, thdn_l, level_r, thd_r, thdn_r = board.request("thd").values
+    print(f"{hz} Hz: THD {thd_l} / {thd_r} dB, THD+N {thdn_l} / {thdn_r} dB")
+    for order, hertz, left, right in board.request("harmonics").data:
+        print(f"H{order} {hertz} Hz: {left} / {right} dBc")
+    board.request("thd stop")
+    board.set("output", False)
+```
+
 ### A serial terminal
 
 Any serial terminal works too: 921600 baud, 8N1, **DTR and RTS off** (asserting them resets the ESP32), line end LF. Type `events on` to see the board's events.
 
 ## The front panel
 
-The board can have a front panel of its own: an **ESP32-2432S028R** display board, sold as the "CYD" (cheap yellow display), 2.8 inches, 320 × 240 pixels, with a resistive touch screen. It sits on a three-wire cable to the board's panel port and runs every application without a PC: choose an application, switch the output, set any value, start a sweep, change the radio station. The panel and the PC application work side by side; what one changes, the other shows.
+The board can have a front panel of its own: an **ESP32-2432S028R** display board, sold as the "CYD" (cheap yellow display), 2.8 inches, 320 × 240 pixels, with a resistive touch screen. It sits on a three-wire cable to the board's panel port and runs every application without a PC: choose an application, switch the output, set any value, start a sweep, measure THD or a spectrum, change the radio station. The panel and the PC application work side by side; what one changes, the other shows.
 
 Wiring, power and flashing are in [the front panel guide](Panel.md). In short: CYD GPIO22 to the board's GPIO37, CYD GPIO35 to the board's GPIO4, GND to GND, and `Flash-Panel.cmd` writes the panel firmware.
 
@@ -682,11 +743,15 @@ Anyone on your network can reach the board this way, as anyone with the USB cabl
 | Vibrato or LFO 1 filter does nothing | The mod wheel is at 0 after every start | Push the mod wheel up |
 | Your SigmaStudio program is gone after using an application | The copy failed (USBi on the bus) or an EEPROM write did not land | Return to SigmaStudio mode (the copy is written back); confirm writes in SigmaStudio |
 | "The board restarted" in the status line | A power dip, a reset, or a crash | The window reads everything again; if it repeats, use a better USB port or supply |
+| THD reads a fundamental of a few dozen Hz far below −60 dBFS | Nothing returns on K2: no cable, or the output off | Connect K3 to K2 or the device; press **Output on** |
+| THD or Spectrum shows `failed` | The DSP's serial output lost its clocks: the DSP runs another program (service mode) | Leave service mode and select **Analysis** again |
+| Spectrum shows a strong line at 50 Hz and its odd multiples | Mains hum: a ground loop between the board, the device and the PC | Power the device and the board from the same outlet; try a USB isolator or a laptop on battery |
 
 ## Technical notes
 
 - **Signals from the ESP32.** The generator and the synthesizer compute their signal on the ESP32 at 48 kHz, 16 bits, and send it to the DSP over I2S; the DSP runs the radio's program for them (the equalizer, set flat, and the volume). The generator keeps its phase in 32 bits, so its frequency is exact to the 0.01 Hz set.
 - **The DSP's core rate.** The SigmaStudio projects run the ADAU1701's core twice per 48 kHz sample (96 kHz). Every frequency the firmware computes (oscillators, filters) is computed for that rate; frequencies typed into SigmaStudio's own controls for these projects act twice as high.
+- **The line input to the ESP32.** The analysis' DSP program sends both line inputs, untouched, to the DSP's serial output (MP6, with its clocks on MP10 and MP11), which the ESP32 receives on its second I2S port. THD and Spectrum take 8192 samples per channel from it, window them (Blackman-Harris) and transform them (an FFT of 5.86 Hz bins); four captures per channel are averaged. The board's own floor: about −97.5 dBFS RMS from 20 Hz to 20 kHz, about 0.016 % THD in a loopback at −7 dBFS.
 - **The clock.** With JP1 on ext. MCLK the ESP32 supplies 12.288 MHz (256 × 48 kHz). The radio drives the clock from its stream's rate instead (256 × 44.1 kHz for most stations), and the equalizer's filters are recomputed for it.
 - **What the board stores** in the ESP32's flash: the WiFi networks, the stations, the analysis' Frequency Response reference, the power-up choice, and the copy of your SigmaStudio program. Flashing a firmware update with the flash tool keeps them; erasing the flash removes them.
 - **The pots** are read by the ESP32 (12-bit, smoothed). The DSP sees them only through the ESP32's DACs in SigmaStudio mode.

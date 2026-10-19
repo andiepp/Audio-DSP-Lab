@@ -2,13 +2,15 @@
 
 The result is application 0x04 of
 the Audio-DSP-Lab firmware, the analysis: a sine on K3 and K4, and on
-each channel of the line input K2 a level the firmware reads back. The ESP32
-sets the sine, computes every filter and reads the levels over I2C; the
-project only has to provide the blocks, with the cell names below,
-because the firmware finds them by those names in the export.
+each channel of the line input K2 a level the firmware reads back (its
+Frequency Response), and both line inputs on the DSP's serial output for
+the ESP32 (its THD and Spectrum, step 8). The ESP32 sets the sine,
+computes every filter and reads the levels over I2C; the project only has
+to provide the blocks, with the cell names below, because the firmware
+finds them by those names in the export.
 
-Allow about 40 minutes. Steps 1-5 need no board; step 6 needs a stereo
-cable from K3 to K2.
+Allow about an hour. Steps 1-5 need no board; steps 6 and 8 need a
+stereo cable from K3 to K2.
 
 ## 1. Start from the Generator project
 

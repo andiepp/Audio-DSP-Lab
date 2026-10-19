@@ -32,7 +32,7 @@ Selecting another application writes that application's program into the EEPROM.
 | EEPROM | 24C256 (32 KB) at 0x50 (0xA0) |
 | Clock | MCLK 12.288 MHz = 256 × 48 kHz from the ESP32; PLL mode 256 × fs |
 | Inputs | ADC0/ADC1 = K2 left/right; serial input 0/1 = I2S from the ESP32 (the radio, the synthesizer and the generator use it) |
-| Outputs | DAC0/DAC1 = K3, DAC2/DAC3 = K4 |
+| Outputs | DAC0/DAC1 = K3, DAC2/DAC3 = K4; DIG0/DIG1 = the serial output SDATA_OUT0 on MP6 (clocks MP10, MP11), which the ESP32 receives: `diag capture` and `diag record` show what your program sends there |
 | Pots | Auxiliary ADC 0 to 3 (see above), read with SigmaStudio's Auxiliary ADC input blocks |
 
 The project `sigmastudio/SigmaStudio/ADAU1701_SigmaStudio.dspproj` is a small working example (a VCO whose pitch follows P1). Start your own projects from it or from Elektor's Demo1: their hardware configuration fits the board.

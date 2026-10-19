@@ -17,7 +17,7 @@ The four pots on the board play the main values of each application, side by sid
 
 ## How it works
 
-The ESP32 runs the Audio-DSP-Lab firmware. It writes each application's DSP program into the ADAU1701's EEPROM, computes the filters, reads the pots and MIDI, streams the radio and makes the synthesizer's sound. The PC application sets values and shows what the board reports, over a simple **text protocol** on the USB serial port: you can use the same protocol from a terminal or a script.
+The ESP32 runs the Audio-DSP-Lab firmware. It writes each application's DSP program into the ADAU1701's EEPROM, computes the filters, reads the pots and MIDI, streams the radio, makes the synthesizer's sound and computes the line input's spectrum for THD and Spectrum. The PC application sets values and shows what the board reports, over a simple **text protocol** on the USB serial port: you can use the same protocol from a terminal or a script.
 
 ```
 > app generator

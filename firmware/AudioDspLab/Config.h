@@ -45,6 +45,9 @@
 #define PIN_I2S_BCLK                  27      // -> MP5 INPUT_BCLK (radio only)
 #define PIN_I2S_LRCLK                 14      // -> MP4 INPUT_LRCLK (radio only)
 // I2S data -> MP0 SDATA_IN0 (radio, synthesizer): GPIO18 or GPIO7 by kit, Board.h
+#define PIN_SOUT_DATA                 32      // <- MP6 SDATA_OUT0: the DSP's serial output (Capture.cpp)
+#define PIN_SOUT_LRCLK                13      // <- MP10 OUTPUT_LRCLK
+#define PIN_SOUT_BCLK                 19      // <- MP11 OUTPUT_BCLK
 #define PIN_POT1                      35      // P1
 #define PIN_POT2                      34      // P2
 #define PIN_POT3                      39      // P3
@@ -71,6 +74,9 @@
 // designed for 300 Hz acted at 1.2 kHz). Every DSP frequency is computed
 // for this rate, not for DSP_SAMPLE_RATE.
 #define DSP_CORE_RATE                 192000
+// The DSP's serial output (MP6, MP10, MP11; Capture.cpp): the images make
+// its port a master at twice the sample rate, 64 BCLK a frame (diag clocks)
+#define DSP_SERIAL_OUT_RATE           96000
 
 // --- timing -------------------------------------------------------------------
 #define DSP_BOOT_TIMEOUT_MS           1500    // self-boot from EEPROM

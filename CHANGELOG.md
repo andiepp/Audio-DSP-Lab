@@ -6,6 +6,7 @@
 - A failed EEPROM read is tried again after the firmware frees the I2C bus (clocks out a byte a device was left sending, then a STOP); `diag boot` reports the reset reason, the bus lines at the start and the EEPROM reads that failed since.
 - Docs: a front panel with its own supply half-powers the board's ESP32 through its cable while the board is unplugged, and the next power-up is not clean (the board silent until EN, or `eeprom-failed` in the SigmaStudio mode). Switch both together.
 - Panel: the panel drives its TX line only while the board's TX line lives. It lets the line go (high-Z) within a tenth of a second of the board losing power, so it no longer feeds an unplugged board, and the board powers up cleanly with the panel on its own supply (5 of 5 replugs `power-on 0x01`). A board that loses power is noticed at once rather than after an unanswered request.
+- Distortion measurement, step 1: `diag clocks` and `diag capture` read the DSP's serial output (MP6, MP10, MP11 to GPIO32, 13, 19) on the ESP32's second I2S port. The program images already make that port a clock master at 96 kHz with 64 bit clocks a frame. New error `no-clock`. `sigmastudio/Response-Instructions.md` step 8 adds the line input to the serial output.
 
 ## 1.1 — front panel and WiFi control
 

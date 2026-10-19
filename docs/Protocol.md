@@ -109,6 +109,7 @@ The board keeps numbers in hundredths. A request with more decimals is rounded, 
 | `wrong-application` | the command needs another application to be running |
 | `no-sweep` | there is no complete sweep to keep as the reference |
 | `store-failed` | the ESP32's flash (NVS) refused the write |
+| `no-clock` | no clock arrives on the DSP's serial output (MP10, MP11) |
 
 ## Commands
 
@@ -213,6 +214,8 @@ The station that plays is the radio's parameter `station`. The radio tries netwo
 | `diag meter` | `ok <pcm-bytes> <peak> <mp3-bytes> <stage> <loops> <task-state>`: the radio task since the last call |
 | `diag raw` | `ok <left> <right>`: the analyzer's raw capture words (5.19) |
 | `diag heap` | `ok <free> <largest-block> <lowest-free>`: the ESP32's heap in bytes: free now, the largest block one allocation can get, the lowest free since the start |
+| `diag clocks` | `ok <lrclk-hz> <bclk-hz>`: the DSP's serial output clocks (MP10 on GPIO13, MP11 on GPIO19), counted with the ESP32's pulse counter; the program images give about 96000 and 6144000 |
+| `diag capture [<frames>]` | `ok <rate> <frames> <rms-L> <peak-L> <hz-L> <rms-R> <peak-R> <hz-R> <first-word>`: the DSP's serial output (MP6 on GPIO32) as the ESP32's second I2S port receives it, 19200 frames (0.2 s) or 256 to 96000: the frame rate timed by the ESP32's clock, per channel the RMS and peak in dBFS (a full-scale sine: -3.01 RMS, 0 peak; -200 for silence) and the frequency of the zero crossings, and the first left slot as received; `err no-clock` without clocks. It uses no I2C, so it also works in service mode |
 
 Addresses and words may be written in hexadecimal with `0x`.
 

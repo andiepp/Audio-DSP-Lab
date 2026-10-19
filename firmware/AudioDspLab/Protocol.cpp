@@ -12,6 +12,7 @@
 #include "StudioBackup.h"
 #include "Eeprom24.h"
 #include "Synth.h"
+#include "Capture.h"
 #include <Arduino.h>
 #include <esp_system.h>
 #include <esp_rom_sys.h>
@@ -114,6 +115,7 @@ static const char *errorWord(uint8_t code) {
     case ERR_WRONG_APPLICATION:   return "wrong-application";
     case ERR_NO_SWEEP:            return "no-sweep";
     case ERR_STORE_FAILED:        return "store-failed";
+    case ERR_NO_CLOCK:            return "no-clock";
     default:                      return "failed";
   }
 }
@@ -133,6 +135,7 @@ static const char *errorText(uint8_t code) {
     case ERR_WRONG_APPLICATION:   return "not available in the running application";
     case ERR_NO_SWEEP:            return "no complete sweep to keep";
     case ERR_STORE_FAILED:        return "storing in flash failed";
+    case ERR_NO_CLOCK:            return "no clock on the DSP's serial output (MP10, MP11)";
     default:                      return "failed";
   }
 }
@@ -990,6 +993,27 @@ static void cmdDiag() {
     return okf("%lu %u %lu %u %lu %u", (unsigned long)bytes, peak, (unsigned long)streamBytes, stage,
                (unsigned long)loops, taskState);
   }
+  // the DSP's serial output, as the ESP32's second I2S port receives it:
+  // the rate timed against the ESP32's clock, the frames taken, per channel
+  // RMS and peak in dBFS and the frequency of its zero crossings, and the
+  // first left slot as it came (no I2C: works in service mode too)
+  if (is(1, "capture") && (tokenCount == 2 || tokenCount == 3)) {
+    long frames = CAPTURE_DEFAULT_FRAMES;
+    if (tokenCount == 3 && !parseLong(tokens[2], CAPTURE_MIN_FRAMES, CAPTURE_MAX_FRAMES, frames)) {
+      return fail(ERR_BAD_ARGUMENT);
+    }
+    CaptureResult r;
+    if (!captureMeasure((uint32_t)frames, r)) return fail(ERR_NO_CLOCK);
+    return okf("%.1f %lu %.2f %.2f %.1f %.2f %.2f %.1f 0x%08lX", r.rate, (unsigned long)r.frames,
+               r.left.rmsDb, r.left.peakDb, r.left.hertz, r.right.rmsDb, r.right.peakDb, r.right.hertz,
+               (unsigned long)r.firstWord);
+  }
+  // the serial output's LRCLK and BCLK, counted on their pins (Hz)
+  if (is(1, "clocks") && tokenCount == 2) {
+    float lrclk, bclk;
+    captureClocks(lrclk, bclk);
+    return okf("%.0f %.0f", lrclk, bclk);
+  }
   if (is(1, "raw") && tokenCount == 2) {
     if (!runningApp(APP_RESPONSE)) return;
     int32_t left, right;
@@ -1036,7 +1060,7 @@ static const Command commands[] = {
   { "load",      cmdLoad,       "load" },
   { "aux",       cmdAux,        "aux" },
   { "backup",    cmdBackup,     "backup" },
-  { "diag",      cmdDiag,       "diag boot|dsp|dspset|eeprom|scan|tone|meter|raw|heap ..." },
+  { "diag",      cmdDiag,       "diag boot|dsp|dspset|eeprom|scan|tone|meter|raw|heap|capture|clocks ..." },
   { "reset",     cmdReset,      "reset" },
 };
 

@@ -130,6 +130,82 @@ and convert the image with
 Remember that the DSP core runs at four times the sample rate (192 kHz):
 frequencies the firmware writes are computed for that rate.
 
+## 8. The serial output, for the distortion measurement
+
+The distortion measurement takes the line input's samples to the ESP32
+and computes their spectrum there. The DSP sends them on its serial
+output: MP6 (SDATA_OUT0) to ESP32 GPIO32, its clocks MP10 (OUTPUT_LRCLK)
+and MP11 (OUTPUT_BCLK) to GPIO13 and GPIO19. The project's register
+settings already make that port a clock master; the ESP32 measured
+96 kHz and 64 bit clocks a frame (`diag clocks`). The only thing the
+project lacks is something on the port, so this step adds one output
+block and changes nothing else. Allow about 20 minutes. The board needs
+firmware with `diag capture` (after 1.1), the USBi on the I2C header, and
+the stereo cable from K3 to K2.
+
+1. Open `sigmastudio\Response\ADAU1701_Response.dspproj`.
+2. **Hardware Configuration tab: change nothing.** Its register and
+   pin settings are what the ESP32 relies on.
+3. Add an output block (*IO > Output*), name it **`SerialOut`**, with
+   two channels: the first on the serial output channel that SigmaStudio
+   lists as **Serial Out 0** (or `SDATA_OUT0 L`, the left slot on
+   MP6), the second on **Serial Out 1** (`SDATA_OUT0 R`).
+4. Wire it in parallel with what is there; nothing existing changes:
+
+   ```
+   LineIn ch 0 (ADC0) --+--> BandL --> ...       (as before)
+                        +--> SerialOut ch 0 (Serial Out 0)
+   LineIn ch 1 (ADC1) --+--> BandR --> ...       (as before)
+                        +--> SerialOut ch 1 (Serial Out 1)
+   ```
+
+   Straight from the input: no gain, no filter in between.
+5. **Link-Compile** (no board needed); it must finish without errors.
+   **File > Save**.
+
+Note down the exact names the output block offers for its channels, and
+which two you took.
+
+### Try it on the board
+
+1. In the Audio-DSP-Lab application tick **Hand the DSP to SigmaStudio**
+   and press **Enter service** (or send `service on` in the console).
+2. SigmaStudio: **Link-Compile-Download**. `Sine` at 1000 Hz and
+   `Amplitude` at -20 dB, as in step 6.
+3. In the application's console send `diag capture`. It needs no I2C, so
+   it works while SigmaStudio holds the DSP. The answer is
+
+   ```
+   ok <rate> <frames> <rms-L> <peak-L> <hz-L> <rms-R> <peak-R> <hz-R> <first-word>
+   ```
+
+   with the levels in dBFS (a full-scale sine is -3.01 dB RMS, 0 dB
+   peak). Note the whole line.
+4. Set `Amplitude` to -40 dB, send `diag capture` again, note it; back
+   to -20 dB.
+5. Pull the cable out of K2, `diag capture`, note it (the floor); plug
+   it back in.
+6. Swap the cable's channels if you can (or pull only one side) to see
+   which reading follows which input.
+
+Expected: a rate near 96000; on both channels a peak near -20 dBFS
+(less or more by the loopback's gain from K3 to K2), 20 dB lower at
+-40 dB; and the same frequency on both. The frequency
+will not be 1000 Hz: SigmaStudio's frequencies play faster on this board
+(see step 6), and the reading shows by how much.
+
+If `diag capture` answers `err no-clock`, the port lost its clocks: check
+that nothing in the Hardware Configuration tab changed. If it answers
+with -200 dB on both channels, the samples did not reach the port: check
+the output block's channel choice.
+
+### Image and export
+
+When the readings look as expected, do **step 7** again (image and
+export from the same compile) and send the noted lines and names along.
+The firmware then takes over the new image and its addresses, which may
+have moved.
+
 ## If something is unclear
 
 - A block is named differently in the toolbox than here: use the

@@ -26,6 +26,7 @@ enum ErrorCode : uint8_t {
   ERR_WRONG_APPLICATION     = 0x16, // the request needs another application running
   ERR_NO_SWEEP              = 0x17, // no complete sweep to keep as the reference
   ERR_STORE_FAILED          = 0x18, // NVS refused a write
+  ERR_NO_CLOCK              = 0x19, // no clock on the DSP's serial output
 };
 
 #endif

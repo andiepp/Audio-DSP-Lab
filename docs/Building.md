@@ -12,7 +12,7 @@ This guide is for developers: building the firmware and the application, running
 | `firmware/MidiMonitor/` | A separate diagnostic sketch: prints what arrives on the MIDI input |
 | `app/` | The Windows application (.NET 10, WPF), its core library and tests |
 | `sigmastudio/` | The DSP programs as SigmaStudio projects, with their recipes |
-| `tools/` | Flash tool, release builder, Python client, image converter, PDF builder |
+| `tools/` | Flash tool, release builder, Python client, image converter, PDF builder, `Make-Overview.py` (draws `docs/images/overview.png`, needs Pillow) |
 | `docs/` | Manual, installation guide, protocol, this guide |
 
 ## The firmware

@@ -126,7 +126,7 @@ For your own DSP programs, install Analog Devices **SigmaStudio 4.7** and connec
 
 ## 9. Optional: the front panel
 
-A touch panel on an ESP32-2432S028R ("CYD") display board runs the applications without a PC and lets the PC application work over WiFi. Three wires connect it to the board (CYD GPIO22 to the board's GPIO37, CYD GPIO35 to GPIO4, and GND); `firmware\Flash-Panel.cmd` writes its firmware over the CYD's own USB port. Wiring, power and use: [the front panel guide](Panel.md).
+A touch panel on an ESP32-2432S028R ("CYD") display board runs the applications without a PC and lets the PC application work over WiFi. Three wires connect it to the board (CYD GPIO22 to the board's GPIO37, CYD GPIO35 to GPIO4, and GND); `firmware\Flash-Panel.cmd` writes its firmware over the CYD's own USB port. Wiring, power and use: the manual's chapter "The front panel", or [the front panel guide](Panel.md).
 
 ## Updating
 

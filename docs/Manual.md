@@ -4,7 +4,7 @@ As of 2026-10-19.
 
 Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.1 and application 1.1, and the optional front panel (panel firmware 1.1).
 
-![Audio-DSP-Lab: the PC sets values over USB, the board does the audio](images/overview.png)
+![Audio-DSP-Lab: the PC over USB, or the optional front panel on its own or as the PC's WiFi link, sets the values; the board does the audio](images/overview.png)
 
 ## At a glance
 
@@ -12,7 +12,7 @@ Audio-DSP-Lab has three parts:
 
 - **The firmware** runs on the board's ESP32. It writes each application's DSP program into the ADAU1701's EEPROM, computes filter coefficients, reads the pots and MIDI, streams the radio, makes the generator's signal and the synthesizer's sound, and analyses the spectrum of the line input for the analysis' THD and Spectrum. It talks to the PC over the board's USB port with a simple text protocol.
 - **The application** (`AudioDspLab.exe`) is the PC's front panel. It shows one page per application, sets every value, and shows what the board reports, including the changes you make with the board's pots.
-- **The front panel** (optional) is a small touch display on a cable to the board, an ESP32 "CYD": it runs the applications without a PC. See [The front panel](#the-front-panel).
+- **The front panel** (optional) is a small touch display on a cable to the board, an ESP32 "CYD". It runs the applications without a PC, and it lets the PC application work over WiFi, without a USB cable. See the chapter [The front panel](#the-front-panel).
 
 The board keeps working without the PC: once an application runs, you can close the window and keep playing. The board can also start an application by itself at power-up.
 
@@ -647,7 +647,35 @@ Any serial terminal works too: 921600 baud, 8N1, **DTR and RTS off** (asserting 
 
 The board can have a front panel of its own: an **ESP32-2432S028R** display board, sold as the "CYD" (cheap yellow display), 2.8 inches, 320 × 240 pixels, with a resistive touch screen. It sits on a three-wire cable to the board's panel port and runs every application without a PC: choose an application, switch the output, set any value, start a sweep, measure THD or a spectrum, change the radio station. The panel and the PC application work side by side; what one changes, the other shows.
 
-Wiring, power and flashing are in [the front panel guide](Panel.md). In short: CYD GPIO22 to the board's GPIO37, CYD GPIO35 to the board's GPIO4, GND to GND, and `Flash-Panel.cmd` writes the panel firmware.
+The panel does two jobs, as the overview at the start of this manual shows: on its own it is the board's front panel, and on your WiFi it is the PC application's way to the board, without a USB cable (see [WiFi control](#wifi-control)). Everything about the panel is in this chapter; [the front panel guide](Panel.md) has the same with notes for building its firmware.
+
+### What you need
+
+- An **ESP32-2432S028R**. The common version with one micro-USB port has an ILI9341 display, which the firmware expects. The version with two ports (USB-C and micro-USB) has an ST7789: its firmware has to be built with `DISPLAY_ST7789` set to 1 (see the front panel guide).
+- Three wires, and a 10 kΩ resistor (recommended).
+- The board with this release's firmware: it has the panel port.
+
+### Wiring
+
+| CYD | | Audio-DSP-FX board |
+| --- | --- | --- |
+| GPIO22 (TX), on the CN1 or P3 connector | → | **GPIO37** (RX): pin IO37 of the ESP32 kit, not connected on the board |
+| GPIO35 (RX), on the P3 connector | ← | **GPIO4** (TX): the pad of R36 ("MIDI out", not fitted), or pin IO4 of the kit |
+| GND | — | GND |
+
+Both sides are 3.3 V logic; no level shifter is needed. Put the 10 kΩ resistor between GPIO37 and 3.3 V on the board: GPIO37 has no pull-up of its own, and its line floats while the panel is off or restarting. The panel works without it too.
+
+The panel needs 5 V, from its own USB port or from the board's 5 V if the board's supply is about 9 V or less (the panel draws up to about 250 mA; above 9 V the board's regulator gets hot). A panel on its own supply lets its TX line go while the board is unplugged, so it does not keep the board half powered; a panel still on the firmware of release 1.1 did, and the board then started badly (see [Troubleshooting](#troubleshooting)).
+
+### Flashing
+
+Connect the CYD by USB; it usually shows up as "USB-SERIAL CH340 (COMn)". In the release's `firmware` folder:
+
+```
+.\Flash-Panel.cmd COM18
+```
+
+(or double-click `Flash-Panel.cmd` and type the port). It writes the panel's single image, `AudioDspLabPanel-merged.bin`, at address 0. The panel keeps one setting of its own, the brightness; flashing resets it to full. Flash the panel and the board from the same release: the panel speaks the board's protocol.
 
 ### Home and settings
 
@@ -718,7 +746,7 @@ Anyone on your network can reach the board this way, as anyone with the USB cabl
 | "Connecting to the board" stays | The board's firmware has no panel port (older than this release) | Flash the board's firmware from this release |
 | | TX and RX swapped, or GND missing | CYD GPIO22 to the board's GPIO37, CYD GPIO35 to GPIO4, GND to GND |
 | The link drops now and then | GPIO37 floats while the panel restarts | Fit the 10 kΩ pull-up from GPIO37 to 3.3 V |
-| Touches land beside their target | Another CYD's touch calibration | Tap the corners and adjust `Config.h` (see the front panel guide) |
+| Touches land beside their target | Another CYD's touch calibration | Tap the corners and adjust `Config.h` (the front panel guide, "For developers") |
 | Colours swapped or the picture upside down | The two-USB CYD with its ST7789 display | Build the panel firmware with `DISPLAY_ST7789` set to 1 |
 | Settings shows "WiFi: none" | No network stored on the board | Enter one in **WiFi networks …** (it serves the radio too) |
 | Settings shows "WiFi: failed" | Neither network answers, or a 5 GHz-only network | The panel tries again every 30 s; use a 2.4 GHz network |

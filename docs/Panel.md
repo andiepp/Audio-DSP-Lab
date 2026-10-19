@@ -1,8 +1,12 @@
 # The front panel
 
-A touch front panel for the board: an **ESP32-2432S028R** display board (the "CYD", "cheap yellow display": 2.8″, 320 × 240, resistive touch) on a cable to the board's panel port. With it the board works without a PC: choose an application, switch the output, and set every value. The panel and the PC application can work side by side; what one changes, the other shows.
+A touch front panel for the board, and the PC application's way to the board over WiFi: an **ESP32-2432S028R** display board (the "CYD", "cheap yellow display": 2.8″, 320 × 240, resistive touch) on a cable to the board's panel port. With it the board works without a PC: choose an application, switch the output, and set every value. The panel and the PC application can work side by side; what one changes, the other shows.
 
-It has the home screen and a settings screen, each application's parameters as tiles with a value editor, the output switch and the knob strip, and pages made for the applications: the equalizer's curve, the radio's station keys, the analysis' sweep and plot with its THD measurement, and the synthesizer's sections with its filter and envelope graphs.
+![What goes where: the panel on its own, or as the PC's WiFi link](images/overview.png)
+
+The manual's chapter "The front panel" covers the same for users, with pictures of every page; this guide adds the notes for building the panel's firmware.
+
+It has the home screen and a settings screen, each application's parameters as tiles with a value editor, the output switch and the knob strip, and pages made for the applications: the equalizer's curve, the radio's station keys, the analysis' sweep and plot with its THD and Spectrum, and the synthesizer's sections with its filter and envelope graphs.
 
 ## What you need
 

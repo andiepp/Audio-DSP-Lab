@@ -1,7 +1,7 @@
 /*
  * File:           H:\Audio-DSP-Lab\sigmastudio\Analysis\Export\ADAU1701_Analysis_IC_1_PARAM.h
  *
- * Created:        Monday, October 19, 2026 1:37:00 PM
+ * Created:        Monday, October 19, 2026 8:28:58 PM
  * Description:    ADAU1701_Analysis:IC 1 parameter RAM definitions.
  *
  * This software is distributed in the hope that it will be useful,
@@ -16,8 +16,8 @@
  *
  * Copyright ©2026 Analog Devices, Inc. All rights reserved.
  */
-#ifndef __ADAU1701_RESPONSE_IC_1_PARAM_H__
-#define __ADAU1701_RESPONSE_IC_1_PARAM_H__
+#ifndef __ADAU1701_ANALYSIS_IC_1_PARAM_H__
+#define __ADAU1701_ANALYSIS_IC_1_PARAM_H__
 
 
 /* Module Sine - Sine Tone*/

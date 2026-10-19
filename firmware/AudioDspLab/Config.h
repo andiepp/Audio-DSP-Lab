@@ -68,15 +68,22 @@
 
 // --- audio clock --------------------------------------------------------------
 #define DSP_SAMPLE_RATE               48000   // MCLK = 256 x fs = 12.288 MHz
+// The ESP32 drives MCLK on GPIO0 from an I2S channel clocked by the APLL.
+// On the ESP32 that pin carries the APLL itself, and the driver sets the
+// APLL to twice the I2S port's own MCLK (its divider cannot go below 2):
+// so the port asks for 128 x fs to put 256 x fs on the pin. With 256 the
+// DSP ran on 24.576 MHz, twice its rating, and its converters made
+// sporadic single-sample errors (found with the serial output capture;
+// on the board's crystal X1 they vanished).
+#define DSP_MCLK_I2S_MULTIPLE         128
 // The rate the DSP core runs its program at. The SigmaStudio projects carry
-// Elektor Demo1's core register (program length 01), and the core runs 4
-// times per 48 kHz sample: measured with a tone during development (a filter
-// designed for 300 Hz acted at 1.2 kHz). Every DSP frequency is computed
-// for this rate, not for DSP_SAMPLE_RATE.
-#define DSP_CORE_RATE                 192000
+// Elektor Demo1's core register (program length 01: 512 instructions), so
+// the core runs twice per sample. Every DSP frequency is computed for this
+// rate, not for DSP_SAMPLE_RATE.
+#define DSP_CORE_RATE                 96000
 // The DSP's serial output (MP6, MP10, MP11; Capture.cpp): the images make
-// its port a master at twice the sample rate, 64 BCLK a frame (diag clocks)
-#define DSP_SERIAL_OUT_RATE           96000
+// its port a master at the sample rate, 64 BCLK a frame (diag clocks)
+#define DSP_SERIAL_OUT_RATE           48000
 
 // --- timing -------------------------------------------------------------------
 #define DSP_BOOT_TIMEOUT_MS           1500    // self-boot from EEPROM

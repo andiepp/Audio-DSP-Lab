@@ -2,7 +2,7 @@
 #include <complex>
 #include <math.h>
 
-#define EQ_CORE_RATE                  192000.0
+#define EQ_CORE_RATE                  96000.0
 #define EQ_MIDDLE_Q                   0.7
 #define SYNTH_RATE                    48000.0
 #define SYNTH_EMPHASIS_MAXIMUM        4.2

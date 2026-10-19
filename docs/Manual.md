@@ -41,7 +41,7 @@ Before you start, the board needs the firmware and two jumper settings: see the 
 | JP1 | DSP clock | On **ext. MCLK**: the ESP32 supplies the clock |
 | JP2 | DSP boot | On **Selfboot** |
 
-The DSP samples at 48 kHz; its core runs four times per sample (192 kHz), and every frequency the firmware computes is computed for that rate. Levels are given in dBFS: 0 dBFS is the DSP's full scale.
+The DSP samples at 48 kHz; its core runs twice per sample (96 kHz), and every frequency the firmware computes is computed for that rate. Levels are given in dBFS: 0 dBFS is the DSP's full scale.
 
 ## Getting started
 
@@ -650,7 +650,7 @@ Anyone on your network can reach the board this way, as anyone with the USB cabl
 ## Technical notes
 
 - **Signals from the ESP32.** The generator and the synthesizer compute their signal on the ESP32 at 48 kHz, 16 bits, and send it to the DSP over I2S; the DSP runs the radio's program for them (the equalizer, set flat, and the volume). The generator keeps its phase in 32 bits, so its frequency is exact to the 0.01 Hz set.
-- **The DSP's core rate.** The SigmaStudio projects run the ADAU1701's core four times per 48 kHz sample (192 kHz). Every frequency the firmware computes (oscillators, filters) is computed for that rate; frequencies typed into SigmaStudio's own controls for these projects act four times higher.
+- **The DSP's core rate.** The SigmaStudio projects run the ADAU1701's core twice per 48 kHz sample (96 kHz). Every frequency the firmware computes (oscillators, filters) is computed for that rate; frequencies typed into SigmaStudio's own controls for these projects act twice as high.
 - **The clock.** With JP1 on ext. MCLK the ESP32 supplies 12.288 MHz (256 × 48 kHz). The radio drives the clock from its stream's rate instead (256 × 44.1 kHz for most stations), and the equalizer's filters are recomputed for it.
 - **What the board stores** in the ESP32's flash: the WiFi networks, the stations, the analyzer's reference, the power-up choice, and the copy of your SigmaStudio program. Flashing a firmware update with the flash tool keeps them; erasing the flash removes them.
 - **The pots** are read by the ESP32 (12-bit, smoothed). The DSP sees them only through the ESP32's DACs in SigmaStudio mode.

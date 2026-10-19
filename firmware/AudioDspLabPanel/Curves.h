@@ -3,7 +3,7 @@
 // ****************************************************************************
 //  What the panel draws, computed as the board computes it: the
 //  equalizer's bands (RBJ cookbook, shelves with slope 1, a peak with
-//  Q 0.7, at the DSP's 192 kHz; firmware Applications.cpp), the
+//  Q 0.7, at the DSP's 96 kHz; firmware Applications.cpp), the
 //  synthesizer's ladder filter (four bilinear stages, feedback k, make-up
 //  1 + k/4, at 48 kHz) and its envelopes (firmware Synth.cpp).
 // ----------------------------------------------------------------------------

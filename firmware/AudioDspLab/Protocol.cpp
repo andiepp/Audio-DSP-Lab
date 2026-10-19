@@ -1004,15 +1004,41 @@ static void cmdDiag() {
     }
     CaptureResult r;
     if (!captureMeasure((uint32_t)frames, r)) return fail(ERR_NO_CLOCK);
-    return okf("%.1f %lu %.2f %.2f %.1f %.2f %.2f %.1f 0x%08lX", r.rate, (unsigned long)r.frames,
+    return okf("%.1f %lu %.2f %.2f %.1f %.2f %.2f %.1f 0x%08lX %.5f %.5f", r.rate, (unsigned long)r.frames,
                r.left.rmsDb, r.left.peakDb, r.left.hertz, r.right.rmsDb, r.right.peakDb, r.right.hertz,
-               (unsigned long)r.firstWord);
+               (unsigned long)r.firstWord, r.left.dc, r.right.dc);
+  }
+  // contiguous frames of the serial output, 16 a data line: per frame the
+  // left and right sample as 6 hex digits (24 bits, two's complement)
+  if (is(1, "record") && (tokenCount == 2 || tokenCount == 3)) {
+    long frames = 4096;
+    if (tokenCount == 3 && !parseLong(tokens[2], CAPTURE_CHUNK_FRAMES, 4096, frames)) return fail(ERR_BAD_ARGUMENT);
+    frames = (frames + CAPTURE_CHUNK_FRAMES - 1) / CAPTURE_CHUNK_FRAMES * CAPTURE_CHUNK_FRAMES;
+    int32_t *samples = (int32_t *)malloc(frames * 2 * sizeof(int32_t));
+    if (samples == nullptr) return fail(ERR_OUT_OF_RANGE);
+    CaptureResult r;
+    if (!captureMeasure((uint32_t)frames, r, samples)) {
+      free(samples);
+      return fail(ERR_NO_CLOCK);
+    }
+    char line[16 * 13 + 1];
+    for (long first = 0; first < frames; first += 16) {
+      int at = 0;
+      for (long i = first; i < first + 16; i++) {
+        at += snprintf(line + at, sizeof(line) - at, "%s%06lX%06lX", i == first ? "" : " ",
+                       (unsigned long)(samples[2 * i] & 0xFFFFFF), (unsigned long)(samples[2 * i + 1] & 0xFFFFFF));
+      }
+      dataf("%s", line);
+    }
+    free(samples);
+    return okf("%.1f %ld", r.rate, frames);
   }
   // the serial output's LRCLK and BCLK, counted on their pins (Hz)
   if (is(1, "clocks") && tokenCount == 2) {
-    float lrclk, bclk;
+    float lrclk, bclk, dataEdges, dataHigh;
     captureClocks(lrclk, bclk);
-    return okf("%.0f %.0f", lrclk, bclk);
+    captureDataPin(dataEdges, dataHigh);
+    return okf("%.0f %.0f %.0f %.1f", lrclk, bclk, dataEdges, dataHigh);
   }
   if (is(1, "raw") && tokenCount == 2) {
     if (!runningApp(APP_RESPONSE)) return;

@@ -81,7 +81,7 @@ and convert the image with
     -Name DspImageRadio -Destination firmware\AudioDspLab\DspImageRadio.h
 ```
 
-Remember that the DSP core runs at four times the sample rate (192 kHz):
+Remember that the DSP core runs at twice the sample rate (96 kHz):
 frequencies the firmware writes are computed for that rate.
 The radio's cells and addresses must stay the equalizer's: the firmware
 uses the same code for both.

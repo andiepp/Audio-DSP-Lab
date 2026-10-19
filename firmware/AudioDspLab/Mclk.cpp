@@ -29,7 +29,8 @@ bool mclkStart(uint32_t sampleRate) {
     },
   };
   config.clk_cfg.clk_src = I2S_CLK_SRC_APLL;                 // exact 12.288 MHz
-  config.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256;      // ADAU1701 PLL 256 x fs
+  // 256 x fs on the pin (ADAU1701 PLL mode 256 x fs): see Config.h
+  config.clk_cfg.mclk_multiple = (i2s_mclk_multiple_t)DSP_MCLK_I2S_MULTIPLE;
 
   if (i2s_channel_init_std_mode(txChannel, &config) != ESP_OK ||
       i2s_channel_enable(txChannel) != ESP_OK) {

@@ -37,7 +37,7 @@ Selecting another application writes that application's program into the EEPROM.
 
 The project `sigmastudio/SigmaStudio/ADAU1701_SigmaStudio.dspproj` is a small working example (a VCO whose pitch follows P1). Start your own projects from it or from Elektor's Demo1: their hardware configuration fits the board.
 
-**About the core rate.** The repository's projects keep Elektor Demo1's core setting, which runs the program four times per 48 kHz sample (192 kHz). In such projects the frequencies you type into SigmaStudio's block GUIs act four times higher than shown. A project of your own with the standard core setting behaves normally.
+**About the core rate.** The repository's projects keep Elektor Demo1's core setting, which runs the program twice per 48 kHz sample (96 kHz). In such projects the frequencies you type into SigmaStudio's block GUIs act twice as high as shown. A project of your own with the standard core setting behaves normally.
 
 ## Service mode
 

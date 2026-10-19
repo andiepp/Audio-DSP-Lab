@@ -95,8 +95,8 @@ K3 or K4; turn any amplifier down.
 5. Pull the cable out of K2, note both values (the noise floor); plug it
    back in.
 
-The frequencies in SigmaStudio's GUIs play four times higher on this
-board (the DSP core runs at four times the sample rate); that
+The frequencies in SigmaStudio's GUIs play twice as high on this
+board (the DSP core runs at twice the sample rate); that
 is expected and does not matter here.
 
 ## 7. Produce the image and the export
@@ -127,7 +127,7 @@ and convert the image with
     -Name DspImageResponse -Destination firmware\AudioDspLab\DspImageResponse.h
 ```
 
-Remember that the DSP core runs at four times the sample rate (192 kHz):
+Remember that the DSP core runs at twice the sample rate (96 kHz):
 frequencies the firmware writes are computed for that rate.
 
 ## 8. The serial output, for the distortion measurement
@@ -137,26 +137,26 @@ and computes their spectrum there. The DSP sends them on its serial
 output: MP6 (SDATA_OUT0) to ESP32 GPIO32, its clocks MP10 (OUTPUT_LRCLK)
 and MP11 (OUTPUT_BCLK) to GPIO13 and GPIO19. The project's register
 settings already make that port a clock master; the ESP32 measured
-96 kHz and 64 bit clocks a frame (`diag clocks`). The only thing the
-project lacks is something on the port, so this step adds one output
-block and changes nothing else. Allow about 20 minutes. The board needs
+48 kHz and 64 bit clocks a frame (`diag clocks`). The only thing the
+project lacks is something on the port, so this step adds two output
+blocks and changes nothing else. Allow about 20 minutes. The board needs
 firmware with `diag capture` (after 1.1), the USBi on the I2C header, and
 the stereo cable from K3 to K2.
 
 1. Open `sigmastudio\Response\ADAU1701_Response.dspproj`.
 2. **Hardware Configuration tab: change nothing.** Its register and
    pin settings are what the ESP32 relies on.
-3. Add an output block (*IO > Output*), name it **`SerialOut`**, with
-   two channels: the first on the serial output channel that SigmaStudio
-   lists as **Serial Out 0** (or `SDATA_OUT0 L`, the left slot on
-   MP6), the second on **Serial Out 1** (`SDATA_OUT0 R`).
-4. Wire it in parallel with what is there; nothing existing changes:
+3. Add two output blocks (*IO > Output*; each carries one channel):
+   **`SerialOutL`** with its list set to **DIG0** and **`SerialOutR`**
+   set to **DIG1**. DIG0 and DIG1 are the left and right slot of
+   SDATA_OUT0 on MP6; DIG2 and up go to pins the ESP32 does not hear.
+4. Wire them in parallel with what is there; nothing existing changes:
 
    ```
    LineIn ch 0 (ADC0) --+--> BandL --> ...       (as before)
-                        +--> SerialOut ch 0 (Serial Out 0)
+                        +--> SerialOutL (DIG0)
    LineIn ch 1 (ADC1) --+--> BandR --> ...       (as before)
-                        +--> SerialOut ch 1 (Serial Out 1)
+                        +--> SerialOutR (DIG1)
    ```
 
    Straight from the input: no gain, no filter in between.
@@ -188,11 +188,17 @@ which two you took.
 6. Swap the cable's channels if you can (or pull only one side) to see
    which reading follows which input.
 
-Expected: a rate near 96000; on both channels a peak near -20 dBFS
-(less or more by the loopback's gain from K3 to K2), 20 dB lower at
--40 dB; and the same frequency on both. The frequency
-will not be 1000 Hz: SigmaStudio's frequencies play faster on this board
-(see step 6), and the reading shows by how much.
+Expected: a rate near 48000; on both channels a peak near -27 dBFS
+(the loopback from K3 to K2 loses about 7 dB), 20 dB lower at -40 dB;
+and the same frequency on both, 2000 Hz: SigmaStudio's frequencies play
+twice as high on this board (see step 6). The levels are measured from
+the input's DC offset (about -0.016 of full scale), which `diag capture`
+reports in its last two fields.
+
+To check the path alone, wire `SerialOutR` to the sine (after
+`Amplitude`) instead of LineIn ch 1 for a moment: `diag record` then
+shows a perfect sine at exactly -20.00 dBFS on the right. Wire it back
+before step 7.
 
 If `diag capture` answers `err no-clock`, the port lost its clocks: check
 that nothing in the Hardware Configuration tab changed. If it answers

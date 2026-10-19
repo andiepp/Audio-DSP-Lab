@@ -112,11 +112,11 @@ public sealed class EqualizerPageViewModel : ApplicationPageViewModel
 /// <summary>
 /// The equalizer's response computed from its bands the way the firmware
 /// designs them (RBJ cookbook: shelves with slope 1, a peak with Q 0.7) at
-/// the DSP core's 192 kHz.
+/// the DSP core's 96 kHz.
 /// </summary>
 public static class EqualizerResponse
 {
-    public const double CoreRateHertz = 192_000.0;
+    public const double CoreRateHertz = 96_000.0;
     public const double MiddleQuality = 0.7;
 
     public readonly record struct Biquad(double B0, double B1, double B2, double A1, double A2)

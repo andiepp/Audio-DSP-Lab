@@ -116,7 +116,7 @@ and convert the image with
     -Name DspImageEqualizer -Destination firmware\AudioDspLab\DspImageEqualizer.h
 ```
 
-Remember that the DSP core runs at four times the sample rate (192 kHz):
+Remember that the DSP core runs at twice the sample rate (96 kHz):
 frequencies the firmware writes are computed for that rate.
 
 ## If something is unclear

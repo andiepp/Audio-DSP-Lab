@@ -45,7 +45,7 @@ static float levelToGain(int32_t centiDb) {
 static int32_t currentValue(uint8_t paramId);
 
 // the rate the DSP core runs at: DSP_CORE_RATE under the firmware's own clock,
-// four times the stream's rate while the radio drives it
+// twice the stream's rate while the radio drives it
 static uint32_t coreRate = DSP_CORE_RATE;
 
 // ----------------------------------------------------------------------------
@@ -164,8 +164,8 @@ static const PotMap generatorPots[] = {
 //    steps 31/33 left at their default
 //  The firmware computes every band from its gain and frequency (RBJ audio EQ
 //  cookbook: low shelf and high shelf with slope 1, peaking with Q 0.7) for
-//  the rate the core really runs, DSP_CORE_RATE (192 kHz; 0.6 and 0.7
-//  computed for 48 kHz, so every band acted at four times its frequency).
+//  the rate the core really runs, DSP_CORE_RATE (96 kHz: twice the sample
+//  rate, Config.h).
 // ----------------------------------------------------------------------------
 
 #define EQ_BASS_GAIN                  1       // 0.01 dB, -12 .. +12 dB
@@ -302,7 +302,7 @@ static const PotMap equalizerPots[] = {
 //  input moved to I2S, so the cells and addresses are the equalizer's.
 //  Parameters 1-8 are the equalizer's, 9 the station. While the radio
 //  runs, the DSP's clock is the stream's (MCLK = 256 x its rate) and the
-//  core rate four times that; the bands follow every change of it.
+//  core rate twice that; the bands follow every change of it.
 // ----------------------------------------------------------------------------
 
 #define RADIO_STATION                 9       // index into the station list
@@ -315,7 +315,7 @@ static bool radioStation(int32_t value) {
 
 static bool radioTakeClock() {
   mclkStop();
-  coreRate = 4UL * RADIO_DEFAULT_SAMPLE_RATE;
+  coreRate = 2UL * RADIO_DEFAULT_SAMPLE_RATE;
   return radioBegin(0);
 }
 
@@ -867,7 +867,7 @@ void appsInit() {
 static void followRadioRate() {
   uint32_t rate;
   if (!radioTakeRateChange(rate) || rate == 0) return;
-  coreRate = 4UL * rate;
+  coreRate = 2UL * rate;
   for (uint8_t i = 0; i < active->paramCount; i++) {
     uint8_t id = active->params[i].id;
     if (id >= EQ_BASS_GAIN && id <= EQ_TREBLE_FREQUENCY) active->params[i].apply(values[i]);

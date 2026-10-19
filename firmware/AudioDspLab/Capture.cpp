@@ -11,13 +11,17 @@
 static int32_t chunk[2 * CAPTURE_CHUNK_FRAMES];
 
 struct Stats {
+  int32_t offset;           // the first chunk's mean: the DC the rest is measured from
   int32_t peak;
+  double sum;
   double squares;
   uint32_t crossings;       // upward, past the hysteresis
   int8_t side;              // -1 below, 1 above, 0 not yet known
 };
 
-static void take(Stats &s, int32_t x) {
+static void take(Stats &s, int32_t sample) {
+  s.sum += sample;
+  const int32_t x = sample - s.offset;
   const int32_t magnitude = x < 0 ? -x : x;
   if (magnitude > s.peak) s.peak = magnitude;
   s.squares += (double)x * x;
@@ -34,7 +38,11 @@ static float decibels(double counts) {
 }
 
 static void finish(const Stats &s, uint32_t frames, float rate, CaptureChannel &out) {
-  out.rmsDb = decibels(sqrt(s.squares / frames));
+  const double mean = s.sum / frames;
+  const double drift = mean - s.offset;
+  const double variance = s.squares / frames - drift * drift;
+  out.rmsDb = decibels(variance > 0 ? sqrt(variance) : 0);
+  out.dc = (float)(mean / 8388608.0);
   out.peakDb = decibels(s.peak);
   out.hertz = s.crossings * rate / frames;
 }
@@ -76,13 +84,24 @@ void captureClocks(float &lrclkHertz, float &bclkHertz) {
   bclkHertz = countEdges(PIN_SOUT_BCLK, 2000);        // up to 12.3 MHz: 24576 edges
 }
 
+void captureDataPin(float &edgesHertz, float &highPercent) {
+  edgesHertz = countEdges(PIN_SOUT_DATA, 2000);
+  pinMode(PIN_SOUT_DATA, INPUT);
+  uint32_t high = 0;
+  for (int i = 0; i < 1000; i++) {
+    high += digitalRead(PIN_SOUT_DATA);
+    delayMicroseconds(3);
+  }
+  highPercent = high / 10.0f;
+}
+
 // one chunk, exactly a DMA buffer, so that every read starts on a frame
 static bool readChunk(i2s_chan_handle_t rx, uint32_t timeoutMs) {
   size_t got = 0;
   return i2s_channel_read(rx, chunk, sizeof(chunk), &got, timeoutMs) == ESP_OK && got == sizeof(chunk);
 }
 
-bool captureMeasure(uint32_t frames, CaptureResult &result) {
+bool captureMeasure(uint32_t frames, CaptureResult &result, int32_t *keep) {
   result = CaptureResult();
   i2s_chan_handle_t rx = NULL;
   i2s_chan_config_t channelConfig = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_1, I2S_ROLE_SLAVE);
@@ -104,8 +123,8 @@ bool captureMeasure(uint32_t frames, CaptureResult &result) {
   };
   // not the APLL: it makes the DSP's MCLK on the first port. A slave's
   // own clock only samples the incoming BCLK and must run at 8 times it
-  // (512 x 96 kHz = 49.152 MHz); at 1024 x 48 kHz, 4 times the 96 kHz
-  // port's BCLK, it miscounted the frames (89.6 kHz measured)
+  // (512 x 48 kHz = 24.576 MHz for 3.07 MHz); at 4 times it the slave
+  // miscounted the frames (measured before the MCLK fix, Config.h)
   config.clk_cfg.clk_src = I2S_CLK_SRC_PLL_160M;
   config.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_512;
 
@@ -127,11 +146,24 @@ bool captureMeasure(uint32_t frames, CaptureResult &result) {
         break;
       }
       lastAt = micros();
-      if (done == 0) result.firstWord = (uint32_t)chunk[0];
+      if (done == 0) {
+        result.firstWord = (uint32_t)chunk[0];
+        int64_t sumLeft = 0, sumRight = 0;
+        for (int i = 0; i < CAPTURE_CHUNK_FRAMES; i++) {
+          sumLeft += chunk[2 * i] >> 8;
+          sumRight += chunk[2 * i + 1] >> 8;
+        }
+        left.offset = (int32_t)(sumLeft / CAPTURE_CHUNK_FRAMES);
+        right.offset = (int32_t)(sumRight / CAPTURE_CHUNK_FRAMES);
+      }
       // 24 bits, MSB first, at the top of each 32-bit slot
       for (int i = 0; i < CAPTURE_CHUNK_FRAMES; i++) {
         take(left, chunk[2 * i] >> 8);
         take(right, chunk[2 * i + 1] >> 8);
+      }
+      if (keep != nullptr) {
+        int32_t *to = keep + 2 * CAPTURE_CHUNK_FRAMES * done;
+        for (int i = 0; i < 2 * CAPTURE_CHUNK_FRAMES; i++) to[i] = chunk[i] >> 8;
       }
       done++;
     }

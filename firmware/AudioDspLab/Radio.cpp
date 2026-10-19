@@ -283,7 +283,7 @@ static bool startI2s(uint32_t rate) {
   config.pin_mck = PIN_MCLK;
   config.i2s_format = I2S_STD_FORMAT;       // ADAU1701 serial input mode 0 = I2S
   config.use_apll = true;
-  config.mclk_multiple = 256;               // ADAU1701 PLL mode 256 x fs
+  config.mclk_multiple = DSP_MCLK_I2S_MULTIPLE;   // 256 x fs on the pin (ADAU1701 PLL mode): Config.h
   config.sample_rate = rate;
   config.channels = 2;
   config.bits_per_sample = 16;

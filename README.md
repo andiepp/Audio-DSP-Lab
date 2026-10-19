@@ -9,7 +9,7 @@ Six audio instruments for the **Elektor Audio-DSP-FX board** (ADAU1701 DSP + ESP
 | **Generator** | Sine, rectangle, triangle, saw, inverse saw or noise, 20 Hz to 20 kHz, −60 to 0 dBFS; a width for the rectangle (pulse) and the triangle (rise) |
 | **Equalizer** | Bass, middle and treble with adjustable frequencies on the line input |
 | **Radio** | MP3 internet radio over WiFi, through the equalizer; eight editable stations |
-| **Analysis** | **Frequency Response**: sweeps a device under test, with a reference to subtract the board's own response. **THD**: the harmonic distortion and THD+N of a device, with its spectrum |
+| **Analysis** | **Frequency Response**: sweeps a device under test, with a reference to subtract the board's own response. **THD**: the harmonic distortion and THD+N of a device, with its spectrum. **Spectrum**: what comes on the line input, with its RMS and strongest peaks |
 | **SigmaStudio** | Runs your own SigmaStudio programs; the pots go to the DSP's auxiliary ADC, your program survives the other applications |
 | **Synthesizer** | A Minimoog-style monophonic synthesizer: three oscillators, ladder filter, envelopes, two LFOs, glide, played from any MIDI keyboard |
 

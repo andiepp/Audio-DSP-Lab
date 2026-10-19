@@ -71,8 +71,14 @@ struct Board {
   float thdLevel[2] = { NAN, NAN };   // the fundamental's peak, dBFS
   float thd[2] = { NAN, NAN };        // dB
   float thdn[2] = { NAN, NAN };
-  std::vector<SweepPoint> spectrum;   // 64 points: per point the strongest bin, dBFS
+  std::vector<SweepPoint> spectrum;   // 64 points: per point the strongest bin, dBFS (THD's or the Spectrum's)
   uint32_t spectrumVersion = 0;
+  // its Spectrum: the latest result's RMS and strongest peak per channel
+  String spectrumState;         // "idle", "running", "failed"
+  int spectrumResults = 0;
+  float rms[2] = { NAN, NAN };        // dBFS, 20 Hz to 20 kHz
+  float peakHertz[2] = { NAN, NAN };
+  float peakDb[2] = { NAN, NAN };     // as a sine's peak, dBFS
 };
 
 extern Board board;
@@ -86,6 +92,7 @@ void linkSelectApplication(const char *name);
 void linkSetPotControl(bool on);
 void linkSweep(bool start);                          // starts or stops a sweep
 void linkDistortion(bool start);                     // starts or stops the THD measurement
+void linkSpectrum(bool start);                       // starts or stops the Spectrum
 void linkReadSettings();                             // pot control and the power-up choice, read again
 void linkSetStartup(bool restores);
 

@@ -369,7 +369,8 @@ static bool anaSetting(int32_t) {
 
 // while the THD measurement runs, the tone sits on a bin's centre
 static bool anaTone(int32_t value) {
-  return analyzerSetTone(distortionState() == DISTORTION_RUNNING ? distortionSnap(value) : value);
+  const bool snapped = distortionState() == DISTORTION_RUNNING && distortionMode() == DISTORTION_THD;
+  return analyzerSetTone(snapped ? distortionSnap(value) : value);
 }
 
 static const ParamDef analysisParams[] = {

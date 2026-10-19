@@ -11,7 +11,7 @@ The board speaks a line-based text protocol on its USB serial port. You can use 
 - [Lines](#lines)
 - [Values](#values)
 - [Errors](#errors)
-- [Commands](#commands): [general](#general), [applications](#applications-and-parameters), [potentiometers and settings](#potentiometers-power-up-and-service-mode), [radio](#radio), [analysis](#analysis-frequency-response-and-thd), [synthesizer](#synthesizer), [SigmaStudio mode](#sigmastudio-mode), [diagnostics](#diagnostics)
+- [Commands](#commands): [general](#general), [applications](#applications-and-parameters), [potentiometers and settings](#potentiometers-power-up-and-service-mode), [radio](#radio), [analysis](#analysis-frequency-response-thd-and-spectrum), [synthesizer](#synthesizer), [SigmaStudio mode](#sigmastudio-mode), [diagnostics](#diagnostics)
 - [Events](#events)
 - [Parameters per application](#parameters-per-application)
 - [A session](#a-session)
@@ -176,9 +176,9 @@ Applications:
 
 The station that plays is the radio's parameter `station`. The radio tries network 0 first, then network 1. Stations and networks are kept in the ESP32's flash.
 
-### Analysis: Frequency Response and THD
+### Analysis: Frequency Response, THD and Spectrum
 
-The application is `analyzer`, as before; its Frequency Response is the sweep, its THD the `thd` measurement.
+The application is `analyzer`, as before; its Frequency Response is the sweep, its THD the `thd` measurement, its Spectrum the `spectrum` measurement.
 
 | Request | Response | Notes |
 | --- | --- | --- |
@@ -193,9 +193,13 @@ The application is `analyzer`, as before; its Frequency Response is the sweep, i
 | `thd start` | as `thd` | measures continuously, a result about every 1.6 s; switches the output on, stops a sweep, puts the tone on the nearest FFT bin (multiples of 5.859 Hz) |
 | `thd stop` | as `thd` | the tone goes back to `tone`; the last result is kept |
 | `harmonics` | `* <n> <hz> <dBc-L> <dBc-R>` per harmonic, `ok` | H2 to H10 of the latest result, as far as they lie below 20 kHz |
-| `spectrum [<points>]` | `* <index> <hz> <dB-L> <dB-R>` per point, `ok` | the latest result's spectrum, 20 Hz to 24 kHz on a logarithmic axis, in 256 points or 16, 32, 64, 128 (each the strongest of its group); per point the strongest FFT bin as a sine's peak in dBFS |
+| `spectrum` | `ok <state> <results> <rms-L> <rms-R>` | the Spectrum: state `idle`, `running`, `failed`; the latest result's RMS from 20 Hz to 20 kHz per channel in dBFS, `-` before the first |
+| `spectrum start` | as `spectrum` | measures continuously what comes on K2, a result about every 1.6 s; no tone of its own: the output and the tone stay as they are; stops a sweep or THD |
+| `spectrum stop` | as `spectrum` | the last result is kept |
+| `spectrum points [<n>]` | `* <index> <hz> <dB-L> <dB-R>` per point, `ok` | the latest result's spectrum (THD's or the Spectrum's), 20 Hz to 24 kHz on a logarithmic axis, in 256 points or 16, 32, 64, 128 (each the strongest of its group); per point the strongest FFT bin as a sine's peak in dBFS |
+| `spectrum peaks` | `* <rank> <hz-L> <dB-L> <hz-R> <dB-R>` per rank, `ok` | the latest result's five strongest peaks per channel from 20 Hz to 20 kHz, strongest first: each its frequency and its level as a sine's peak in dBFS; a peak masks its neighbours within 8 bins (47 Hz) |
 
-The THD measurement takes the line input as the DSP sends it to its serial output: 8192 frames per channel (0.17 s), a Blackman-Harris window, an FFT, the power of 4 captures per channel averaged (left and right take turns). It needs about 82 KB of the ESP32's heap, in one block of 32 KB and three of 16 KB, while it runs; `diag blocks` shows what the heap offers. The fundamental is the strongest bin from 20 Hz to 20 kHz; its level is its peak in dBFS. `thd` is the harmonics H2 to H10 below 20 kHz against the fundamental, `thdn` everything from 20 Hz to 20 kHz but the fundamental, both in dB (as a percentage: 100 x 10^(dB/20)). The tone sits on a bin of the FFT, so it does not leak into its neighbours. A sweep and the THD measurement exclude each other: each stops the other.
+The THD measurement takes the line input as the DSP sends it to its serial output: 8192 frames per channel (0.17 s), a Blackman-Harris window, an FFT, the power of 4 captures per channel averaged (left and right take turns). It needs about 82 KB of the ESP32's heap, in one block of 32 KB and three of 16 KB, while it runs; `diag blocks` shows what the heap offers. The fundamental is the strongest bin from 20 Hz to 20 kHz; its level is its peak in dBFS. `thd` is the harmonics H2 to H10 below 20 kHz against the fundamental, `thdn` everything from 20 Hz to 20 kHz but the fundamental, both in dB (as a percentage: 100 x 10^(dB/20)). The tone sits on a bin of the FFT, so it does not leak into its neighbours. A sweep, THD and the Spectrum exclude each other: each stops the others. The Spectrum measures the same way, without the fundamental: its RMS is everything from 20 Hz to 20 kHz (a full-scale sine: -3.01 dBFS), its peaks the strongest lobes; `harmonics` answers only for a THD result.
 
 ### Synthesizer
 
@@ -250,6 +254,7 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | `! point <index> <hz> <left> <right> <rel-left> <rel-right>` | the analyzer measured a point |
 | `! sweep <state> <measured> <total> <reference-points>` | the sweep progressed or ended, or a reference was kept |
 | `! thd <state> <results> <hz> <level-L> <thd-L> <thdn-L> <level-R> <thd-R> <thdn-R>` | the THD measurement has a new result, or its state changed; as `thd` |
+| `! spectrum <state> <results> <rms-L> <rms-R>` | the Spectrum has a new result, or its state changed; as `spectrum` |
 | `! voice <note> <gate> <held> <channel> <mod-strip> <stage>` | the synthesizer's voice changed; at most 20 per second |
 
 ## Parameters per application

@@ -511,6 +511,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             candidate.Restarted += info => Post(() => _ = OnRestartedAsync());
             BoardClient connecting = candidate;
             candidate.DistortionChanged += status => Post(() => _ = Analyzer.ApplyDistortionAsync(connecting, status));
+            candidate.SpectrumChanged += status => Post(() => _ = Analyzer.ApplySpectrumAsync(connecting, status));
             candidate.Disconnected += exception => Post(() =>
             {
                 if (client == connecting)

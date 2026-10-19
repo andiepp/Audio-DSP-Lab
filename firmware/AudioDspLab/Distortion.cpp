@@ -30,6 +30,7 @@ static TaskHandle_t task = NULL;
 static volatile bool stopRequested = false;
 static volatile bool taskDone = true;
 static volatile DistortionState state = DISTORTION_IDLE;
+static DistortionMode mode = DISTORTION_THD;
 static portMUX_TYPE lock = portMUX_INITIALIZER_UNLOCKED;
 static DistortionResult published;
 static uint32_t resultCount = 0;
@@ -153,8 +154,36 @@ float distortionSpectrumHertz(uint16_t point) {
   return DISTORTION_LOW_HZ * powf(24000.0f / DISTORTION_LOW_HZ, point / (float)(DISTORTION_SPECTRUM_POINTS - 1));
 }
 
+// the strongest peaks from first to last: each the strongest bin left,
+// its neighbours within two lobes masked, so one tone counts once
+static void findPeaks(const float *power, int first, int last, double bin, double meanSquare,
+                      DistortionChannel &out) {
+  int taken[DISTORTION_PEAKS];
+  for (int p = 0; p < DISTORTION_PEAKS; p++) {
+    int best = -1;
+    for (int k = first; k <= last; k++) {
+      bool masked = false;
+      for (int q = 0; q < p && !masked; q++) masked = abs(k - taken[q]) <= 2 * LOBE;
+      if (!masked && (best < 0 || power[k] > power[best])) best = k;
+    }
+    if (best < 0 || power[best] <= 0) {
+      for (; p < DISTORTION_PEAKS; p++) out.peakHertz[p] = out.peakDb[p] = NAN;
+      return;
+    }
+    taken[p] = best;
+    double weighted = 0, total = 0;
+    for (int k = max(best - LOBE, 1); k <= min(best + LOBE, HALF); k++) {
+      weighted += k * (double)power[k];
+      total += power[k];
+    }
+    out.peakHertz[p] = (float)(weighted / total * bin);
+    out.peakDb[p] = decibels(2.0 * total * meanSquare);
+  }
+}
+
 // the summed spectra of `averages` captures to a result
 static void analyse(int averages, DistortionResult &result) {
+  result.mode = mode;
   const double bin = distortionBinHertz();
   const int first = max((int)ceil(DISTORTION_LOW_HZ / bin), LOBE + 1);
   const int last = min((int)floor(DISTORTION_HIGH_HZ / bin), HALF - LOBE);
@@ -197,6 +226,9 @@ static void analyse(int averages, DistortionResult &result) {
     for (int k = first; k <= last; k++) band += power[c][k];
     const double rest = (band - lobe(power[c], f)) * meanSquare;
     out.thdnDb = decibels(rest / fundamental);
+
+    out.rmsDb = decibels(band * meanSquare);
+    findPeaks(power[c], first, last, bin, meanSquare, out);
 
     for (uint16_t i = 0; i < DISTORTION_SPECTRUM_POINTS; i++) {
       const float hz = distortionSpectrumHertz(i);
@@ -245,8 +277,9 @@ static void run(void *) {
 //  Public
 // ----------------------------------------------------------------------------
 
-uint8_t distortionStart() {
+uint8_t distortionStart(DistortionMode part) {
   distortionStop();
+  mode = part;
   if (!allocate()) return ERR_NO_MEMORY;
   resultCount = 0;
   published.count = 0;
@@ -277,6 +310,10 @@ void distortionStop() {
 
 DistortionState distortionState() {
   return state;
+}
+
+DistortionMode distortionMode() {
+  return mode;
 }
 
 bool distortionBusy() {
@@ -317,7 +354,10 @@ uint8_t distortionSelfTest(DistortionResult &result) {
     samples[n] = (float)(0.1 * sin(phase) + 0.00001 * sin(2 * phase + 0.7) - 0.015);
   }
   addSpectrum(samples, powerRight);
+  const DistortionMode running = mode;
+  mode = DISTORTION_THD;
   analyse(1, result);
+  mode = running;
   result.count = 0;
   release();
   return ERR_NONE;

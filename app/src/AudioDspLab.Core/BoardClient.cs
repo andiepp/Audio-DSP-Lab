@@ -43,6 +43,9 @@ public sealed class BoardClient : IDisposable
     /// <summary>The THD measurement has a new result, or its state changed.</summary>
     public event Action<DistortionStatus>? DistortionChanged;
 
+    /// <summary>The Spectrum has a new result, or its state changed.</summary>
+    public event Action<SpectrumStatus>? SpectrumChanged;
+
     public event Action<Exception>? Disconnected;
 
     /// <summary>Every event line as it came, for a console.</summary>
@@ -259,12 +262,29 @@ public sealed class BoardClient : IDisposable
         return [.. response.Data.Select(Harmonic.Parse)];
     }
 
-    /// <summary>The latest result's spectrum in 16 to 256 points (a power of two).</summary>
+    /// <summary>The latest result's spectrum, THD's or the Spectrum's, in 16 to 256 points (a power of two).</summary>
     public async Task<IReadOnlyList<SpectrumPoint>> GetSpectrumAsync(int points = 256, CancellationToken cancellationToken = default)
     {
-        BoardResponse response = await SendAsync(points == 256 ? "spectrum" : Invariant($"spectrum {points}"), cancellationToken)
+        BoardResponse response = await SendAsync(points == 256 ? "spectrum points" : Invariant($"spectrum points {points}"), cancellationToken)
             .ConfigureAwait(false);
         return [.. response.Data.Select(SpectrumPoint.Parse)];
+    }
+
+    public async Task<SpectrumStatus> GetSpectrumStatusAsync(CancellationToken cancellationToken = default) =>
+        SpectrumStatus.Parse((await SendAsync("spectrum", cancellationToken).ConfigureAwait(false)).Values);
+
+    /// <summary>Measures the spectrum continuously: no tone of its own, the output left as it is; stops a sweep or THD.</summary>
+    public async Task<SpectrumStatus> StartSpectrumAsync(CancellationToken cancellationToken = default) =>
+        SpectrumStatus.Parse((await SendAsync("spectrum start", cancellationToken).ConfigureAwait(false)).Values);
+
+    public async Task<SpectrumStatus> StopSpectrumAsync(CancellationToken cancellationToken = default) =>
+        SpectrumStatus.Parse((await SendAsync("spectrum stop", cancellationToken).ConfigureAwait(false)).Values);
+
+    /// <summary>The latest result's five strongest peaks per channel, strongest first.</summary>
+    public async Task<IReadOnlyList<SpectrumPeak>> GetPeaksAsync(CancellationToken cancellationToken = default)
+    {
+        BoardResponse response = await SendAsync("spectrum peaks", cancellationToken).ConfigureAwait(false);
+        return [.. response.Data.Select(SpectrumPeak.Parse)];
     }
 
     /// <summary>The input levels at the tone playing now, in dBFS.</summary>
@@ -367,6 +387,9 @@ public sealed class BoardClient : IDisposable
                     break;
                 case "thd" when values.Count >= 2:
                     DistortionChanged?.Invoke(DistortionStatus.Parse(values));
+                    break;
+                case "spectrum" when values.Count >= 2:
+                    SpectrumChanged?.Invoke(SpectrumStatus.Parse(values));
                     break;
             }
         }

@@ -9,7 +9,9 @@ namespace AudioDspLab.ViewModels;
 /// The analysis application. Its Frequency Response: a sine on K3/K4
 /// stepped through a sweep, the levels on K2 measured at each point, against
 /// a reference if one is kept. Its THD: the tone's THD and THD+N on K2 with
-/// the harmonics and the spectrum, measured continuously by the board.
+/// the harmonics and the spectrum, measured continuously by the board. Its
+/// Spectrum: what comes on K2, no tone of its own, with the RMS and the
+/// strongest peaks.
 /// </summary>
 public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
 {
@@ -30,7 +32,16 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
     private bool showRelative;
     private bool isReferenceConfirmed;
     private bool isBusy;
-    private bool isDistortionMode;
+    public const string ResponseMode = "response";
+    public const string ThdMode = "thd";
+    public const string SpectrumMode = "spectrum";
+
+    private string mode = ResponseMode;
+    private SpectrumStatus? spectrumStatus;
+    private IReadOnlyList<SpectrumPoint> spectrumPoints = [];
+    private IReadOnlyList<SpectrumPeak> peaks = [];
+    private int shownSpectrumResults;
+    private bool isFetchingSpectrum;
     private DistortionStatus? distortion;
     private IReadOnlyList<SpectrumPoint> spectrum = [];
     private IReadOnlyList<Harmonic> harmonics = [];
@@ -55,9 +66,11 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
         StopSweepCommand = new RelayCommand(() => _ = StopSweepAsync(), () => CanStop);
         KeepReferenceCommand = new RelayCommand(() => _ = KeepReferenceAsync(), () => CanKeepReference);
         ShowRelativeCommand = new RelayCommand(mode => ShowRelative = mode as string == "relative");
-        ShowModeCommand = new RelayCommand(mode => IsDistortionMode = mode as string == "distortion");
+        ShowModeCommand = new RelayCommand(shown => Mode = shown as string ?? ResponseMode);
         StartDistortionCommand = new RelayCommand(() => _ = StartDistortionAsync(), () => CanStartDistortion);
         StopDistortionCommand = new RelayCommand(() => _ = StopDistortionAsync(), () => CanStopDistortion);
+        StartSpectrumCommand = new RelayCommand(() => _ = StartSpectrumAsync(), () => CanStartSpectrum);
+        StopSpectrumCommand = new RelayCommand(() => _ = StopSpectrumAsync(), () => CanStopSpectrum);
     }
 
     public ParameterViewModel Level { get; }
@@ -86,20 +99,88 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
 
     public ICommand StopDistortionCommand { get; }
 
-    /// <summary>The page shows the THD measurement instead of the Frequency Response.</summary>
-    public bool IsDistortionMode
+    public ICommand StartSpectrumCommand { get; }
+
+    public ICommand StopSpectrumCommand { get; }
+
+    /// <summary>The part on show: <see cref="ResponseMode"/>, <see cref="ThdMode"/> or <see cref="SpectrumMode"/>.</summary>
+    public string Mode
     {
-        get => isDistortionMode;
+        get => mode;
         set
         {
-            if (SetProperty(ref isDistortionMode, value))
+            if (SetProperty(ref mode, value))
             {
                 RaisePropertyChanged(nameof(IsResponseMode));
+                RaisePropertyChanged(nameof(IsThdMode));
+                RaisePropertyChanged(nameof(IsSpectrumMode));
             }
         }
     }
 
-    public bool IsResponseMode => !isDistortionMode;
+    public bool IsResponseMode => mode == ResponseMode;
+
+    public bool IsThdMode => mode == ThdMode;
+
+    public bool IsSpectrumMode => mode == SpectrumMode;
+
+    public bool IsMeasuringSpectrum => spectrumStatus?.IsRunning == true;
+
+    public bool CanStartSpectrum => IsRunning && !isBusy && !IsMeasuringSpectrum;
+
+    public bool CanStopSpectrum => IsRunning && !isBusy && IsMeasuringSpectrum;
+
+    /// <summary>The Spectrum's latest spectrum (THD keeps its own in <see cref="Spectrum"/>).</summary>
+    public IReadOnlyList<SpectrumPoint> SpectrumPoints
+    {
+        get => spectrumPoints;
+        private set => SetProperty(ref spectrumPoints, value);
+    }
+
+    public IReadOnlyList<SpectrumPeak> Peaks
+    {
+        get => peaks;
+        private set
+        {
+            if (SetProperty(ref peaks, value))
+            {
+                RaisePropertyChanged(nameof(PeaksLeftText));
+                RaisePropertyChanged(nameof(PeaksRightText));
+                RaisePropertyChanged(nameof(PeakLeftText));
+                RaisePropertyChanged(nameof(PeakRightText));
+                RaisePropertyChanged(nameof(PeakLeftLevelText));
+                RaisePropertyChanged(nameof(PeakRightLevelText));
+            }
+        }
+    }
+
+    public string SpectrumStateText =>
+        spectrumStatus switch
+        {
+            null => string.Empty,
+            { State: DistortionStatus.Failed } => "failed: no clock on the DSP's serial output",
+            { Results: 0, IsRunning: true } => "measuring …",
+            { Results: 0 } => "not measured yet",
+            _ => string.Format(CultureInfo.CurrentCulture, "RMS {0:0.00} / {1:0.00} dBFS · result {2}{3}",
+                spectrumStatus.LeftRmsDecibel, spectrumStatus.RightRmsDecibel,
+                spectrumStatus.Results, spectrumStatus.IsRunning ? string.Empty : " · stopped")
+        };
+
+    public string RmsLeftText => LevelText(spectrumStatus?.LeftRmsDecibel);
+
+    public string RmsRightText => LevelText(spectrumStatus?.RightRmsDecibel);
+
+    public string PeakLeftText => HertzText(peaks.Count > 0 ? peaks[0].LeftHertz : null);
+
+    public string PeakRightText => HertzText(peaks.Count > 0 ? peaks[0].RightHertz : null);
+
+    public string PeakLeftLevelText => DecibelText(peaks.Count > 0 ? peaks[0].LeftDecibel : null, "dBFS");
+
+    public string PeakRightLevelText => DecibelText(peaks.Count > 0 ? peaks[0].RightDecibel : null, "dBFS");
+
+    public string PeaksLeftText => PeaksText(peak => (peak.LeftHertz, peak.LeftDecibel));
+
+    public string PeaksRightText => PeaksText(peak => (peak.RightHertz, peak.RightDecibel));
 
     public bool IsMeasuringDistortion => distortion?.IsRunning == true;
 
@@ -272,7 +353,7 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
         CanStartDistortion
             ? Run(async client =>
             {
-                IsDistortionMode = true;
+                Mode = ThdMode;
                 await ApplyDistortionAsync(client, await client.StartDistortionAsync().ConfigureAwait(true)).ConfigureAwait(true);
                 Output.Apply(await client.GetAsync("output").ConfigureAwait(true), fromBoard: false);
                 ApplySweep(await client.GetSweepAsync().ConfigureAwait(true));
@@ -284,6 +365,66 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
             ? Run(async client => await ApplyDistortionAsync(client, await client.StopDistortionAsync().ConfigureAwait(true))
                 .ConfigureAwait(true), "THD measurement stopped.")
             : Task.CompletedTask;
+
+    public Task StartSpectrumAsync() =>
+        CanStartSpectrum
+            ? Run(async client =>
+            {
+                Mode = SpectrumMode;
+                await ApplySpectrumAsync(client, await client.StartSpectrumAsync().ConfigureAwait(true)).ConfigureAwait(true);
+                ApplySweep(await client.GetSweepAsync().ConfigureAwait(true));
+            }, "Spectrum measurement started.")
+            : Task.CompletedTask;
+
+    public Task StopSpectrumAsync() =>
+        CanStopSpectrum
+            ? Run(async client => await ApplySpectrumAsync(client, await client.StopSpectrumAsync().ConfigureAwait(true))
+                .ConfigureAwait(true), "Spectrum measurement stopped.")
+            : Task.CompletedTask;
+
+    /// <summary>The Spectrum's state; a result not yet shown brings its spectrum and peaks along.</summary>
+    internal async Task ApplySpectrumAsync(BoardClient client, SpectrumStatus status)
+    {
+        spectrumStatus = status;
+        foreach (string name in new[]
+                 {
+                     nameof(IsMeasuringSpectrum), nameof(SpectrumStateText), nameof(RmsLeftText), nameof(RmsRightText),
+                 })
+        {
+            RaisePropertyChanged(name);
+        }
+
+        CommandManager.InvalidateRequerySuggested();
+        if (status.Results == 0)
+        {
+            shownSpectrumResults = 0;
+            SpectrumPoints = [];
+            Peaks = [];
+            return;
+        }
+
+        if (status.Results == shownSpectrumResults || isFetchingSpectrum)
+        {
+            return;
+        }
+
+        isFetchingSpectrum = true;
+        try
+        {
+            IReadOnlyList<SpectrumPoint> read = await client.GetSpectrumAsync().ConfigureAwait(true);
+            Peaks = await client.GetPeaksAsync().ConfigureAwait(true);
+            SpectrumPoints = read;
+            shownSpectrumResults = status.Results;
+        }
+        catch (Exception exception) when (exception is BoardErrorException or IOException or TimeoutException)
+        {
+            // the next result tries again
+        }
+        finally
+        {
+            isFetchingSpectrum = false;
+        }
+    }
 
     /// <summary>
     /// The measurement's state; a result not yet shown brings its spectrum
@@ -385,10 +526,18 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
         DistortionStatus status = await client.GetDistortionAsync().ConfigureAwait(true);
         if (status.IsRunning)
         {
-            IsDistortionMode = true;
+            Mode = ThdMode;
         }
 
         await ApplyDistortionAsync(client, status).ConfigureAwait(true);
+        shownSpectrumResults = 0;
+        SpectrumStatus spectrumNow = await client.GetSpectrumStatusAsync().ConfigureAwait(true);
+        if (spectrumNow.IsRunning)
+        {
+            Mode = SpectrumMode;
+        }
+
+        await ApplySpectrumAsync(client, spectrumNow).ConfigureAwait(true);
     }
 
     internal void ApplySweep(SweepStatus status)
@@ -426,6 +575,13 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
         shownResults = 0;
         Spectrum = [];
         Harmonics = [];
+        spectrumStatus = null;
+        shownSpectrumResults = 0;
+        SpectrumPoints = [];
+        Peaks = [];
+        RaisePropertyChanged(nameof(SpectrumStateText));
+        RaisePropertyChanged(nameof(RmsLeftText));
+        RaisePropertyChanged(nameof(RmsRightText));
         RaisePropertyChanged(nameof(DistortionStateText));
         ApplyInput(null, null);
         RaisePropertyChanged(nameof(ProgressText));
@@ -451,6 +607,20 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
 
     private static string DecibelText(double? decibel, string unit) =>
         decibel is double value ? value.ToString("0.00", CultureInfo.CurrentCulture) + " " + unit : "-- " + unit + " --";
+
+    private static string HertzText(double? hertz) =>
+        hertz is double value ? value.ToString("#,0.0", CultureInfo.CurrentCulture) : "-----";
+
+    private string PeaksText(Func<SpectrumPeak, (double? Hertz, double? Decibel)> channel) =>
+        peaks.Count == 0
+            ? "peaks: --"
+            : string.Join("  ", peaks.Select(peak =>
+            {
+                (double? hertz, double? decibel) = channel(peak);
+                return hertz is double h && decibel is double d
+                    ? string.Format(CultureInfo.CurrentCulture, "{0}: {1:#,0.#} Hz {2:0}", peak.Rank, h, d)
+                    : string.Format(CultureInfo.CurrentCulture, "{0}: --", peak.Rank);
+            })) + " dBFS";
 
     private string HarmonicsText(Func<Harmonic, double?> level) =>
         harmonics.Count == 0

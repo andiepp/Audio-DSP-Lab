@@ -89,7 +89,9 @@ static lv_obj_t *sweepButton;
 static lv_obj_t *sweepLabel;
 // the THD view in the same plot: its key, the spectrum and the readouts
 #define SPECTRUM_RANGE_DB             140     // 0 dBFS at the top
-static bool thdView = false;
+enum AnalysisView : uint8_t { VIEW_RESPONSE, VIEW_THD, VIEW_SPECTRUM, VIEW_COUNT };
+static AnalysisView view = VIEW_RESPONSE;
+static const char *const viewNames[VIEW_COUNT] = { "Resp", "THD", "Spec" };
 static lv_obj_t *modeButton;
 static lv_obj_t *specLeft;
 static lv_obj_t *specRight;
@@ -98,6 +100,7 @@ static std::vector<lv_point_precise_t> specLeftPoints;
 static std::vector<lv_point_precise_t> specRightPoints;
 static uint32_t drawnSpectrum = 0xFFFFFFFF;
 static String seenThdState;
+static String seenSpectrumState;
 static lv_obj_t *plotLeft;
 static lv_obj_t *plotRight;
 static lv_obj_t *plotTopLabel;
@@ -610,14 +613,15 @@ static void refreshRadio() {
 // --- the analyzer's header -----------------------------------------------------------------
 
 static void onSweep(lv_event_t *) {
-  if (thdView) linkDistortion(board.thdState != "running");
+  if (view == VIEW_THD) linkDistortion(board.thdState != "running");
+  else if (view == VIEW_SPECTRUM) linkSpectrum(board.spectrumState != "running");
   else linkSweep(board.sweepState != "running");
 }
 
 static void refreshAnalyzer();
 
 static void onMode(lv_event_t *) {
-  thdView = !thdView;
+  view = (AnalysisView)((view + 1) % VIEW_COUNT);
   drawnPoints = drawnSpectrum = 0xFFFFFFFF;
   refreshAnalyzer();
 }
@@ -639,6 +643,7 @@ static int plotY(float level) {
 }
 
 static String hertzText(float hertz) {
+  if (isnan(hertz)) return "--";
   char text[24];
   if (hertz >= 1000) snprintf(text, sizeof(text), "%.2f kHz", hertz / 1000);
   else snprintf(text, sizeof(text), "%.0f Hz", hertz);
@@ -675,7 +680,7 @@ static void drawCursor() {
 
 // a touch on the plot, or a finger moving on it: the cursor to the nearest point
 static void onPlot(lv_event_t *e) {
-  if (thdView || board.points.empty()) return;
+  if (view != VIEW_RESPONSE || board.points.empty()) return;
   lv_point_t touch;
   lv_indev_get_point(lv_indev_active(), &touch);
   lv_area_t area;
@@ -775,6 +780,8 @@ static String percentText(float decibel) {
   return String(text);
 }
 
+static void drawSpectrum();
+
 static void refreshDistortion() {
   const bool running = board.thdState == "running";
   lv_label_set_text(lv_obj_get_child(sweepButton, 0), running ? "Stop" : "Start");
@@ -796,6 +803,34 @@ static void refreshDistortion() {
     text = "THD and THD+N, L / R:\nStart measures K2";
   }
   lv_label_set_text(thdLabel, text.c_str());
+  drawSpectrum();
+}
+
+// the Spectrum's readouts: the RMS and the strongest peak of each channel
+static void refreshSpectrumView() {
+  const bool running = board.spectrumState == "running";
+  lv_label_set_text(lv_obj_get_child(sweepButton, 0), running ? "Stop" : "Start");
+  markSelected(sweepButton, running);
+  String status;
+  if (board.spectrumState == "failed") status = "failed";
+  else if (board.spectrumResults > 0) status = String("#") + board.spectrumResults + (running ? "" : " stopped");
+  else if (running) status = "measuring";
+  lv_label_set_text(sweepLabel, status.c_str());
+  String text;
+  if (board.spectrumResults > 0) {
+    char line[112];
+    snprintf(line, sizeof(line), "RMS %.1f / %.1f dBFS\nL %s  %.1f dBFS\nR %s  %.1f dBFS",
+             board.rms[0], board.rms[1], hertzText(board.peakHertz[0]).c_str(), board.peakDb[0],
+             hertzText(board.peakHertz[1]).c_str(), board.peakDb[1]);
+    text = line;
+  } else {
+    text = "RMS and the strongest peak, L / R:\nStart measures K2, no tone";
+  }
+  lv_label_set_text(thdLabel, text.c_str());
+  drawSpectrum();
+}
+
+static void drawSpectrum() {
   if (drawnSpectrum == board.spectrumVersion) return;
   drawnSpectrum = board.spectrumVersion;
   specLeftPoints.clear();
@@ -816,33 +851,42 @@ static void refreshAnalyzer() {
   if (sweepButton == nullptr) return;
   // a measurement started elsewhere (the PC) shows itself
   if (board.thdState != seenThdState) {
-    if (board.thdState == "running" && !thdView) {
-      thdView = true;
+    if (board.thdState == "running" && view != VIEW_THD) {
+      view = VIEW_THD;
       drawnSpectrum = 0xFFFFFFFF;
     }
     seenThdState = board.thdState;
   }
+  if (board.spectrumState != seenSpectrumState) {
+    if (board.spectrumState == "running" && view != VIEW_SPECTRUM) {
+      view = VIEW_SPECTRUM;
+      drawnSpectrum = 0xFFFFFFFF;
+    }
+    seenSpectrumState = board.spectrumState;
+  }
+  const bool spectral = view != VIEW_RESPONSE;
   // the key names the view on show; a tap changes it
-  lv_label_set_text(lv_obj_get_child(modeButton, 0), thdView ? "THD" : "Resp");
+  lv_label_set_text(lv_obj_get_child(modeButton, 0), viewNames[view]);
   for (lv_obj_t *part : { plotLeft, plotRight }) {
-    if (thdView) lv_obj_add_flag(part, LV_OBJ_FLAG_HIDDEN);
+    if (spectral) lv_obj_add_flag(part, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_remove_flag(part, LV_OBJ_FLAG_HIDDEN);
   }
   for (lv_obj_t *part : { specLeft, specRight, thdLabel }) {
-    if (thdView) lv_obj_remove_flag(part, LV_OBJ_FLAG_HIDDEN);
+    if (spectral) lv_obj_remove_flag(part, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(part, LV_OBJ_FLAG_HIDDEN);
   }
   // the progress left of the keys; in the THD view, where the readouts take
   // the left, below them
-  if (thdView) lv_obj_align(sweepLabel, LV_ALIGN_TOP_RIGHT, -2, 34);
+  if (spectral) lv_obj_align(sweepLabel, LV_ALIGN_TOP_RIGHT, -2, 34);
   else lv_obj_align(sweepLabel, LV_ALIGN_TOP_RIGHT, -158, 8);
-  if (thdView) {
+  if (spectral) {
     // the readouts take the corner; the scale is 0 to -140 dBFS
     lv_obj_add_flag(plotTopLabel, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(plotBottomLabel, LV_OBJ_FLAG_HIDDEN);
     cursorIndex = -1;
     drawCursor();
-    refreshDistortion();
+    if (view == VIEW_THD) refreshDistortion();
+    else refreshSpectrumView();
     return;
   }
   lv_obj_remove_flag(plotTopLabel, LV_OBJ_FLAG_HIDDEN);
@@ -1380,7 +1424,7 @@ void uiPoll() {
 // commands on the USB port, for screenshots and tests: "page home|app|settings",
 // "section osc|filter|env|lfo|perf|all", "edit <parameter>", "close",
 // "cursor <point>" (the Frequency Response plot's cursor on that point, -1 none),
-// "view response|thd" (the analysis' view)
+// "view response|thd|spectrum" (the analysis' view)
 void uiCommand(const String &line) {
   if (line.startsWith("page ")) {
     const String name = line.substring(5);
@@ -1403,8 +1447,8 @@ void uiCommand(const String &line) {
   } else if (line.startsWith("cursor ")) {
     cursorIndex = line.substring(7).toInt();
     drawCursor();
-  } else if (line == "view thd" || line == "view response") {
-    thdView = line == "view thd";
+  } else if (line == "view thd" || line == "view response" || line == "view spectrum") {
+    view = line == "view thd" ? VIEW_THD : line == "view spectrum" ? VIEW_SPECTRUM : VIEW_RESPONSE;
     drawnPoints = drawnSpectrum = 0xFFFFFFFF;
     refreshAnalyzer();
   } else {

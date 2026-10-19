@@ -861,10 +861,20 @@ static void formatDb(char *out, size_t size, float value) {
   else snprintf(out, size, "%.2f", value);
 }
 
+// a part's state: the engine's while it runs (or failed) for that part, idle else
+static const char *partWord(DistortionMode part) {
+  return distortionMode() == part ? thdWord(distortionState()) : "idle";
+}
+
+// the latest result, if the part made it
+static bool partResult(DistortionMode part) {
+  return distortionResult(thdResult) && thdResult.mode == part;
+}
+
 // <state> <count> <hz> <level-L> <thd-L> <thdn-L> <level-R> <thd-R> <thdn-R>
 static void thdText(char *text, size_t size) {
-  const char *state = thdWord(distortionState());
-  if (!distortionResult(thdResult)) {
+  const char *state = partWord(DISTORTION_THD);
+  if (!partResult(DISTORTION_THD)) {
     snprintf(text, size, "%s 0 - - - - - - -", state);
     return;
   }
@@ -884,6 +894,25 @@ static void thdStatus() {
   okf("%s", text);
 }
 
+// <state> <count> <rms-L> <rms-R>
+static void spectrumText(char *text, size_t size) {
+  const char *state = partWord(DISTORTION_SPECTRUM);
+  if (!partResult(DISTORTION_SPECTRUM)) {
+    snprintf(text, size, "%s 0 - -", state);
+    return;
+  }
+  char l[16], r[16];
+  formatDb(l, sizeof(l), thdResult.channel[0].rmsDb);
+  formatDb(r, sizeof(r), thdResult.channel[1].rmsDb);
+  snprintf(text, size, "%s %lu %s %s", state, (unsigned long)thdResult.count, l, r);
+}
+
+static void spectrumStatus() {
+  char text[80];
+  spectrumText(text, sizeof(text));
+  okf("%s", text);
+}
+
 static void cmdThd() {
   if (tokenCount == 1) return thdStatus();
   if (tokenCount != 2) return fail(ERR_BAD_ARGUMENT);
@@ -892,7 +921,7 @@ static void cmdThd() {
     analyzerStopSweep();
     uint8_t error = appParamSet(ANA_OUTPUT, 1);
     if (error == ERR_NONE) onParamChanged(ANA_OUTPUT, 1);   // every port hears the output go on
-    if (error == ERR_NONE) error = distortionStart();
+    if (error == ERR_NONE) error = distortionStart(DISTORTION_THD);
     if (error != ERR_NONE) return fail(error);
     // the tone on a bin's centre: it falls on its bin exactly
     int32_t tone;
@@ -900,7 +929,7 @@ static void cmdThd() {
     return thdStatus();
   }
   if (is(1, "stop")) {
-    stopDistortion();
+    if (distortionMode() == DISTORTION_THD) stopDistortion();
     return thdStatus();
   }
   fail(ERR_BAD_ARGUMENT);
@@ -908,7 +937,7 @@ static void cmdThd() {
 
 static void cmdHarmonics() {
   if (tokenCount != 1) return fail(ERR_BAD_ARGUMENT);
-  if (distortionResult(thdResult)) {
+  if (partResult(DISTORTION_THD)) {
     for (int h = 2; h <= DISTORTION_HARMONIC_LAST; h++) {
       if (isnan(thdResult.channel[0].harmonicDb[h])) break;
       char l[16], r[16];
@@ -920,12 +949,12 @@ static void cmdHarmonics() {
   ok();
 }
 
-// the spectrum in `points` points (16 .. 256, a power of two): each the
-// strongest of its group
-static void cmdSpectrum() {
+// the latest result's spectrum (THD's or the Spectrum's) in `points`
+// points (16 .. 256, a power of two): each the strongest of its group
+static void spectrumPoints() {
   long points = DISTORTION_SPECTRUM_POINTS;
-  if (tokenCount == 2 && !parseLong(tokens[1], 16, DISTORTION_SPECTRUM_POINTS, points)) return fail(ERR_BAD_ARGUMENT);
-  if (tokenCount > 2 || (points & (points - 1)) != 0) return fail(ERR_BAD_ARGUMENT);
+  if (tokenCount == 3 && !parseLong(tokens[2], 16, DISTORTION_SPECTRUM_POINTS, points)) return fail(ERR_BAD_ARGUMENT);
+  if (tokenCount > 3 || (points & (points - 1)) != 0) return fail(ERR_BAD_ARGUMENT);
   if (distortionResult(thdResult)) {
     const int group = DISTORTION_SPECTRUM_POINTS / points;
     for (int i = 0; i < points; i++) {
@@ -939,6 +968,45 @@ static void cmdSpectrum() {
     }
   }
   ok();
+}
+
+// the latest result's strongest peaks: per rank each channel's frequency and level
+static void spectrumPeaks() {
+  if (tokenCount != 2) return fail(ERR_BAD_ARGUMENT);
+  if (distortionResult(thdResult)) {
+    for (int p = 0; p < DISTORTION_PEAKS; p++) {
+      char v[4][16];
+      for (int c = 0; c < 2; c++) {
+        const float hz = thdResult.channel[c].peakHertz[p];
+        if (isnan(hz)) snprintf(v[2 * c], sizeof(v[0]), "-");
+        else snprintf(v[2 * c], sizeof(v[0]), "%.1f", hz);
+        formatDb(v[2 * c + 1], sizeof(v[0]), thdResult.channel[c].peakDb[p]);
+      }
+      dataf("%d %s %s %s %s", p + 1, v[0], v[1], v[2], v[3]);
+    }
+  }
+  ok();
+}
+
+// the analysis' Spectrum: no tone of its own, the output left as it is
+static void cmdSpectrum() {
+  if (tokenCount >= 2 && is(1, "points")) return spectrumPoints();
+  if (tokenCount >= 2 && is(1, "peaks")) return spectrumPeaks();
+  if (tokenCount == 1) return spectrumStatus();
+  if (tokenCount != 2) return fail(ERR_BAD_ARGUMENT);
+  if (!runningApp(APP_ANALYSIS)) return;
+  if (is(1, "start")) {
+    analyzerStopSweep();
+    stopDistortion();                         // a THD's tone goes back to the one set
+    const uint8_t error = distortionStart(DISTORTION_SPECTRUM);
+    if (error != ERR_NONE) return fail(error);
+    return spectrumStatus();
+  }
+  if (is(1, "stop")) {
+    if (distortionMode() == DISTORTION_SPECTRUM) stopDistortion();
+    return spectrumStatus();
+  }
+  fail(ERR_BAD_ARGUMENT);
 }
 
 static void cmdReference() {
@@ -1227,7 +1295,7 @@ static const Command commands[] = {
   { "reference", cmdReference,  "reference [keep]" },
   { "thd",       cmdThd,        "thd [start|stop]" },
   { "harmonics", cmdHarmonics,  "harmonics" },
-  { "spectrum",  cmdSpectrum,   "spectrum [<points>]" },
+  { "spectrum",  cmdSpectrum,   "spectrum [start|stop|points [<n>]|peaks]" },
   { "level",     cmdLevel,      "level" },
   { "voice",     cmdVoice,      "voice" },
   { "midi",      cmdMidi,       "midi" },
@@ -1271,6 +1339,7 @@ static char seenTitle[RADIO_TEXT_LENGTH];
 static uint8_t seenSweepState = 0xFF;
 static uint8_t seenThdState = DISTORTION_IDLE;
 static uint32_t seenThdCount = 0;
+static uint8_t seenThdMode = DISTORTION_THD;
 static uint16_t seenPoints = 0;
 static uint16_t seenReference = 0;
 static char seenVoice[64];
@@ -1318,6 +1387,7 @@ static void syncEvents() {
   seenSweepState = analyzerState();
   seenThdState = distortionState();
   seenThdCount = distortionCount();
+  seenThdMode = distortionMode();
   seenPoints = analyzerPointCount();
   seenReference = analyzerReferenceCount();
   seenVoice[0] = '\0';
@@ -1418,12 +1488,26 @@ static void thdEvents() {
   if (!appRunning(APP_ANALYSIS)) return;
   const uint8_t state = distortionState();
   const uint32_t count = distortionCount();
-  if (state == seenThdState && count == seenThdCount) return;
+  const uint8_t part = distortionMode();
+  if (state == seenThdState && count == seenThdCount && part == seenThdMode) return;
+  // a part that hands over to the other reports its end
+  if (part != seenThdMode) {
+    char text[160];
+    if (seenThdMode == DISTORTION_THD) thdText(text, sizeof(text));
+    else spectrumText(text, sizeof(text));
+    eventf("%s %s", seenThdMode == DISTORTION_THD ? "thd" : "spectrum", text);
+  }
   seenThdState = state;
   seenThdCount = count;
+  seenThdMode = part;
   char text[160];
-  thdText(text, sizeof(text));
-  eventf("thd %s", text);
+  if (part == DISTORTION_THD) {
+    thdText(text, sizeof(text));
+    eventf("thd %s", text);
+  } else {
+    spectrumText(text, sizeof(text));
+    eventf("spectrum %s", text);
+  }
 }
 
 static void voiceEvents(uint32_t now) {

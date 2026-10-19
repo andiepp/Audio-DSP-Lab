@@ -475,9 +475,13 @@
                                      IsChecked="{Binding IsResponseMode, Mode=OneWay}"
                                      Command="{Binding ShowModeCommand}" CommandParameter="response" />
                         <RadioButton x:Name="DistortionModeChoice" GroupName="AnalyzerMode" Foreground="{DynamicResource AudioLabText}" VerticalContentAlignment="Center"
-                                     Content="THD" FontWeight="Bold"
-                                     IsChecked="{Binding IsDistortionMode, Mode=OneWay}"
-                                     Command="{Binding ShowModeCommand}" CommandParameter="distortion" />
+                                     Margin="0,0,10,0" Content="THD" FontWeight="Bold"
+                                     IsChecked="{Binding IsThdMode, Mode=OneWay}"
+                                     Command="{Binding ShowModeCommand}" CommandParameter="thd" />
+                        <RadioButton x:Name="SpectrumModeChoice" GroupName="AnalyzerMode" Foreground="{DynamicResource AudioLabText}" VerticalContentAlignment="Center"
+                                     Content="Spectrum" FontWeight="Bold"
+                                     IsChecked="{Binding IsSpectrumMode, Mode=OneWay}"
+                                     Command="{Binding ShowModeCommand}" CommandParameter="spectrum" />
                     </StackPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
                                 Visibility="{Binding IsResponseMode, Converter={StaticResource VisibleWhen}}">
@@ -497,7 +501,10 @@
                                    Visibility="{Binding IsResponseMode, Converter={StaticResource VisibleWhen}}" />
                         <TextBlock x:Name="DistortionInfo" Foreground="{StaticResource AudioLabDimText}" VerticalAlignment="Center"
                                    HorizontalAlignment="Right" Text="{Binding DistortionStateText}" TextTrimming="CharacterEllipsis"
-                                   Visibility="{Binding IsDistortionMode, Converter={StaticResource VisibleWhen}}" />
+                                   Visibility="{Binding IsThdMode, Converter={StaticResource VisibleWhen}}" />
+                        <TextBlock x:Name="SpectrumInfo" Foreground="{StaticResource AudioLabDimText}" VerticalAlignment="Center"
+                                   HorizontalAlignment="Right" Text="{Binding SpectrumStateText}" TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding IsSpectrumMode, Converter={StaticResource VisibleWhen}}" />
                     </Grid>
                 </DockPanel>
                 <Border Margin="2,0,2,0" BorderBrush="{StaticResource AudioLabSeparator}" BorderThickness="1">
@@ -508,7 +515,10 @@
                         <controls:SpectrumChart x:Name="SpectrumCurve" Height="200"
                                                 Points="{Binding Spectrum}" Harmonics="{Binding Harmonics}"
                                                 FundamentalHertz="{Binding FundamentalHertz}"
-                                                Visibility="{Binding IsDistortionMode, Converter={StaticResource VisibleWhen}}" />
+                                                Visibility="{Binding IsThdMode, Converter={StaticResource VisibleWhen}}" />
+                        <controls:SpectrumChart x:Name="SpectrumPartCurve" Height="200"
+                                                Points="{Binding SpectrumPoints}" Peaks="{Binding Peaks}"
+                                                Visibility="{Binding IsSpectrumMode, Converter={StaticResource VisibleWhen}}" />
                     </Grid>
                 </Border>
                 <TextBlock Margin="6,2,0,0" Foreground="{StaticResource AudioLabDimText}"
@@ -518,10 +528,16 @@
                     <Run Text="  · the reference dashed in absolute mode · hover a point to read it" />
                 </TextBlock>
                 <TextBlock Margin="6,2,0,0" Foreground="{StaticResource AudioLabDimText}"
-                           Visibility="{Binding IsDistortionMode, Converter={StaticResource VisibleWhen}}">
+                           Visibility="{Binding IsThdMode, Converter={StaticResource VisibleWhen}}">
                     <Run Foreground="{DynamicResource AudioLabChartLeft}" Text="— left" />
                     <Run Foreground="{DynamicResource AudioLabChartRight}" Text="  — right" />
                     <Run Text="  · dBFS, a sine's peak per point · 1 the fundamental, 2 to 10 its harmonics · hover to read" />
+                </TextBlock>
+                <TextBlock Margin="6,2,0,0" Foreground="{StaticResource AudioLabDimText}"
+                           Visibility="{Binding IsSpectrumMode, Converter={StaticResource VisibleWhen}}">
+                    <Run Foreground="{DynamicResource AudioLabChartLeft}" Text="— left" />
+                    <Run Foreground="{DynamicResource AudioLabChartRight}" Text="  — right" />
+                    <Run Text="  · dBFS, a sine's peak per point · 1 to 5 the strongest peaks · hover to read" />
                 </TextBlock>
                 <StackPanel Visibility="{Binding IsResponseMode, Converter={StaticResource VisibleWhen}}">
                 <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,4,0,0">
@@ -589,7 +605,7 @@
                     </DockPanel>
                 </Border>
                 </StackPanel>
-                <StackPanel x:Name="DistortionBlock" Visibility="{Binding IsDistortionMode, Converter={StaticResource VisibleWhen}}">
+                <StackPanel x:Name="DistortionBlock" Visibility="{Binding IsThdMode, Converter={StaticResource VisibleWhen}}">
                     <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,4,0,0">
                         <DockPanel>
                             <TextBlock Style="{StaticResource HintStyle}" Text="The tone on K3/K4 against what returns on K2, about every 1.6 s" />
@@ -645,6 +661,66 @@
                                            Text="{Binding HarmonicsLeftText}" />
                                 <TextBlock x:Name="HarmonicsRight" Foreground="{DynamicResource AudioLabChartRight}" TextTrimming="CharacterEllipsis"
                                            Text="{Binding HarmonicsRightText}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                </StackPanel>
+                <StackPanel x:Name="SpectrumBlock" Visibility="{Binding IsSpectrumMode, Converter={StaticResource VisibleWhen}}">
+                    <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,4,0,0">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource HintStyle}" Text="What comes on K2, no tone of its own, about every 1.6 s" />
+                            <TextBlock Style="{StaticResource AudioLabHeaderStyle}" Text="Spectrum" />
+                        </DockPanel>
+                    </Border>
+                    <UniformGrid Columns="4" Margin="2,0,2,0">
+                        <StackPanel Margin="0,0,6,0">
+                            <controls:LabDisplay x:Name="RmsLeftDisplay" Title="RMS left" TitleFontSize="13"
+                                                 DisplayBackground="{StaticResource AudioLabAmplitudeBackground}">
+                                <controls:LabDisplay.Body>
+                                    <TextBlock Text="{Binding RmsLeftText}" Foreground="{DynamicResource AudioLabDisplayValue}" FontSize="22" />
+                                </controls:LabDisplay.Body>
+                            </controls:LabDisplay>
+                            <TextBlock Style="{StaticResource AudioLabUnitLineStyle}" Text="-- dBFS, 20 Hz to 20 kHz --" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,6,0">
+                            <controls:LabDisplay x:Name="PeakLeftDisplay" Title="Strongest left" TitleFontSize="13"
+                                                 DisplayBackground="{StaticResource AudioLabFrequencyBackground}">
+                                <controls:LabDisplay.Body>
+                                    <TextBlock Text="{Binding PeakLeftText}" Foreground="{DynamicResource AudioLabDisplayValue}" FontSize="22" />
+                                </controls:LabDisplay.Body>
+                            </controls:LabDisplay>
+                            <TextBlock Style="{StaticResource AudioLabUnitLineStyle}" Text="{Binding PeakLeftLevelText, StringFormat='Hz  ·  {0}'}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,6,0">
+                            <controls:LabDisplay x:Name="RmsRightDisplay" Title="RMS right" TitleFontSize="13"
+                                                 DisplayBackground="{StaticResource AudioLabAmplitudeBackground}">
+                                <controls:LabDisplay.Body>
+                                    <TextBlock Text="{Binding RmsRightText}" Foreground="{DynamicResource AudioLabDisplayValue}" FontSize="22" />
+                                </controls:LabDisplay.Body>
+                            </controls:LabDisplay>
+                            <TextBlock Style="{StaticResource AudioLabUnitLineStyle}" Text="-- dBFS, 20 Hz to 20 kHz --" />
+                        </StackPanel>
+                        <StackPanel>
+                            <controls:LabDisplay x:Name="PeakRightDisplay" Title="Strongest right" TitleFontSize="13"
+                                                 DisplayBackground="{StaticResource AudioLabFrequencyBackground}">
+                                <controls:LabDisplay.Body>
+                                    <TextBlock Text="{Binding PeakRightText}" Foreground="{DynamicResource AudioLabDisplayValue}" FontSize="22" />
+                                </controls:LabDisplay.Body>
+                            </controls:LabDisplay>
+                            <TextBlock Style="{StaticResource AudioLabUnitLineStyle}" Text="{Binding PeakRightLevelText, StringFormat='Hz  ·  {0}'}" />
+                        </StackPanel>
+                    </UniformGrid>
+                    <Border Style="{StaticResource AudioLabSettingsBlockStyle}" Margin="2,2,2,0">
+                        <DockPanel>
+                            <Button x:Name="StartSpectrumKey" DockPanel.Dock="Left" Style="{StaticResource AudioLabKeyStyle}" Height="30"
+                                    FontWeight="Bold" Content="Start measuring" Command="{Binding StartSpectrumCommand}" />
+                            <Button x:Name="StopSpectrumKey" DockPanel.Dock="Left" Style="{StaticResource AudioLabKeyStyle}" Height="30"
+                                    Content="Stop" Command="{Binding StopSpectrumCommand}" />
+                            <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="PeaksLeft" Foreground="{DynamicResource AudioLabChartLeft}" TextTrimming="CharacterEllipsis"
+                                           Text="{Binding PeaksLeftText}" />
+                                <TextBlock x:Name="PeaksRight" Foreground="{DynamicResource AudioLabChartRight}" TextTrimming="CharacterEllipsis"
+                                           Text="{Binding PeaksRightText}" />
                             </StackPanel>
                         </DockPanel>
                     </Border>

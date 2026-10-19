@@ -151,6 +151,44 @@ public sealed class BoardClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Spectrum_ReportsRmsAndPeaksWithoutATone()
+    {
+        await client.SelectApplicationAsync(Applications.Analyzer);
+        var result = new TaskCompletionSource<SpectrumStatus>();
+        client.SpectrumChanged += status =>
+        {
+            if (status.Results > 0)
+            {
+                result.TrySetResult(status);
+            }
+        };
+
+        SpectrumStatus started = await client.StartSpectrumAsync();
+        Assert.Equal((DistortionStatus.Running, 0), (started.State, started.Results));
+        Assert.Equal("off", await client.GetAsync("output"));        // no tone of its own
+
+        SpectrumStatus first = await result.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.InRange(first.LeftRmsDecibel!.Value, -98, -97);     // the floor alone
+        IReadOnlyList<SpectrumPeak> peaks = await client.GetPeaksAsync();
+        Assert.Equal(5, peaks.Count);
+        Assert.Equal(50.0, peaks[0].LeftHertz);                    // the hum
+        Assert.Empty(await client.GetHarmonicsAsync());            // a Spectrum result has no tone
+        Assert.Equal(256, (await client.GetSpectrumAsync()).Count);
+
+        DistortionStatus thd = await client.StartDistortionAsync();
+        Assert.True(thd.IsRunning);
+        Assert.Equal(DistortionStatus.Idle, (await client.GetSpectrumStatusAsync()).State);   // one part at a time
+    }
+
+    [Fact]
+    public void SpectrumStatus_AndPeaks_ParseTheBoardsLines()
+    {
+        Assert.Equal(new SpectrumStatus("running", 2, -97.53, -98.08), SpectrumStatus.Parse(["running", "2", "-97.53", "-98.08"]));
+        Assert.Equal(new SpectrumStatus("idle", 0, null, null), SpectrumStatus.Parse(["idle", "0", "-", "-"]));
+        Assert.Equal(new SpectrumPeak(1, 47.1, -104.56, 48.1, -104.78), SpectrumPeak.Parse(["1", "47.1", "-104.56", "48.1", "-104.78"]));
+    }
+
+    [Fact]
     public void DistortionStatus_ParsesTheBoardsLine()
     {
         DistortionStatus status = DistortionStatus.Parse(

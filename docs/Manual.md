@@ -21,7 +21,7 @@ The board keeps working without the PC: once an application runs, you can close 
 | Generator | Sine, rectangle, triangle, saw, inverse saw or noise, 20 Hz to 20 kHz, with a width for rectangle and triangle | out K3, K4 |
 | Equalizer | Bass, middle, treble and volume on the line input | in K2, out K3, K4 |
 | Radio | Eight MP3 internet stations over WiFi, through the equalizer | out K3, K4 |
-| Analysis | Frequency Response: sweeps a sine through a device under test and plots its response. THD: its harmonic distortion, THD+N and spectrum | out K3, K4, in K2 |
+| Analysis | Frequency Response: sweeps a sine through a device under test and plots its response. THD: its harmonic distortion, THD+N and spectrum. Spectrum: what comes on the line input | out K3, K4, in K2 |
 | SigmaStudio | Runs your own SigmaStudio program from the EEPROM | as your program |
 | Synthesizer | A monophonic synthesizer played from a MIDI keyboard | MIDI in K5, out K3, K4 |
 
@@ -149,7 +149,7 @@ The radio plays MP3 streams over plain HTTP. Streams that are only offered over 
 
 ### Analysis
 
-Measures a device under test: a sine leaves on K3/K4, passes the device and returns on K2. The application has two parts, chosen with **Measure** above the plot: **Frequency Response** and **THD**. Both use the same tone, output level and output switch.
+Measures a device under test: a sine leaves on K3/K4, passes the device and returns on K2. The application has three parts, chosen with **Measure** above the plot: **Frequency Response**, **THD** and **Spectrum**. They use the same tone, output level and output switch; Spectrum plays no tone of its own.
 
 #### Frequency Response
 
@@ -181,6 +181,18 @@ The board takes the spectrum of what returns on K2 and computes the tone's harmo
 ![The analysis page, THD: the spectrum with the harmonics marked, THD and THD+N per channel](images/screenshots/thd.png)
 
 What the board measures of itself, a cable from K3 to K2: at an output level of −20 dB (−27 dBFS at the input) THD+N about 0.05 %, the harmonics below the noise; at 0 dB (−7 dBFS) THD about 0.016 % and THD+N about 0.017 %, H2 −81 and H3 −78 dBc. Measure the cable first: a device's figures mean something down to these. A level near the input's full scale gives the lowest THD+N, until the converters' own distortion rises.
+
+#### Spectrum
+
+The spectrum of whatever comes on K2, with no tone of its own: a signal from outside (a preamp, an effect, a phone), the board's own noise floor, mains hum. The measurement is THD's (8192 samples per channel, four captures averaged, a result about every 1.6 s); the output stays as it is, normally off.
+
+1. Choose **Measure: Spectrum** and press **Start measuring**.
+2. Read, per channel: the **RMS** from 20 Hz to 20 kHz in dBFS (a full-scale sine reads −3.01; with nothing on K2 it is the noise), and the **strongest peak** with its frequency and level. Below them the five strongest peaks of each channel, strongest first, marked 1 to 5 in the spectrum. A peak's level is a sine's peak in dBFS; peaks closer than about 47 Hz count as one.
+3. **Stop** ends it; THD and a sweep end it too.
+
+![The analysis page, Spectrum: the spectrum with its five strongest peaks, the RMS and the strongest peak per channel](images/screenshots/spectrum.png)
+
+The board's own input, nothing on K2: an RMS of about −97.5 dBFS, about 95 dB below a full-scale sine, and mains hum at 50 Hz around −105 dBFS, more or less with the cables and the supply.
 
 ### SigmaStudio mode
 
@@ -610,11 +622,15 @@ In the editor **−** and **+** step the value; hold them to repeat, and after a
 
 ![Analysis, Frequency Response: the last sweep with the cursor on one of its points, Start sweep in the plot's corner](images/panel/analysis.png)
 
-**Analysis.** **Resp** in the plot's corner shows the Frequency Response, **THD** the THD measurement; a tap switches between them. **Frequency Response:** the plot of the last sweep, the left channel teal and the right blue, from 20 Hz to 20 kHz, scaled to the 60 dB below its loudest point. **Start sweep** in the plot's corner starts a sweep and switches the output on; it reads **Stop** while the sweep runs, and the points measured stand beside it. The start and stop frequencies, the points per decade and the level are the tiles below.
+**Analysis.** The key in the plot's corner names the part on show, **Resp** (the Frequency Response), **THD** or **Spec** (the Spectrum); a tap goes to the next. **Frequency Response:** the plot of the last sweep, the left channel teal and the right blue, from 20 Hz to 20 kHz, scaled to the 60 dB below its loudest point. **Start sweep** in the plot's corner starts a sweep and switches the output on; it reads **Stop** while the sweep runs, and the points measured stand beside it. The start and stop frequencies, the points per decade and the level are the tiles below.
 
 ![Analysis, THD: the spectrum, THD and THD+N of both channels, the tone and its levels; Stop in the plot's corner](images/panel/analysis-thd.png)
 
 **THD** shows the spectrum of both channels from 0 to −140 dBFS and, in the plot's corner, THD and THD+N of the left and the right channel in %, the tone and its levels. **Start** measures continuously and switches the output on; a measurement started on the PC shows itself here.
+
+![Analysis, Spectrum: the spectrum of the open input, the RMS and the strongest peak of each channel](images/panel/analysis-spectrum.png)
+
+**Spec** shows the spectrum in the same way and, in the corner, the RMS of both channels and each channel's strongest peak with its frequency. **Start** measures without a tone of its own and leaves the output as it is.
 
 **The cursor.** Touch the plot, or move a finger along it: a line jumps to the nearest measured point, a dot marks it on each channel, and a box beside the line gives the point's frequency and both levels. The cursor stays where you leave it; during the next sweep it shows again as soon as the sweep reaches its point. (In the PC application, the mouse over the plot does the same.)
 

@@ -84,6 +84,12 @@ static class Program
                         Save(window, Path.Combine(output, "thd.png"));
                         Console.WriteLine($"thd: {vm.Analyzer.DistortionStateText} | {window.ActualWidth}x{window.ActualHeight}");
                         await vm.Analyzer.StopDistortionAsync();
+                        // the third part: what comes on K2, here the simulated hum with the tone still on
+                        await vm.Analyzer.StartSpectrumAsync();
+                        await Task.Delay(3600);
+                        Save(window, Path.Combine(output, "spectrum.png"));
+                        Console.WriteLine($"spectrum: {vm.Analyzer.SpectrumStateText} | {window.ActualWidth}x{window.ActualHeight}");
+                        await vm.Analyzer.StopSpectrumAsync();
                     }
                 }
 

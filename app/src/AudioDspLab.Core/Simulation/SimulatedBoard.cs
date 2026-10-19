@@ -80,6 +80,8 @@ public sealed class SimulatedBoard : ILineTransport
     private int thdResults;
     private long nextThdAt;
     private string seenThd = string.Empty;
+    private string measuring = PartThd;                // the part measuring, or that measured last
+    private string seenSpectrum = string.Empty;
 
     private int? note;
     private bool gate;
@@ -277,7 +279,7 @@ public sealed class SimulatedBoard : ILineTransport
             case "level": Level(); break;
             case "thd": Thd(args); break;
             case "harmonics": Harmonics(); break;
-            case "spectrum": Spectrum(args); break;
+            case "spectrum": SpectrumPart(args); break;
             case "voice": if (Running(Applications.Synthesizer)) Ok(VoiceText()); break;
             case "midi": if (Running(Applications.Synthesizer)) Ok("0 0 0 0"); break;
             case "load": if (Running(Applications.Synthesizer)) Ok("12.5 18.3"); break;
@@ -300,7 +302,7 @@ public sealed class SimulatedBoard : ILineTransport
                      "params", "get [<parameter>]", "set <parameter> <value>", "pots", "potctl [on|off]",
                      "startup [on|off]", "service [on|off]", "led [on|off]", "stations", "station ...", "radio",
                      "wifi ...", "sweep [start|stop]", "points [<from>]", "reference [keep]", "level",
-                     "thd [start|stop]", "harmonics", "spectrum [<points>]", "voice",
+                     "thd [start|stop]", "harmonics", "spectrum [start|stop|points [<n>]|peaks]", "voice",
                      "midi", "load", "aux", "backup", "diag ...", "reset",
                  })
         {
@@ -402,6 +404,7 @@ public sealed class SimulatedBoard : ILineTransport
         sweepTotal = 0;
         thdState = DistortionStatus.Idle;
         thdResults = 0;
+        measuring = PartThd;
         radioState = name == Applications.Radio ? "connecting-wifi" : "idle";
         radioChangeAt = Now + 400;
         title = string.Empty;
@@ -896,25 +899,33 @@ public sealed class SimulatedBoard : ILineTransport
         Ok(output ? $"{FormatLevel(Response(tone, 0))} {FormatLevel(Response(tone, -0.05))}" : "-110.5 -110.5");
     }
 
-    // --- distortion ---------------------------------------------------------------------
+    // --- analysis: THD and Spectrum ------------------------------------------------------
 
     // the firmware's FFT: 8192 frames at 48 kHz; a result about every 1.6 s
     private const double ThdBinHertz = 48000.0 / 8192;
     private const int ThdPeriodMilliseconds = 1600;
+    private const string PartThd = "thd";
+    private const string PartSpectrum = "spectrum";
 
-    // a made-up device: these harmonics (H2 .. H10, dBc) and a noise floor
-    // of -95 dBFS RMS from 20 Hz to 20 kHz, -120 dBFS a bin in the spectrum
+    // a made-up device: these harmonics (H2 .. H10, dBc), mains hum, and a
+    // noise floor of -97.5 dBFS RMS from 20 Hz to 20 kHz, -120 dBFS a bin
     private static readonly double[] SimulatedHarmonics = [-82, -78, -95, -91, -99, -97, -103, -101, -106];
-    private const double NoiseDecibel = -95;
+    private static readonly (double Hertz, double Decibel)[] SimulatedHum = [(50.0, -104.8), (150.1, -113.6), (4232.5, -116.5)];
+    private const double NoiseDecibel = -97.5;
     private const double BinFloorDecibel = -120;
 
     private double ThdHertz => Math.Round(Math.Max(1, Math.Round(values.GetValueOrDefault("tone", 1000) / ThdBinHertz)) * ThdBinHertz, 2);
+
+    // the tone as the part plays it: THD on an FFT bin, Spectrum as set
+    private double ToneHertz => measuring == PartThd ? ThdHertz : values.GetValueOrDefault("tone", 1000);
+
+    private double ToneLevel(double offset) => values["output"] != 0 ? Response(ToneHertz, offset) : -140;
 
     // the harmonics below 20 kHz of the latest result, a little different each time
     private List<(int Order, double Hertz, double Decibel)> ThdHarmonics(double offset)
     {
         List<(int, double, double)> harmonics = [];
-        double hertz = ThdHertz;
+        double hertz = ToneHertz;
         for (int order = 2; order <= 10 && order * hertz <= 20000; order++)
         {
             double wobble = 0.4 * Math.Sin((thdResults * 1.7) + order + offset);
@@ -924,9 +935,27 @@ public sealed class SimulatedBoard : ILineTransport
         return harmonics;
     }
 
+    // every line in the spectrum: the tone and its harmonics while the output plays, and the hum
+    private List<(double Hertz, double Decibel)> Lines(double offset)
+    {
+        List<(double, double)> lines = [.. SimulatedHum.Select(hum => (hum.Hertz, hum.Decibel + (offset * 4)))];
+        double level = ToneLevel(offset);
+        if (values["output"] != 0)
+        {
+            lines.Add((ToneHertz, level));
+            lines.AddRange(ThdHarmonics(offset).Select(harmonic => (harmonic.Hertz, level + harmonic.Decibel)));
+        }
+
+        return lines;
+    }
+
+    private string PartState(string part) => measuring == part ? thdState : DistortionStatus.Idle;
+
+    private int PartResults(string part) => measuring == part ? thdResults : 0;
+
     private string ThdChannelText(double offset)
     {
-        double level = values["output"] != 0 ? Response(ThdHertz, offset) : -140;
+        double level = ToneLevel(offset);
         List<(int Order, double Hertz, double Decibel)> harmonics = ThdHarmonics(offset);
         double sum = harmonics.Sum(harmonic => Math.Pow(10, harmonic.Decibel / 10));
         double noise = Math.Pow(10, (NoiseDecibel - (level - 3.01)) / 10);
@@ -935,9 +964,32 @@ public sealed class SimulatedBoard : ILineTransport
     }
 
     private string ThdText() =>
-        thdResults == 0
-            ? $"{thdState} 0 - - - - - - -"
-            : $"{thdState} {thdResults} {ProtocolText.FormatNumber(ThdHertz)} {ThdChannelText(0)} {ThdChannelText(-0.05)}";
+        PartResults(PartThd) == 0
+            ? $"{PartState(PartThd)} 0 - - - - - - -"
+            : $"{PartState(PartThd)} {thdResults} {ProtocolText.FormatNumber(ThdHertz)} {ThdChannelText(0)} {ThdChannelText(-0.05)}";
+
+    // everything from 20 Hz to 20 kHz: the lines' mean squares and the noise
+    private double Rms(double offset) =>
+        Math.Round(10 * Math.Log10(Lines(offset).Where(line => line.Hertz <= 20000).Sum(line => Math.Pow(10, line.Decibel / 10) / 2)
+                                   + Math.Pow(10, NoiseDecibel / 10)), 2);
+
+    private string SpectrumText() =>
+        PartResults(PartSpectrum) == 0
+            ? $"{PartState(PartSpectrum)} 0 - -"
+            : $"{PartState(PartSpectrum)} {thdResults} {ProtocolText.FormatNumber(Rms(0))} {ProtocolText.FormatNumber(Rms(-0.05))}";
+
+    private void StartPart(string part)
+    {
+        if (sweepState == SweepStatus.Running)
+        {
+            sweepState = SweepStatus.Stopped;
+        }
+
+        measuring = part;
+        thdState = DistortionStatus.Running;
+        thdResults = 0;
+        nextThdAt = Now + ThdPeriodMilliseconds;
+    }
 
     private void Thd(IReadOnlyList<string> args)
     {
@@ -955,20 +1007,62 @@ public sealed class SimulatedBoard : ILineTransport
         switch (args[0])
         {
             case "start":
-                if (sweepState == SweepStatus.Running)
-                {
-                    sweepState = SweepStatus.Stopped;
-                }
-
                 values["output"] = 1;
-                thdState = DistortionStatus.Running;
-                thdResults = 0;
-                nextThdAt = Now + ThdPeriodMilliseconds;
+                StartPart(PartThd);
                 Ok(ThdText());
                 return;
             case "stop":
-                thdState = DistortionStatus.Idle;
+                if (measuring == PartThd)
+                {
+                    thdState = DistortionStatus.Idle;
+                }
+
                 Ok(ThdText());
+                return;
+            default:
+                BadArgument();
+                return;
+        }
+    }
+
+    private void SpectrumPart(IReadOnlyList<string> args)
+    {
+        if (args.Count >= 1 && args[0] == "points")
+        {
+            SpectrumPoints(args);
+            return;
+        }
+
+        if (args.Count == 1 && args[0] == "peaks")
+        {
+            Peaks();
+            return;
+        }
+
+        if (args.Count == 0)
+        {
+            Ok(SpectrumText());
+            return;
+        }
+
+        if (!Running(Applications.Analyzer))
+        {
+            return;
+        }
+
+        switch (args[0])
+        {
+            case "start":
+                StartPart(PartSpectrum);
+                Ok(SpectrumText());
+                return;
+            case "stop":
+                if (measuring == PartSpectrum)
+                {
+                    thdState = DistortionStatus.Idle;
+                }
+
+                Ok(SpectrumText());
                 return;
             default:
                 BadArgument();
@@ -978,7 +1072,7 @@ public sealed class SimulatedBoard : ILineTransport
 
     private void Harmonics()
     {
-        if (thdResults > 0)
+        if (PartResults(PartThd) > 0)
         {
             List<(int Order, double Hertz, double Decibel)> left = ThdHarmonics(0);
             List<(int Order, double Hertz, double Decibel)> right = ThdHarmonics(-0.05);
@@ -992,10 +1086,31 @@ public sealed class SimulatedBoard : ILineTransport
         Ok();
     }
 
-    private void Spectrum(IReadOnlyList<string> args)
+    // the strongest lines per channel, strongest first; the floor's bumps make up five
+    private void Peaks()
+    {
+        if (thdResults > 0)
+        {
+            (double Hertz, double Decibel)[] Ranked(double offset) =>
+                [.. Lines(offset).Where(line => line.Hertz <= 20000)
+                    .Concat([(Hertz: 171.9, Decibel: -116.9 + offset), (Hertz: 343.3, Decibel: -117.2 + offset), (Hertz: 887.1, Decibel: -117.6 + offset)])
+                    .OrderByDescending(line => line.Decibel).Take(5)];
+            (double Hertz, double Decibel)[] left = Ranked(0);
+            (double Hertz, double Decibel)[] right = Ranked(-0.05);
+            for (int rank = 0; rank < 5; rank++)
+            {
+                Data($"{rank + 1} {ProtocolText.FormatNumber(Math.Round(left[rank].Hertz, 1))} {ProtocolText.FormatNumber(Math.Round(left[rank].Decibel, 2))} " +
+                     $"{ProtocolText.FormatNumber(Math.Round(right[rank].Hertz, 1))} {ProtocolText.FormatNumber(Math.Round(right[rank].Decibel, 2))}");
+            }
+        }
+
+        Ok();
+    }
+
+    private void SpectrumPoints(IReadOnlyList<string> args)
     {
         int count = 256;
-        if (args.Count == 1 && (!int.TryParse(args[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out count)
+        if (args.Count == 2 && (!int.TryParse(args[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out count)
                                 || count < 16 || count > 256 || (count & (count - 1)) != 0))
         {
             BadArgument();
@@ -1004,22 +1119,15 @@ public sealed class SimulatedBoard : ILineTransport
 
         if (thdResults > 0)
         {
-            double fundamental = ThdHertz;
             double SpectrumHertz(int point) => 20 * Math.Pow(1200, point / 255.0);
             double Peak(double offset, double low, double high)
             {
                 double strongest = BinFloorDecibel + (1.5 * Math.Sin(low * 7.3));
-                double level = values["output"] != 0 ? Response(fundamental, offset) : -140;
-                if (fundamental >= low && fundamental < high)
-                {
-                    strongest = Math.Max(strongest, level);
-                }
-
-                foreach ((int _, double hertz, double decibel) in ThdHarmonics(offset))
+                foreach ((double hertz, double decibel) in Lines(offset))
                 {
                     if (hertz >= low && hertz < high)
                     {
-                        strongest = Math.Max(strongest, level + decibel);
+                        strongest = Math.Max(strongest, decibel);
                     }
                 }
 
@@ -1208,6 +1316,13 @@ public sealed class SimulatedBoard : ILineTransport
             {
                 seenThd = thd;
                 Emit($"! thd {thd}");
+            }
+
+            string spectrum = SpectrumText();
+            if (spectrum != seenSpectrum)
+            {
+                seenSpectrum = spectrum;
+                Emit($"! spectrum {spectrum}");
             }
         }
 

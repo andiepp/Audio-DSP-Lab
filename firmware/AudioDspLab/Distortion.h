@@ -12,7 +12,9 @@
 //  per channel: the fundamental's level, the harmonics H2 to H10 below
 //  20 kHz, THD and THD+N (20 Hz to 20 kHz without DC and the
 //  fundamental), and a spectrum of 256 points on a logarithmic axis for
-//  the plots.
+//  the plots. The same engine serves the analysis' Spectrum: no tone of
+//  its own, and per channel the RMS from 20 Hz to 20 kHz and the
+//  strongest peaks.
 //
 //  The DSP and the capture share one clock, so a tone on a bin's centre
 //  (distortionSnap) sits on its bin exactly; the window is the margin for
@@ -33,8 +35,16 @@
 #define DISTORTION_AVERAGES           4       // captures a result averages per channel
 #define DISTORTION_HARMONIC_LAST      10      // H2 .. H10
 #define DISTORTION_SPECTRUM_POINTS    256     // 20 Hz .. 24 kHz, logarithmic
-#define DISTORTION_LOW_HZ             20.0f   // THD+N's band
+#define DISTORTION_PEAKS              5       // the Spectrum's strongest peaks per channel
+#define DISTORTION_LOW_HZ             20.0f   // THD+N's band, the RMS's and the peaks'
 #define DISTORTION_HIGH_HZ            20000.0f
+
+// which part of the analysis measures: THD plays its tone and reads its
+// harmonics, Spectrum takes what comes
+enum DistortionMode : uint8_t {
+  DISTORTION_THD      = 0,
+  DISTORTION_SPECTRUM = 1,
+};
 
 enum DistortionState : uint8_t {
   DISTORTION_IDLE    = 0,
@@ -47,16 +57,21 @@ struct DistortionChannel {
   float thdDb;              // the harmonics against the fundamental, dB; NAN without any below 20 kHz
   float thdnDb;             // all but the fundamental from 20 Hz to 20 kHz, dB
   float harmonicDb[DISTORTION_HARMONIC_LAST + 1];   // [2] .. [10], dBc; NAN above 20 kHz
+  float rmsDb;              // everything from 20 Hz to 20 kHz, dBFS RMS (a full-scale sine: -3.01)
+  float peakHertz[DISTORTION_PEAKS];   // the strongest peaks, strongest first; NAN where none
+  float peakDb[DISTORTION_PEAKS];      // each as a sine's peak, dBFS
 };
 
 struct DistortionResult {
   uint32_t count;           // results since the start
+  DistortionMode mode;      // the part that measured it
   float hertz;              // the fundamental
   DistortionChannel channel[2];
   float spectrumDb[2][DISTORTION_SPECTRUM_POINTS];  // per point the strongest bin, as a sine's peak in dBFS
 };
 
-uint8_t distortionStart();                  // an error code (Errors.h); restarts a running one
+uint8_t distortionStart(DistortionMode mode);   // an error code (Errors.h); restarts a running one
+DistortionMode distortionMode();            // the part running, or that ran last
 void distortionStop();                      // waits for the task, gives the memory back
 DistortionState distortionState();
 bool distortionBusy();                      // the task holds the serial output capture

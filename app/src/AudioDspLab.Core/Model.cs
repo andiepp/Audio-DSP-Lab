@@ -195,6 +195,32 @@ public sealed record DistortionChannel(double LevelDecibel, double? ThdDecibel, 
             : null;
 }
 
+/// <summary>
+/// The analysis' Spectrum (<c>spectrum</c>, <c>! spectrum</c>): its state,
+/// the results so far and, per channel, the RMS from 20 Hz to 20 kHz in dBFS.
+/// </summary>
+public sealed record SpectrumStatus(string State, int Results, double? LeftRmsDecibel, double? RightRmsDecibel)
+{
+    public bool IsRunning => State == DistortionStatus.Running;
+
+    public static SpectrumStatus Parse(IReadOnlyList<string> values) =>
+        new(values[0],
+            ProtocolText.ParseInteger(values[1]),
+            values.Count > 2 ? ProtocolText.ParseNumberOrNone(values[2]) : null,
+            values.Count > 3 ? ProtocolText.ParseNumberOrNone(values[3]) : null);
+}
+
+/// <summary>A rank of the latest result's strongest peaks (<c>spectrum peaks</c>): per channel its frequency and level, a sine's peak in dBFS.</summary>
+public sealed record SpectrumPeak(int Rank, double? LeftHertz, double? LeftDecibel, double? RightHertz, double? RightDecibel)
+{
+    public static SpectrumPeak Parse(IReadOnlyList<string> words) =>
+        new(ProtocolText.ParseInteger(words[0]),
+            ProtocolText.ParseNumberOrNone(words[1]),
+            ProtocolText.ParseNumberOrNone(words[2]),
+            ProtocolText.ParseNumberOrNone(words[3]),
+            ProtocolText.ParseNumberOrNone(words[4]));
+}
+
 /// <summary>A harmonic of the latest result (<c>harmonics</c>), in dB against the fundamental.</summary>
 public sealed record Harmonic(int Order, double FrequencyHertz, double? LeftDecibel, double? RightDecibel)
 {
@@ -205,7 +231,7 @@ public sealed record Harmonic(int Order, double FrequencyHertz, double? LeftDeci
             ProtocolText.ParseNumberOrNone(words[3]));
 }
 
-/// <summary>A point of the latest result's spectrum (<c>spectrum</c>): the strongest bin as a sine's peak in dBFS.</summary>
+/// <summary>A point of the latest result's spectrum (<c>spectrum points</c>): the strongest bin as a sine's peak in dBFS.</summary>
 public sealed record SpectrumPoint(int Index, double FrequencyHertz, double LeftDecibel, double RightDecibel)
 {
     public static SpectrumPoint Parse(IReadOnlyList<string> words) =>

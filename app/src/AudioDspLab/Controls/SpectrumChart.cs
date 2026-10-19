@@ -10,7 +10,8 @@ namespace AudioDspLab.Controls;
 /// Draws the THD measurement's spectrum on a logarithmic frequency
 /// axis, 20 Hz to 24 kHz, from -140 to 0 dBFS: left in gold, right in cyan
 /// (the sweep chart's colours), a mark over the fundamental and each
-/// harmonic with its order. Hovering shows the nearest point.
+/// harmonic with its order, or over each peak with its rank. Hovering
+/// shows the nearest point.
 /// </summary>
 public sealed class SpectrumChart : FrameworkElement
 {
@@ -28,6 +29,12 @@ public sealed class SpectrumChart : FrameworkElement
     public static readonly DependencyProperty HarmonicsProperty = DependencyProperty.Register(
         nameof(Harmonics),
         typeof(IReadOnlyList<Harmonic>),
+        typeof(SpectrumChart),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty PeaksProperty = DependencyProperty.Register(
+        nameof(Peaks),
+        typeof(IReadOnlyList<SpectrumPeak>),
         typeof(SpectrumChart),
         new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
@@ -74,6 +81,13 @@ public sealed class SpectrumChart : FrameworkElement
     {
         get => (IReadOnlyList<Harmonic>?)GetValue(HarmonicsProperty);
         set => SetValue(HarmonicsProperty, value);
+    }
+
+    /// <summary>The Spectrum's strongest peaks, marked with their rank: the left channel's, and the right's where it lies elsewhere.</summary>
+    public IReadOnlyList<SpectrumPeak>? Peaks
+    {
+        get => (IReadOnlyList<SpectrumPeak>?)GetValue(PeaksProperty);
+        set => SetValue(PeaksProperty, value);
     }
 
     /// <summary>The fundamental, marked "1".</summary>
@@ -143,6 +157,23 @@ public sealed class SpectrumChart : FrameworkElement
             foreach (Harmonic harmonic in Harmonics ?? [])
             {
                 Mark(context, pixels, points, harmonic.FrequencyHertz, harmonic.Order.ToString(CultureInfo.CurrentCulture));
+            }
+        }
+
+        if (points.Count > 0)
+        {
+            foreach (SpectrumPeak peak in Peaks ?? [])
+            {
+                string rank = peak.Rank.ToString(CultureInfo.CurrentCulture);
+                if (peak.LeftHertz is double left)
+                {
+                    Mark(context, pixels, points, left, rank);
+                }
+
+                if (peak.RightHertz is double right && (peak.LeftHertz is not double other || Math.Abs(Math.Log(right / other)) > 0.02))
+                {
+                    Mark(context, pixels, points, right, rank);
+                }
             }
         }
 

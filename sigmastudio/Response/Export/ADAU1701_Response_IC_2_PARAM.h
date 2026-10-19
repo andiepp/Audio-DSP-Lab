@@ -1,7 +1,7 @@
 /*
- * File:           H:\Development-Lab\AudioMiniLab\sigmastudio\Response\Export\ADAU1701_Response_IC_2_PARAM.h
+ * File:           H:\Audio-DSP-Lab\sigmastudio\Response\Export\ADAU1701_Response_IC_2_PARAM.h
  *
- * Created:        Monday, October 12, 2026 9:26:14 AM
+ * Created:        Monday, October 19, 2026 1:37:00 PM
  * Description:    ADAU1701_Response:IC 2 parameter RAM definitions.
  *
  * This software is distributed in the hope that it will be useful,

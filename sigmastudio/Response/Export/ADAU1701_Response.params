@@ -45,7 +45,7 @@ Parameter Data :
 
 Cell Name         = BandL
 Parameter Name    = EQ1940Single10B1
-Parameter Address = 5
+Parameter Address = 10
 Parameter Value   = 1
 Parameter Data :
 0x00 ,	0x80 ,	0x00 ,	0x00 ,	
@@ -54,7 +54,7 @@ Parameter Data :
 
 Cell Name         = BandL
 Parameter Name    = EQ1940Single11B1
-Parameter Address = 6
+Parameter Address = 11
 Parameter Value   = 0
 Parameter Data :
 0x00 ,	0x00 ,	0x00 ,	0x00 ,	
@@ -63,7 +63,7 @@ Parameter Data :
 
 Cell Name         = BandL
 Parameter Name    = EQ1940Single12B1
-Parameter Address = 7
+Parameter Address = 12
 Parameter Value   = 0
 Parameter Data :
 0x00 ,	0x00 ,	0x00 ,	0x00 ,	
@@ -72,7 +72,7 @@ Parameter Data :
 
 Cell Name         = BandL
 Parameter Name    = EQ1940Single11A1
-Parameter Address = 8
+Parameter Address = 13
 Parameter Value   = 0
 Parameter Data :
 0x00 ,	0x00 ,	0x00 ,	0x00 ,	
@@ -81,7 +81,7 @@ Parameter Data :
 
 Cell Name         = BandL
 Parameter Name    = EQ1940Single12A1
-Parameter Address = 9
+Parameter Address = 14
 Parameter Value   = 0
 Parameter Data :
 0x00 ,	0x00 ,	0x00 ,	0x00 ,	
@@ -138,7 +138,7 @@ Parameter Name    = ReadBackAlg1
 Parameter Address = 2074
 Readback Address = 0
 Parameter Data :
-0x01 ,	0x7A ,	
+0x01 ,	0x8A ,	
 
 
 Cell Name         = LevelL
@@ -152,7 +152,7 @@ Parameter Data :
 
 Cell Name         = BandR
 Parameter Name    = EQ1940Single30B1
-Parameter Address = 10
+Parameter Address = 5
 Parameter Value   = 1
 Parameter Data :
 0x00 ,	0x80 ,	0x00 ,	0x00 ,	
@@ -161,7 +161,7 @@ Parameter Data :
 
 Cell Name         = BandR
 Parameter Name    = EQ1940Single31B1
-Parameter Address = 11
+Parameter Address = 6
 Parameter Value   = 0
 Parameter Data :
 0x00 ,	0x00 ,	0x00 ,	0x00 ,	
@@ -170,7 +170,7 @@ Parameter Data :
 
 Cell Name         = BandR
 Parameter Name    = EQ1940Single32B1
-Parameter Address = 12
+Parameter Address = 7
 Parameter Value   = 0
 Parameter Data :
 0x00 ,	0x00 ,	0x00 ,	0x00 ,	
@@ -179,7 +179,7 @@ Parameter Data :
 
 Cell Name         = BandR
 Parameter Name    = EQ1940Single31A1
-Parameter Address = 13
+Parameter Address = 8
 Parameter Value   = 0
 Parameter Data :
 0x00 ,	0x00 ,	0x00 ,	0x00 ,	
@@ -188,7 +188,7 @@ Parameter Data :
 
 Cell Name         = BandR
 Parameter Name    = EQ1940Single32A1
-Parameter Address = 14
+Parameter Address = 9
 Parameter Value   = 0
 Parameter Data :
 0x00 ,	0x00 ,	0x00 ,	0x00 ,	
@@ -245,7 +245,7 @@ Parameter Name    = ReadBackAlg2
 Parameter Address = 2074
 Readback Address = 0
 Parameter Data :
-0x01 ,	0x86 ,	
+0x01 ,	0x96 ,	
 
 
 Cell Name         = LevelR

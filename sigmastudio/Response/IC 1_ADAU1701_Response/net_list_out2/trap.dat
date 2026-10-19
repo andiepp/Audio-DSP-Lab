@@ -1,2 +1,2 @@
-Instance  14 Signal LevelL_ReadBackAlg1 trap value 94 register MAC_out
-Instance  15 Signal LevelR_ReadBackAlg2 trap value 97 register MAC_out
+Instance  16 Signal LevelL_ReadBackAlg1 trap value 98 register MAC_out
+Instance  17 Signal LevelR_ReadBackAlg2 trap value 101 register MAC_out

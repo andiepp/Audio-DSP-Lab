@@ -1,7 +1,7 @@
 /*
  * File:           defines.h
  *
- * Created:        Monday, October 12, 2026 9:26:14 AM
+ * Created:        Monday, October 19, 2026 1:37:00 PM
  * Description:    ADAU1701_Response IC default download data definitions.
  *
  * This software is distributed in the hope that it will be useful,

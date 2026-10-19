@@ -7,24 +7,27 @@
 #include <math.h>
 
 // ----------------------------------------------------------------------------
-//  SigmaStudio project sigmastudio/Response, export of 2026-10-12 09:26.
+//  SigmaStudio project sigmastudio/Response, export of 2026-10-19 13:37.
 //  Parameter RAM (Export/ADAU1701_Response_IC_1_PARAM.h):
 //    Sine increment 1 (5.23, f / (DSP_CORE_RATE / 2), as the generator's)
 //    'General (2nd order)' double precision cells, B0 B1 B2 A1 A2, the A
-//    coefficients stored negated: BandL 5, BandR 10, SmoothL 15, SmoothR 20
+//    coefficients stored negated: BandR 5, BandL 10, SmoothL 15, SmoothR 20
 //  Readback (data capture) settings, program count and register select:
-//    LevelL 0x017A, LevelR 0x0186; captured in 0x081A and 0x081B
+//    LevelL 0x018A, LevelR 0x0196; captured in 0x081A and 0x081B
+//  The line input also goes, untouched, to the serial output (SerialOutL
+//  DIG0, SerialOutR DIG1: SDATA_OUT0 on MP6) for the distortion
+//  measurement (Capture.cpp).
 // ----------------------------------------------------------------------------
 
 #define ADDR_SINE_INCREMENT           1
-#define ADDR_BAND_L                   5
-#define ADDR_BAND_R                   10
+#define ADDR_BAND_L                   10
+#define ADDR_BAND_R                   5
 #define ADDR_SMOOTH_L                 15
 #define ADDR_SMOOTH_R                 20
 #define CAPTURE_REGISTER_L            0x081A
 #define CAPTURE_REGISTER_R            0x081B
-#define CAPTURE_SETTING_L             0x017A
-#define CAPTURE_SETTING_R             0x0186
+#define CAPTURE_SETTING_L             0x018A
+#define CAPTURE_SETTING_R             0x0196
 
 // the band-pass: RBJ, 0 dB at its centre, Q 5 (a fifth of an octave either
 // side is -3 dB down), so noise and harmonics stay out of the reading

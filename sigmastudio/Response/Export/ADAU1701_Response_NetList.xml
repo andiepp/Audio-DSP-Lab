@@ -20,55 +20,61 @@
             <Algorithm name="sin_lookupAlg19401" friendlyname="Tone Synthesis (lookup/sine) " cell="Sine " location="{X=139, Y=285} " Growth="0 " GrowthB="0 " FS="48000">
                 <Link pin="O_C15_A0_P1_out" dir="out" link="Link0" />
             </Algorithm>
-            <Algorithm name="ICSigma100In1" friendlyname="170x\140x input " cell="LineIn " location="{X=165, Y=532} " Growth="10 " GrowthB="0 " FS="48000">
-                <Link pin="O_C4_A0_P1_out" dir="out" link="Link1" />
+            <Algorithm name="ICSigma100In1" friendlyname="170x\140x input " cell="LineIn " location="{X=109, Y=575} " Growth="10 " GrowthB="0 " FS="48000">
+                <Link pin="O_C4_A0_P1_out" dir="out" link="Link9" />
                 <Link pin="O_C4_A0_P2_out" dir="out" link="Link8" />
             </Algorithm>
             <Algorithm name="SWGain1940DBAlg1" friendlyname="Gain (RC Slew) " cell="Amplitude " location="{X=298, Y=219} " Growth="1 " GrowthB="0">
                 <Link pin="I_C7_A0_P1_in" dir="in" link="Link0" />
-                <Link pin="O_C7_A0_P2_out" dir="out" link="Link9" />
+                <Link pin="O_C7_A0_P2_out" dir="out" link="Link7" />
             </Algorithm>
-            <Algorithm name="EQ1940Single1" friendlyname="1 Channel - Double Precision " cell="BandL " location="{X=298, Y=468} " Growth="1 " GrowthB="0">
-                <Link pin="I_C30_A0_P1_in" dir="in" link="Link1" />
-                <Link pin="O_C30_A0_P2_out" dir="out" link="Link2" />
-            </Algorithm>
-            <Algorithm name="EQ1940Single3" friendlyname="1 Channel - Double Precision " cell="BandR " location="{X=300, Y=560} " Growth="1 " GrowthB="0">
+            <Algorithm name="EQ1940Single3" friendlyname="1 Channel - Double Precision " cell="BandR " location="{X=298, Y=612} " Growth="1 " GrowthB="0">
                 <Link pin="I_C57_A0_P1_in" dir="in" link="Link8" />
-                <Link pin="O_C57_A0_P2_out" dir="out" link="Link5" />
+                <Link pin="O_C57_A0_P2_out" dir="out" link="Link4" />
             </Algorithm>
-            <Algorithm name="AbsAlg1" friendlyname="Absolute Value " cell="AbsL " location="{X=407, Y=485} " Growth="0 " GrowthB="0">
-                <Link pin="I_C35_A0_P1_in" dir="in" link="Link2" />
-                <Link pin="O_C35_A0_P2_out" dir="out" link="Link3" />
+            <Algorithm name="EQ1940Single1" friendlyname="1 Channel - Double Precision " cell="BandL " location="{X=296, Y=520} " Growth="1 " GrowthB="0">
+                <Link pin="I_C30_A0_P1_in" dir="in" link="Link9" />
+                <Link pin="O_C30_A0_P2_out" dir="out" link="Link1" />
             </Algorithm>
-            <Algorithm name="AbsAlg2" friendlyname="Absolute Value " cell="AbsR " location="{X=409, Y=577} " Growth="0 " GrowthB="0">
-                <Link pin="I_C62_A0_P1_in" dir="in" link="Link5" />
-                <Link pin="O_C62_A0_P2_out" dir="out" link="Link7" />
+            <Algorithm name="ICSigma100Out5" friendlyname="170x\140x output " cell="SerialOutL " location="{X=301, Y=468} " Growth="0 " GrowthB="0">
+                <Link pin="I_C0_A0_P1_in" dir="in" link="Link9" />
+            </Algorithm>
+            <Algorithm name="ICSigma100Out6" friendlyname="170x\140x output " cell="SerialOutR " location="{X=304, Y=710} " Growth="0 " GrowthB="0">
+                <Link pin="I_C10_A0_P1_in" dir="in" link="Link8" />
             </Algorithm>
             <Algorithm name="ICSigma100Out1" friendlyname="170x\140x output " cell="OutK3L " location="{X=559, Y=228} " Growth="0 " GrowthB="0">
-                <Link pin="I_C2_A0_P1_in" dir="in" link="Link9" />
+                <Link pin="I_C2_A0_P1_in" dir="in" link="Link7" />
             </Algorithm>
             <Algorithm name="ICSigma100Out2" friendlyname="170x\140x output " cell="OutK3R " location="{X=559, Y=273.1914} " Growth="0 " GrowthB="0">
-                <Link pin="I_C32_A0_P1_in" dir="in" link="Link9" />
+                <Link pin="I_C32_A0_P1_in" dir="in" link="Link7" />
             </Algorithm>
             <Algorithm name="ICSigma100Out3" friendlyname="170x\140x output " cell="OutK4L " location="{X=558, Y=323.1914} " Growth="0 " GrowthB="0">
-                <Link pin="I_C50_A0_P1_in" dir="in" link="Link9" />
+                <Link pin="I_C50_A0_P1_in" dir="in" link="Link7" />
             </Algorithm>
             <Algorithm name="ICSigma100Out4" friendlyname="170x\140x output " cell="OutK4R " location="{X=558, Y=373.1914} " Growth="0 " GrowthB="0">
-                <Link pin="I_C58_A0_P1_in" dir="in" link="Link9" />
+                <Link pin="I_C58_A0_P1_in" dir="in" link="Link7" />
             </Algorithm>
-            <Algorithm name="EQ1940Single2" friendlyname="1 Channel - Double Precision " cell="SmoothL " location="{X=484, Y=468} " Growth="1 " GrowthB="0">
-                <Link pin="I_C38_A0_P1_in" dir="in" link="Link3" />
-                <Link pin="O_C38_A0_P2_out" dir="out" link="Link4" />
+            <Algorithm name="AbsAlg1" friendlyname="Absolute Value " cell="AbsL " location="{X=405, Y=537} " Growth="0 " GrowthB="0">
+                <Link pin="I_C35_A0_P1_in" dir="in" link="Link1" />
+                <Link pin="O_C35_A0_P2_out" dir="out" link="Link2" />
             </Algorithm>
-            <Algorithm name="EQ1940Single4" friendlyname="1 Channel - Double Precision " cell="SmoothR " location="{X=486, Y=560} " Growth="1 " GrowthB="0">
-                <Link pin="I_C68_A0_P1_in" dir="in" link="Link7" />
-                <Link pin="O_C68_A0_P2_out" dir="out" link="Link6" />
+            <Algorithm name="AbsAlg2" friendlyname="Absolute Value " cell="AbsR " location="{X=407, Y=629} " Growth="0 " GrowthB="0">
+                <Link pin="I_C62_A0_P1_in" dir="in" link="Link4" />
+                <Link pin="O_C62_A0_P2_out" dir="out" link="Link6" />
             </Algorithm>
-            <Algorithm name="ReadBackAlg1" friendlyname="Data Capture Register Readback " cell="LevelL " location="{X=607, Y=462} " Growth="0 " GrowthB="0">
-                <Link pin="I_C41_A0_P1_in" dir="in" link="Link4" />
+            <Algorithm name="EQ1940Single2" friendlyname="1 Channel - Double Precision " cell="SmoothL " location="{X=482, Y=520} " Growth="1 " GrowthB="0">
+                <Link pin="I_C38_A0_P1_in" dir="in" link="Link2" />
+                <Link pin="O_C38_A0_P2_out" dir="out" link="Link3" />
             </Algorithm>
-            <Algorithm name="ReadBackAlg2" friendlyname="Data Capture Register Readback " cell="LevelR " location="{X=609, Y=554} " Growth="0 " GrowthB="0">
-                <Link pin="I_C73_A0_P1_in" dir="in" link="Link6" />
+            <Algorithm name="EQ1940Single4" friendlyname="1 Channel - Double Precision " cell="SmoothR " location="{X=484, Y=612} " Growth="1 " GrowthB="0">
+                <Link pin="I_C68_A0_P1_in" dir="in" link="Link6" />
+                <Link pin="O_C68_A0_P2_out" dir="out" link="Link5" />
+            </Algorithm>
+            <Algorithm name="ReadBackAlg1" friendlyname="Data Capture Register Readback " cell="LevelL " location="{X=605, Y=514} " Growth="0 " GrowthB="0">
+                <Link pin="I_C41_A0_P1_in" dir="in" link="Link3" />
+            </Algorithm>
+            <Algorithm name="ReadBackAlg2" friendlyname="Data Capture Register Readback " cell="LevelR " location="{X=607, Y=606} " Growth="0 " GrowthB="0">
+                <Link pin="I_C73_A0_P1_in" dir="in" link="Link5" />
             </Algorithm>
         </Schematic>
     </IC>

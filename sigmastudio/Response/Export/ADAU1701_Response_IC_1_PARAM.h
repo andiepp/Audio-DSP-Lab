@@ -1,7 +1,7 @@
 /*
- * File:           H:\Development-Lab\AudioMiniLab\sigmastudio\Response\Export\ADAU1701_Response_IC_1_PARAM.h
+ * File:           H:\Audio-DSP-Lab\sigmastudio\Response\Export\ADAU1701_Response_IC_1_PARAM.h
  *
- * Created:        Monday, October 12, 2026 9:26:14 AM
+ * Created:        Monday, October 19, 2026 1:37:00 PM
  * Description:    ADAU1701_Response:IC 1 parameter RAM definitions.
  *
  * This software is distributed in the hope that it will be useful,
@@ -48,53 +48,53 @@
 #define MOD_AMPLITUDE_ALG0_STEP_VALUE                  SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0.000244140625)
 #define MOD_AMPLITUDE_ALG0_STEP_TYPE                   SIGMASTUDIOTYPE_FIXPOINT
 
-/* Module BandL - General (2nd order)*/
-#define MOD_BANDL_COUNT                                5
-#define MOD_BANDL_DEVICE                               "IC1"
-#define MOD_BANDL_ALG0_STAGE0_B0_ADDR                  5
-#define MOD_BANDL_ALG0_STAGE0_B0_FIXPT                 0x00800000
-#define MOD_BANDL_ALG0_STAGE0_B0_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(1)
-#define MOD_BANDL_ALG0_STAGE0_B0_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
-#define MOD_BANDL_ALG0_STAGE0_B1_ADDR                  6
-#define MOD_BANDL_ALG0_STAGE0_B1_FIXPT                 0x00000000
-#define MOD_BANDL_ALG0_STAGE0_B1_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
-#define MOD_BANDL_ALG0_STAGE0_B1_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
-#define MOD_BANDL_ALG0_STAGE0_B2_ADDR                  7
-#define MOD_BANDL_ALG0_STAGE0_B2_FIXPT                 0x00000000
-#define MOD_BANDL_ALG0_STAGE0_B2_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
-#define MOD_BANDL_ALG0_STAGE0_B2_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
-#define MOD_BANDL_ALG0_STAGE0_A0_ADDR                  8
-#define MOD_BANDL_ALG0_STAGE0_A0_FIXPT                 0x00000000
-#define MOD_BANDL_ALG0_STAGE0_A0_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
-#define MOD_BANDL_ALG0_STAGE0_A0_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
-#define MOD_BANDL_ALG0_STAGE0_A1_ADDR                  9
-#define MOD_BANDL_ALG0_STAGE0_A1_FIXPT                 0x00000000
-#define MOD_BANDL_ALG0_STAGE0_A1_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
-#define MOD_BANDL_ALG0_STAGE0_A1_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
-
 /* Module BandR - General (2nd order)*/
 #define MOD_BANDR_COUNT                                5
 #define MOD_BANDR_DEVICE                               "IC1"
-#define MOD_BANDR_ALG0_STAGE0_B0_ADDR                  10
+#define MOD_BANDR_ALG0_STAGE0_B0_ADDR                  5
 #define MOD_BANDR_ALG0_STAGE0_B0_FIXPT                 0x00800000
 #define MOD_BANDR_ALG0_STAGE0_B0_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(1)
 #define MOD_BANDR_ALG0_STAGE0_B0_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
-#define MOD_BANDR_ALG0_STAGE0_B1_ADDR                  11
+#define MOD_BANDR_ALG0_STAGE0_B1_ADDR                  6
 #define MOD_BANDR_ALG0_STAGE0_B1_FIXPT                 0x00000000
 #define MOD_BANDR_ALG0_STAGE0_B1_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
 #define MOD_BANDR_ALG0_STAGE0_B1_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
-#define MOD_BANDR_ALG0_STAGE0_B2_ADDR                  12
+#define MOD_BANDR_ALG0_STAGE0_B2_ADDR                  7
 #define MOD_BANDR_ALG0_STAGE0_B2_FIXPT                 0x00000000
 #define MOD_BANDR_ALG0_STAGE0_B2_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
 #define MOD_BANDR_ALG0_STAGE0_B2_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
-#define MOD_BANDR_ALG0_STAGE0_A0_ADDR                  13
+#define MOD_BANDR_ALG0_STAGE0_A0_ADDR                  8
 #define MOD_BANDR_ALG0_STAGE0_A0_FIXPT                 0x00000000
 #define MOD_BANDR_ALG0_STAGE0_A0_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
 #define MOD_BANDR_ALG0_STAGE0_A0_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
-#define MOD_BANDR_ALG0_STAGE0_A1_ADDR                  14
+#define MOD_BANDR_ALG0_STAGE0_A1_ADDR                  9
 #define MOD_BANDR_ALG0_STAGE0_A1_FIXPT                 0x00000000
 #define MOD_BANDR_ALG0_STAGE0_A1_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
 #define MOD_BANDR_ALG0_STAGE0_A1_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
+
+/* Module BandL - General (2nd order)*/
+#define MOD_BANDL_COUNT                                5
+#define MOD_BANDL_DEVICE                               "IC1"
+#define MOD_BANDL_ALG0_STAGE0_B0_ADDR                  10
+#define MOD_BANDL_ALG0_STAGE0_B0_FIXPT                 0x00800000
+#define MOD_BANDL_ALG0_STAGE0_B0_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(1)
+#define MOD_BANDL_ALG0_STAGE0_B0_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
+#define MOD_BANDL_ALG0_STAGE0_B1_ADDR                  11
+#define MOD_BANDL_ALG0_STAGE0_B1_FIXPT                 0x00000000
+#define MOD_BANDL_ALG0_STAGE0_B1_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
+#define MOD_BANDL_ALG0_STAGE0_B1_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
+#define MOD_BANDL_ALG0_STAGE0_B2_ADDR                  12
+#define MOD_BANDL_ALG0_STAGE0_B2_FIXPT                 0x00000000
+#define MOD_BANDL_ALG0_STAGE0_B2_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
+#define MOD_BANDL_ALG0_STAGE0_B2_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
+#define MOD_BANDL_ALG0_STAGE0_A0_ADDR                  13
+#define MOD_BANDL_ALG0_STAGE0_A0_FIXPT                 0x00000000
+#define MOD_BANDL_ALG0_STAGE0_A0_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
+#define MOD_BANDL_ALG0_STAGE0_A0_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
+#define MOD_BANDL_ALG0_STAGE0_A1_ADDR                  14
+#define MOD_BANDL_ALG0_STAGE0_A1_FIXPT                 0x00000000
+#define MOD_BANDL_ALG0_STAGE0_A1_VALUE                 SIGMASTUDIOTYPE_FIXPOINT_CONVERT(0)
+#define MOD_BANDL_ALG0_STAGE0_A1_TYPE                  SIGMASTUDIOTYPE_FIXPOINT
 
 /* Module SmoothL - General (2nd order)*/
 #define MOD_SMOOTHL_COUNT                              5
@@ -148,7 +148,7 @@
 #define MOD_LEVELR_COUNT                               2
 #define MOD_LEVELR_DEVICE                              "IC1"
 #define MOD_LEVELR_ALG0_VAL0_ADDR                      2074
-#define MOD_LEVELR_ALG0_VAL0_VALUES                    SIGMASTUDIOTYPE_SPECIAL(0x0186)
+#define MOD_LEVELR_ALG0_VAL0_VALUES                    SIGMASTUDIOTYPE_SPECIAL(0x0196)
 #define MOD_LEVELR_ALG0_VAL0_TYPE                      SIGMASTUDIOTYPE_SPECIAL
 #define MOD_LEVELR_ALG0_VAL0_READBACK_ADDR             0
 #define MOD_LEVELR_ALG0_VAL1_ADDR                      2074
@@ -159,7 +159,7 @@
 #define MOD_LEVELL_COUNT                               2
 #define MOD_LEVELL_DEVICE                              "IC1"
 #define MOD_LEVELL_ALG0_VAL0_ADDR                      2074
-#define MOD_LEVELL_ALG0_VAL0_VALUES                    SIGMASTUDIOTYPE_SPECIAL(0x017A)
+#define MOD_LEVELL_ALG0_VAL0_VALUES                    SIGMASTUDIOTYPE_SPECIAL(0x018A)
 #define MOD_LEVELL_ALG0_VAL0_TYPE                      SIGMASTUDIOTYPE_SPECIAL
 #define MOD_LEVELL_ALG0_VAL0_READBACK_ADDR             0
 #define MOD_LEVELL_ALG0_VAL1_ADDR                      2074

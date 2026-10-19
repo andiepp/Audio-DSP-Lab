@@ -204,6 +204,7 @@ The station that plays is the radio's parameter `station`. The radio tries netwo
 
 | Request | Response |
 | --- | --- |
+| `diag boot` | `ok <reason> <code> <lines> <failures> <recovered> <first-ms> <first-address> <first-lines> <clocks>`: the last start and the EEPROM reads since: the reset reason (`power-on`, `external`, `software`, `panic`, `watchdog`, `brownout`, `other`) and the chip's own code (`0x01` a clean power-on; `0x07` the boot watchdog restarted a boot that hung, as an unclean power-up gives it); the I2C lines before the firmware took them (bit 0 SDA, bit 1 SCL, high); EEPROM reads that failed, and how many of them a retry after freeing the bus cured; the first failure: ms after the start, EEPROM address, the lines then, and the clocks that freed SDA |
 | `diag dsp <address>` | `ok <word> <hex>`: one word of the DSP's parameter RAM |
 | `diag dspset <address> <word>` | `ok`: safeload one raw word |
 | `diag eeprom <address> <count>` | `ok <hex bytes>`: up to 64 bytes of the EEPROM |

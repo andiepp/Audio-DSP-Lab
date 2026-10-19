@@ -13,6 +13,8 @@
 #include "Eeprom24.h"
 #include "Synth.h"
 #include <Arduino.h>
+#include <esp_system.h>
+#include <esp_rom_sys.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -903,6 +905,20 @@ static void cmdBackup() {
 
 // --- diagnostics -----------------------------------------------------------------
 
+static const char *resetReason() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON:   return "power-on";
+    case ESP_RST_EXT:       return "external";
+    case ESP_RST_SW:        return "software";
+    case ESP_RST_PANIC:     return "panic";
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT:       return "watchdog";
+    case ESP_RST_BROWNOUT:  return "brownout";
+    default:                return "other";
+  }
+}
+
 static void cmdDiag() {
   long address, number;
   // the heap: free now, the largest block one allocation can get, the
@@ -910,6 +926,17 @@ static void cmdDiag() {
   if (is(1, "heap") && tokenCount == 2) {
     return okf("%u %u %u", (unsigned)ESP.getFreeHeap(),
                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT), (unsigned)ESP.getMinFreeHeap());
+  }
+  // the start and the EEPROM reads since: the reset reason and the chip's
+  // own code for it (0x07: the boot watchdog restarted a boot that hung, as
+  // an unclean power-up gives it), the I2C lines before the driver took
+  // them, failed reads, those a retry cured, and the first failure (ms after
+  // the start, address, lines, clocks that freed SDA)
+  if (is(1, "boot") && tokenCount == 2) {
+    const EepromFaults &f = eepromFaults();
+    return okf("%s 0x%02X %u %u %u %lu %u %u %u", resetReason(), (unsigned)esp_rom_get_reset_reason(0),
+               f.linesAtStart, f.failures, f.recovered, (unsigned long)f.firstMs, f.firstAddress,
+               f.linesAtFailure, f.firstClocks);
   }
   if (is(1, "dsp") && tokenCount == 3) {
     if (appInServiceMode() || appRunning(APP_SIGMASTUDIO)) return fail(ERR_SERVICE_MODE);
@@ -1009,7 +1036,7 @@ static const Command commands[] = {
   { "load",      cmdLoad,       "load" },
   { "aux",       cmdAux,        "aux" },
   { "backup",    cmdBackup,     "backup" },
-  { "diag",      cmdDiag,       "diag dsp|dspset|eeprom|scan|tone|meter|raw|heap ..." },
+  { "diag",      cmdDiag,       "diag boot|dsp|dspset|eeprom|scan|tone|meter|raw|heap ..." },
   { "reset",     cmdReset,      "reset" },
 };
 

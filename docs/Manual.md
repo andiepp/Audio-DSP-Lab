@@ -636,6 +636,7 @@ Anyone on your network can reach the board this way, as anyone with the USB cabl
 | "No Audio-DSP-Lab board answers" | The board runs other firmware, or JP1 is not on ext. MCLK | Flash the firmware; check the jumpers |
 | No sound after selecting an application | The output is off after every start | Press **Output on**; check volume or amplitude |
 | The application fails with `eeprom-failed` | SigmaStudio's USBi is still on the I2C header | Unplug the USBi and select again |
+| After plugging the board in it does not answer, or the SigmaStudio mode shows `eeprom-failed` | The front panel has its own supply and kept the board's ESP32 half powered through its cable while the board was unplugged | Press the ESP32 kit's EN button (or `reset`); power the panel from the board, or unplug the panel first (see the front panel chapter) |
 | The application fails with `dsp-not-responding` | JP1 on the crystal instead of ext. MCLK, JP2 not on Selfboot | Set the jumpers as in the installation guide |
 | After a power cycle the board is in SigmaStudio mode | **Power-up** shows SigmaStudio mode, or the last application could not start | Select the application again, or set **Power-up** to **Last application** |
 | Radio shows "No network" | No WiFi network set, a 5 GHz network, or out of reach | **WiFi**: enter a 2.4 GHz network |

@@ -22,6 +22,8 @@ Both sides are 3.3 V logic; no level shifter is needed. Put the 10 kΩ resistor 
 
 The panel needs 5 V, from its own USB port or from the board's 5 V if the board's supply is about 9 V or less (the panel draws up to about 250 mA; above 9 V the board's regulator gets hot).
 
+**Switch the board and the panel off together.** A panel with its own supply keeps its TX line at 3.3 V while the board is unplugged, and that line feeds the board's ESP32 through GPIO37. The ESP32 then never quite powers off, and the next power-up is not a clean one: the chip restarts itself once or twice before the firmware runs (`diag boot` shows `watchdog 0x07`), now and then the board stays silent on USB until its EN button is pressed, and the SigmaStudio mode can come up with `eeprom-failed`. Measured on the ESP32-PICO-KIT-1 board: with the panel powered, every replug was such an unclean start; with it unpowered, every replug was a clean power-on. Powering the panel from the board's 5 V avoids it; with two supplies, unplug the panel before the board, or press EN after plugging the board in.
+
 ## Flashing
 
 Connect the CYD by USB; it usually shows up as "USB-SERIAL CH340 (COMn)". In the release's `firmware` folder:

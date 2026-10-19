@@ -208,8 +208,8 @@ bool captureSamples(uint32_t frames, float *left, float *right) {
   for (uint32_t done = 0; clocked && done < frames; done += CAPTURE_CHUNK_FRAMES) {
     clocked = readChunk(rx, CAPTURE_CLOCK_TIMEOUT_MS);
     for (int i = 0; clocked && i < CAPTURE_CHUNK_FRAMES; i++) {
-      left[done + i] = (chunk[2 * i] & ~0xFF) * scale;
-      right[done + i] = (chunk[2 * i + 1] & ~0xFF) * scale;
+      if (left != nullptr) left[done + i] = (chunk[2 * i] & ~0xFF) * scale;
+      if (right != nullptr) right[done + i] = (chunk[2 * i + 1] & ~0xFF) * scale;
     }
   }
   closeRx(rx);

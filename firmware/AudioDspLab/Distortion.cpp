@@ -15,9 +15,10 @@
 #define TASK_STACK                    4096
 #define FLOOR_DB                      -200.0f
 
-static float *left = nullptr;               // FRAMES samples, then the FFT's HALF complex points
-static float *right = nullptr;
-static float *window = nullptr;             // HALF + 1: the window is symmetric
+// one channel at a time: after the radio the heap holds two blocks of 32 KB
+// at most and a single one of 16 KB, so the measurement asks for one of
+// 32 KB (the samples) and three of 16 KB (esp-dsp's table, the two sums)
+static float *samples = nullptr;            // FRAMES samples, then the FFT's HALF complex points
 static float *powerLeft = nullptr;          // HALF + 1 bins, summed over the averages
 static float *powerRight = nullptr;
 static DistortionResult *working = nullptr;
@@ -37,61 +38,68 @@ static uint32_t resultCount = 0;
 //  Memory and the FFT
 // ----------------------------------------------------------------------------
 
+// the window, Blackman-Harris with 4 terms, periodic (sidelobes below
+// -92 dB), sample by sample without a table: cos(2x) and cos(3x) from
+// cos(x). Single precision throughout: the ESP32's FPU has no double
+template <typename Each>
+static void forEachWindowValue(Each each) {
+  const float step = 2.0f * (float)M_PI / FRAMES;
+  for (int n = 0; n < FRAMES; n++) {
+    const float c = cosf(step * n);
+    const float c2 = 2 * c * c - 1, c3 = (4 * c * c - 3) * c;
+    each(n, 0.35875f - 0.48829f * c + 0.14128f * c2 - 0.01168f * c3);
+  }
+}
+
 static void release() {
-  free(left);
-  free(right);
-  free(window);
+  free(samples);
   free(powerLeft);
   free(powerRight);
   free(working);
-  left = right = window = powerLeft = powerRight = nullptr;
+  samples = powerLeft = powerRight = nullptr;
   working = nullptr;
   dsps_fft2r_deinit_fc32();
 }
 
 static bool allocate() {
-  left = (float *)malloc(FRAMES * sizeof(float));
-  right = (float *)malloc(FRAMES * sizeof(float));
-  window = (float *)malloc((HALF + 1) * sizeof(float));
+  // the largest first, while the heap still has it
+  samples = (float *)malloc(FRAMES * sizeof(float));
+  if (samples == nullptr || dsps_fft2r_init_fc32(NULL, HALF) != ESP_OK) {
+    release();
+    return false;
+  }
   powerLeft = (float *)malloc((HALF + 1) * sizeof(float));
   powerRight = (float *)malloc((HALF + 1) * sizeof(float));
   working = (DistortionResult *)malloc(sizeof(DistortionResult));
-  if (left == nullptr || right == nullptr || window == nullptr || powerLeft == nullptr ||
-      powerRight == nullptr || working == nullptr || dsps_fft2r_init_fc32(NULL, HALF) != ESP_OK) {
+  if (powerLeft == nullptr || powerRight == nullptr || working == nullptr) {
     release();
     return false;
   }
 
-  // Blackman-Harris, 4 terms, periodic (sidelobes below -92 dB)
   windowSum = windowSquares = 0;
-  for (int n = 0; n <= HALF; n++) {
-    const double x = 2.0 * M_PI * n / FRAMES;
-    window[n] = (float)(0.35875 - 0.48829 * cos(x) + 0.14128 * cos(2 * x) - 0.01168 * cos(3 * x));
-  }
-  for (int n = 0; n < FRAMES; n++) {
-    const double w = window[n <= HALF ? n : FRAMES - n];
+  forEachWindowValue([](int, float w) {
     windowSum += w;
-    windowSquares += w * w;
-  }
+    windowSquares += (double)w * w;
+  });
 
   // which way the library turns: e^(+j 2 pi 3 m / HALF) lands on bin 3 of
   // a forward (e^-j) transform, on bin HALF - 3 of the other
   for (int m = 0; m < HALF; m++) {
-    left[2 * m] = cosf(2.0f * (float)M_PI * 3 * m / HALF);
-    left[2 * m + 1] = sinf(2.0f * (float)M_PI * 3 * m / HALF);
+    samples[2 * m] = cosf(2.0f * (float)M_PI * 3 * m / HALF);
+    samples[2 * m + 1] = sinf(2.0f * (float)M_PI * 3 * m / HALF);
   }
-  dsps_fft2r_fc32(left, HALF);
-  dsps_bit_rev_fc32(left, HALF);
-  libraryForward = hypotf(left[6], left[7]) > hypotf(left[2 * (HALF - 3)], left[2 * (HALF - 3) + 1]);
+  dsps_fft2r_fc32(samples, HALF);
+  dsps_bit_rev_fc32(samples, HALF);
+  libraryForward = hypotf(samples[6], samples[7]) > hypotf(samples[2 * (HALF - 3)], samples[2 * (HALF - 3) + 1]);
   return true;
 }
 
 // one channel's samples to its power spectrum, added to `power`
 static void addSpectrum(float *x, float *power) {
-  double mean = 0;
-  for (int n = 0; n < FRAMES; n++) mean += x[n];
-  mean /= FRAMES;
-  for (int n = 0; n < FRAMES; n++) x[n] = (float)((x[n] - mean) * window[n <= HALF ? n : FRAMES - n]);
+  double sum = 0;
+  for (int n = 0; n < FRAMES; n++) sum += x[n];
+  const float mean = (float)(sum / FRAMES);
+  forEachWindowValue([x, mean](int n, float w) { x[n] = (x[n] - mean) * w; });
 
   // the real samples as HALF complex points: z[m] = x[2m] + j x[2m+1]
   dsps_fft2r_fc32(x, HALF);
@@ -99,23 +107,19 @@ static void addSpectrum(float *x, float *power) {
 
   // the split: X[k] = E[k] + W^k O[k], W = e^(-j 2 pi / FRAMES), with
   // E = (Z[k] + Z*[HALF-k]) / 2 and O = (Z[k] - Z*[HALF-k]) / 2j
-  const double step = 2.0 * M_PI / FRAMES;
-  double wr = 1.0, wi = 0.0;
-  const double cr = cos(step), ci = -sin(step);
+  const float step = 2.0f * (float)M_PI / FRAMES;
   for (int k = 0; k <= HALF; k++) {
     const int a = libraryForward ? k % HALF : (HALF - k) % HALF;
     const int b = libraryForward ? (HALF - k) % HALF : k % HALF;
-    const double zr = x[2 * a], zi = x[2 * a + 1];
-    const double yr = x[2 * b], yi = -x[2 * b + 1];          // Z*[HALF-k]
-    const double er = 0.5 * (zr + yr), ei = 0.5 * (zi + yi);
-    const double dr = 0.5 * (zr - yr), di = 0.5 * (zi - yi);
-    const double orr = di, oi = -dr;                          // (Z - Z*) / 2j
-    const double xr = er + wr * orr - wi * oi;
-    const double xi = ei + wr * oi + wi * orr;
-    power[k] += (float)(xr * xr + xi * xi);
-    const double t = wr * cr - wi * ci;
-    wi = wr * ci + wi * cr;
-    wr = t;
+    const float wr = cosf(step * k), wi = -sinf(step * k);
+    const float zr = x[2 * a], zi = x[2 * a + 1];
+    const float yr = x[2 * b], yi = -x[2 * b + 1];            // Z*[HALF-k]
+    const float er = 0.5f * (zr + yr), ei = 0.5f * (zi + yi);
+    const float dr = 0.5f * (zr - yr), di = 0.5f * (zi - yi);
+    const float orr = di, oi = -dr;                           // (Z - Z*) / 2j
+    const float xr = er + wr * orr - wi * oi;
+    const float xi = ei + wr * oi + wi * orr;
+    power[k] += xr * xr + xi * xi;
   }
 }
 
@@ -216,12 +220,10 @@ static void run(void *) {
     memset(powerLeft, 0, (HALF + 1) * sizeof(float));
     memset(powerRight, 0, (HALF + 1) * sizeof(float));
     bool clocked = true;
-    for (int a = 0; a < DISTORTION_AVERAGES && clocked && !stopRequested; a++) {
-      clocked = captureSamples(FRAMES, left, right);
-      if (clocked) {
-        addSpectrum(left, powerLeft);
-        addSpectrum(right, powerRight);
-      }
+    for (int a = 0; a < 2 * DISTORTION_AVERAGES && clocked && !stopRequested; a++) {
+      const bool isLeft = a % 2 == 0;
+      clocked = captureSamples(FRAMES, isLeft ? samples : nullptr, isLeft ? nullptr : samples);
+      if (clocked) addSpectrum(samples, isLeft ? powerLeft : powerRight);
     }
     if (stopRequested) break;
     if (!clocked) {
@@ -269,7 +271,7 @@ void distortionStop() {
     while (!taskDone && millis() - startedAt < STOP_WAIT_MS) delay(5);
     task = NULL;
   }
-  if (left != nullptr) release();
+  if (samples != nullptr) release();
   state = DISTORTION_IDLE;
 }
 
@@ -307,11 +309,14 @@ uint8_t distortionSelfTest(DistortionResult &result) {
   const int k = 171;                        // 1001.95 Hz
   for (int n = 0; n < FRAMES; n++) {
     const double phase = 2.0 * M_PI * k * n / FRAMES;
-    left[n] = (float)(0.1 * sin(phase) + 0.0001 * sin(3 * phase + 0.3) - 0.016);
-    right[n] = (float)(0.1 * sin(phase) + 0.00001 * sin(2 * phase + 0.7) - 0.015);
+    samples[n] = (float)(0.1 * sin(phase) + 0.0001 * sin(3 * phase + 0.3) - 0.016);
   }
-  addSpectrum(left, powerLeft);
-  addSpectrum(right, powerRight);
+  addSpectrum(samples, powerLeft);
+  for (int n = 0; n < FRAMES; n++) {
+    const double phase = 2.0 * M_PI * k * n / FRAMES;
+    samples[n] = (float)(0.1 * sin(phase) + 0.00001 * sin(2 * phase + 0.7) - 0.015);
+  }
+  addSpectrum(samples, powerRight);
   analyse(1, result);
   result.count = 0;
   release();

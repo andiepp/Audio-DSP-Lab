@@ -1108,6 +1108,22 @@ static void cmdDiag() {
   // the rate timed against the ESP32's clock, the frames taken, per channel
   // RMS and peak in dBFS and the frequency of its zero crossings, and the
   // first left slot as it came (no I2C: works in service mode too)
+  if (is(1, "blocks") && tokenCount == 2) {
+    // how many blocks of 32, 16, 8 and 4 KB the heap gives, greedily, all given back
+    static void *taken[96];
+    int count = 0, got[4] = {0, 0, 0, 0};
+    const size_t sizes[4] = {32768, 16384, 8192, 4096};
+    for (int k = 0; k < 4; k++) {
+      while (count < 96) {
+        void *block = malloc(sizes[k]);
+        if (block == nullptr) break;
+        taken[count++] = block;
+        got[k]++;
+      }
+    }
+    for (int i = 0; i < count; i++) free(taken[i]);
+    return okf("%d %d %d %d", got[0], got[1], got[2], got[3]);
+  }
   if (is(1, "thd-test") && tokenCount == 2) {
     const uint8_t error = distortionSelfTest(thdResult);
     if (error != ERR_NONE) return fail(error);

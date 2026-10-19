@@ -7,18 +7,21 @@
 //  frames of both channels (0.17 s at 48 kHz), windows them (Blackman-
 //  Harris, 4 terms), transforms them (esp-dsp: a complex FFT of 4096
 //  points and the split into the real spectrum) and averages the power
-//  of DISTORTION_AVERAGES captures. From that spectrum, per channel: the
-//  fundamental's level, the harmonics H2 to H10 below 20 kHz, THD and
-//  THD+N (20 Hz to 20 kHz without DC and the fundamental), and a spectrum
-//  of 256 points on a logarithmic axis for the plots.
+//  of DISTORTION_AVERAGES captures per channel; it keeps one channel of a
+//  capture at a time, so left and right take turns. From that spectrum,
+//  per channel: the fundamental's level, the harmonics H2 to H10 below
+//  20 kHz, THD and THD+N (20 Hz to 20 kHz without DC and the
+//  fundamental), and a spectrum of 256 points on a logarithmic axis for
+//  the plots.
 //
 //  The DSP and the capture share one clock, so a tone on a bin's centre
 //  (distortionSnap) sits on its bin exactly; the window is the margin for
 //  tones that do not (an outside source).
 //
 //  The task touches the serial output and its own memory only; the
-//  firmware's loop alone talks to the DSP. About 120 KB of heap while it
-//  runs, all of it given back by distortionStop().
+//  firmware's loop alone talks to the DSP. About 82 KB of heap while it
+//  runs (one block of 32 KB, three of 16 KB: they fit after the radio has
+//  run too), all of it given back by distortionStop().
 // ----------------------------------------------------------------------------
 
 #ifndef DISTORTION_H
@@ -27,7 +30,7 @@
 #include <stdint.h>
 
 #define DISTORTION_FRAMES             8192    // per capture: 0.17 s at 48 kHz
-#define DISTORTION_AVERAGES           4       // captures a result averages: about 0.75 s
+#define DISTORTION_AVERAGES           4       // captures a result averages per channel
 #define DISTORTION_HARMONIC_LAST      10      // H2 .. H10
 #define DISTORTION_SPECTRUM_POINTS    256     // 20 Hz .. 24 kHz, logarithmic
 #define DISTORTION_LOW_HZ             20.0f   // THD+N's band

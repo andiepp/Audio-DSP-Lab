@@ -45,7 +45,8 @@ struct CaptureResult {
 // rounded-up frames times two
 bool captureMeasure(uint32_t frames, CaptureResult &result, int32_t *keep = nullptr);
 // receives `frames` contiguous frames (a multiple of CAPTURE_CHUNK_FRAMES)
-// as samples of full scale 1.0; false without clocks. Not reentrant: one
+// as samples of full scale 1.0, a channel left out where its array is
+// nullptr; false without clocks. Not reentrant: one
 // capture at a time (the distortion measurement's task, or a diag request)
 bool captureSamples(uint32_t frames, float *left, float *right);
 

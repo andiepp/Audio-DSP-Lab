@@ -76,6 +76,10 @@ public sealed class SimulatedBoard : ILineTransport
     private int sweepTotal;
     private long nextPointAt;
     private string seenSweep = string.Empty;
+    private string thdState = DistortionStatus.Idle;
+    private int thdResults;
+    private long nextThdAt;
+    private string seenThd = string.Empty;
 
     private int? note;
     private bool gate;
@@ -271,6 +275,9 @@ public sealed class SimulatedBoard : ILineTransport
             case "points": Points(args); break;
             case "reference": Reference(args); break;
             case "level": Level(); break;
+            case "thd": Thd(args); break;
+            case "harmonics": Harmonics(); break;
+            case "spectrum": Spectrum(args); break;
             case "voice": if (Running(Applications.Synthesizer)) Ok(VoiceText()); break;
             case "midi": if (Running(Applications.Synthesizer)) Ok("0 0 0 0"); break;
             case "load": if (Running(Applications.Synthesizer)) Ok("12.5 18.3"); break;
@@ -292,7 +299,8 @@ public sealed class SimulatedBoard : ILineTransport
                      "help", "ping", "echo <word>", "info", "events [on|off]", "status", "apps", "app [<application>]",
                      "params", "get [<parameter>]", "set <parameter> <value>", "pots", "potctl [on|off]",
                      "startup [on|off]", "service [on|off]", "led [on|off]", "stations", "station ...", "radio",
-                     "wifi ...", "sweep [start|stop]", "points [<from>]", "reference [keep]", "level", "voice",
+                     "wifi ...", "sweep [start|stop]", "points [<from>]", "reference [keep]", "level",
+                     "thd [start|stop]", "harmonics", "spectrum [<points>]", "voice",
                      "midi", "load", "aux", "backup", "diag ...", "reset",
                  })
         {
@@ -392,6 +400,8 @@ public sealed class SimulatedBoard : ILineTransport
         points.Clear();
         sweepState = SweepStatus.Idle;
         sweepTotal = 0;
+        thdState = DistortionStatus.Idle;
+        thdResults = 0;
         radioState = name == Applications.Radio ? "connecting-wifi" : "idle";
         radioChangeAt = Now + 400;
         title = string.Empty;
@@ -788,6 +798,7 @@ public sealed class SimulatedBoard : ILineTransport
 
                 points.Clear();
                 values["output"] = 1;
+                thdState = DistortionStatus.Idle;
                 sweepState = SweepStatus.Running;
                 nextPointAt = Now + 150;
                 Ok(SweepText());
@@ -885,6 +896,151 @@ public sealed class SimulatedBoard : ILineTransport
         Ok(output ? $"{FormatLevel(Response(tone, 0))} {FormatLevel(Response(tone, -0.05))}" : "-110.5 -110.5");
     }
 
+    // --- distortion ---------------------------------------------------------------------
+
+    // the firmware's FFT: 8192 frames at 48 kHz; a result about every 1.6 s
+    private const double ThdBinHertz = 48000.0 / 8192;
+    private const int ThdPeriodMilliseconds = 1600;
+
+    // a made-up device: these harmonics (H2 .. H10, dBc) and a noise floor
+    // of -95 dBFS RMS from 20 Hz to 20 kHz, -120 dBFS a bin in the spectrum
+    private static readonly double[] SimulatedHarmonics = [-82, -78, -95, -91, -99, -97, -103, -101, -106];
+    private const double NoiseDecibel = -95;
+    private const double BinFloorDecibel = -120;
+
+    private double ThdHertz => Math.Round(Math.Max(1, Math.Round(values.GetValueOrDefault("tone", 1000) / ThdBinHertz)) * ThdBinHertz, 2);
+
+    // the harmonics below 20 kHz of the latest result, a little different each time
+    private List<(int Order, double Hertz, double Decibel)> ThdHarmonics(double offset)
+    {
+        List<(int, double, double)> harmonics = [];
+        double hertz = ThdHertz;
+        for (int order = 2; order <= 10 && order * hertz <= 20000; order++)
+        {
+            double wobble = 0.4 * Math.Sin((thdResults * 1.7) + order + offset);
+            harmonics.Add((order, order * hertz, Math.Round(SimulatedHarmonics[order - 2] + wobble + (offset * 10), 2)));
+        }
+
+        return harmonics;
+    }
+
+    private string ThdChannelText(double offset)
+    {
+        double level = values["output"] != 0 ? Response(ThdHertz, offset) : -140;
+        List<(int Order, double Hertz, double Decibel)> harmonics = ThdHarmonics(offset);
+        double sum = harmonics.Sum(harmonic => Math.Pow(10, harmonic.Decibel / 10));
+        double noise = Math.Pow(10, (NoiseDecibel - (level - 3.01)) / 10);
+        string thd = harmonics.Count > 0 ? ProtocolText.FormatNumber(Math.Round(10 * Math.Log10(sum), 2)) : "-";
+        return $"{ProtocolText.FormatNumber(level)} {thd} {ProtocolText.FormatNumber(Math.Round(10 * Math.Log10(sum + noise), 2))}";
+    }
+
+    private string ThdText() =>
+        thdResults == 0
+            ? $"{thdState} 0 - - - - - - -"
+            : $"{thdState} {thdResults} {ProtocolText.FormatNumber(ThdHertz)} {ThdChannelText(0)} {ThdChannelText(-0.05)}";
+
+    private void Thd(IReadOnlyList<string> args)
+    {
+        if (args.Count == 0)
+        {
+            Ok(ThdText());
+            return;
+        }
+
+        if (!Running(Applications.Analyzer))
+        {
+            return;
+        }
+
+        switch (args[0])
+        {
+            case "start":
+                if (sweepState == SweepStatus.Running)
+                {
+                    sweepState = SweepStatus.Stopped;
+                }
+
+                values["output"] = 1;
+                thdState = DistortionStatus.Running;
+                thdResults = 0;
+                nextThdAt = Now + ThdPeriodMilliseconds;
+                Ok(ThdText());
+                return;
+            case "stop":
+                thdState = DistortionStatus.Idle;
+                Ok(ThdText());
+                return;
+            default:
+                BadArgument();
+                return;
+        }
+    }
+
+    private void Harmonics()
+    {
+        if (thdResults > 0)
+        {
+            List<(int Order, double Hertz, double Decibel)> left = ThdHarmonics(0);
+            List<(int Order, double Hertz, double Decibel)> right = ThdHarmonics(-0.05);
+            for (int index = 0; index < left.Count; index++)
+            {
+                Data($"{left[index].Order} {ProtocolText.FormatNumber(Math.Round(left[index].Hertz, 2))} " +
+                     $"{ProtocolText.FormatNumber(left[index].Decibel)} {ProtocolText.FormatNumber(right[index].Decibel)}");
+            }
+        }
+
+        Ok();
+    }
+
+    private void Spectrum(IReadOnlyList<string> args)
+    {
+        int count = 256;
+        if (args.Count == 1 && (!int.TryParse(args[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out count)
+                                || count < 16 || count > 256 || (count & (count - 1)) != 0))
+        {
+            BadArgument();
+            return;
+        }
+
+        if (thdResults > 0)
+        {
+            double fundamental = ThdHertz;
+            double SpectrumHertz(int point) => 20 * Math.Pow(1200, point / 255.0);
+            double Peak(double offset, double low, double high)
+            {
+                double strongest = BinFloorDecibel + (1.5 * Math.Sin(low * 7.3));
+                double level = values["output"] != 0 ? Response(fundamental, offset) : -140;
+                if (fundamental >= low && fundamental < high)
+                {
+                    strongest = Math.Max(strongest, level);
+                }
+
+                foreach ((int _, double hertz, double decibel) in ThdHarmonics(offset))
+                {
+                    if (hertz >= low && hertz < high)
+                    {
+                        strongest = Math.Max(strongest, level + decibel);
+                    }
+                }
+
+                return Math.Round(strongest, 2);
+            }
+
+            int group = 256 / count;
+            double edge = Math.Pow(1200, 0.5 / 255);
+            for (int index = 0; index < count; index++)
+            {
+                double low = SpectrumHertz(index * group) / edge;
+                double high = SpectrumHertz(((index + 1) * group) - 1) * edge;
+                double hertz = Math.Sqrt(SpectrumHertz(index * group) * SpectrumHertz(((index + 1) * group) - 1));
+                Data($"{index} {ProtocolText.FormatNumber(Math.Round(hertz, 1))} " +
+                     $"{ProtocolText.FormatNumber(Peak(0, low, high))} {ProtocolText.FormatNumber(Peak(-0.05, low, high))}");
+            }
+        }
+
+        Ok();
+    }
+
     // --- synthesizer ------------------------------------------------------------------
 
     private string VoiceText() =>
@@ -920,6 +1076,12 @@ public sealed class SimulatedBoard : ILineTransport
             }
 
             nextPointAt = now + 40;
+        }
+
+        if (thdState == DistortionStatus.Running && now >= nextThdAt)
+        {
+            thdResults++;
+            nextThdAt = now + ThdPeriodMilliseconds;
         }
 
         if (demo && application == Applications.Synthesizer && state == BoardStatus.Running && now >= noteAt)
@@ -1039,6 +1201,13 @@ public sealed class SimulatedBoard : ILineTransport
             {
                 seenSweep = sweep;
                 Emit($"! sweep {sweep}");
+            }
+
+            string thd = ThdText();
+            if (thd != seenThd)
+            {
+                seenThd = thd;
+                Emit($"! thd {thd}");
             }
         }
 

@@ -509,6 +509,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             candidate.VoiceChanged += voice => Post(() => Synth.ApplyVoice(voice));
             candidate.Restarted += info => Post(() => _ = OnRestartedAsync());
             BoardClient connecting = candidate;
+            candidate.DistortionChanged += status => Post(() => _ = Analyzer.ApplyDistortionAsync(connecting, status));
             candidate.Disconnected += exception => Post(() =>
             {
                 if (client == connecting)

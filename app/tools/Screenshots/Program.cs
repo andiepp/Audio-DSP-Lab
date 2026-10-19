@@ -76,6 +76,15 @@ static class Program
                     }
                     Save(window, Path.Combine(output, $"{name}.png"));
                     Console.WriteLine($"{name}: {vm.ApplicationStateText} | {vm.StatusInfo} | {window.ActualWidth}x{window.ActualHeight}");
+                    if (name == "analyzer")
+                    {
+                        // the analyzer's second mode: two results, their spectrum and harmonics
+                        await vm.Analyzer.StartDistortionAsync();
+                        await Task.Delay(3600);
+                        Save(window, Path.Combine(output, "distortion.png"));
+                        Console.WriteLine($"distortion: {vm.Analyzer.DistortionStateText} | {window.ActualWidth}x{window.ActualHeight}");
+                        await vm.Analyzer.StopDistortionAsync();
+                    }
                 }
 
                 window.Close();

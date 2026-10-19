@@ -1,11 +1,15 @@
 using System.Globalization;
+using System.IO;
 using System.Windows.Input;
+using AudioDspLab.Protocol;
 
 namespace AudioDspLab.ViewModels;
 
 /// <summary>
 /// The response analyzer: a sine on K3/K4 stepped through a sweep, the
-/// levels on K2 measured at each point, against a reference if one is kept.
+/// levels on K2 measured at each point, against a reference if one is kept;
+/// or, in its distortion mode, the tone's THD and THD+N on K2 with the
+/// harmonics and the spectrum, measured continuously by the board.
 /// </summary>
 public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
 {
@@ -26,6 +30,12 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
     private bool showRelative;
     private bool isReferenceConfirmed;
     private bool isBusy;
+    private bool isDistortionMode;
+    private DistortionStatus? distortion;
+    private IReadOnlyList<SpectrumPoint> spectrum = [];
+    private IReadOnlyList<Harmonic> harmonics = [];
+    private int shownResults;
+    private bool isFetching;
 
     public AnalyzerPageViewModel(ParameterWrite write, BoardAction run)
         : base(write, run, Applications.Analyzer)
@@ -45,6 +55,9 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
         StopSweepCommand = new RelayCommand(() => _ = StopSweepAsync(), () => CanStop);
         KeepReferenceCommand = new RelayCommand(() => _ = KeepReferenceAsync(), () => CanKeepReference);
         ShowRelativeCommand = new RelayCommand(mode => ShowRelative = mode as string == "relative");
+        ShowModeCommand = new RelayCommand(mode => IsDistortionMode = mode as string == "distortion");
+        StartDistortionCommand = new RelayCommand(() => _ = StartDistortionAsync(), () => CanStartDistortion);
+        StopDistortionCommand = new RelayCommand(() => _ = StopDistortionAsync(), () => CanStopDistortion);
     }
 
     public ParameterViewModel Level { get; }
@@ -66,6 +79,90 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
     public ICommand KeepReferenceCommand { get; }
 
     public ICommand ShowRelativeCommand { get; }
+
+    public ICommand ShowModeCommand { get; }
+
+    public ICommand StartDistortionCommand { get; }
+
+    public ICommand StopDistortionCommand { get; }
+
+    /// <summary>The page shows the distortion measurement instead of the sweep.</summary>
+    public bool IsDistortionMode
+    {
+        get => isDistortionMode;
+        set
+        {
+            if (SetProperty(ref isDistortionMode, value))
+            {
+                RaisePropertyChanged(nameof(IsResponseMode));
+            }
+        }
+    }
+
+    public bool IsResponseMode => !isDistortionMode;
+
+    public bool IsMeasuringDistortion => distortion?.IsRunning == true;
+
+    public bool CanStartDistortion => IsRunning && !isBusy && !IsMeasuringDistortion;
+
+    public bool CanStopDistortion => IsRunning && !isBusy && IsMeasuringDistortion;
+
+    public IReadOnlyList<SpectrumPoint> Spectrum
+    {
+        get => spectrum;
+        private set => SetProperty(ref spectrum, value);
+    }
+
+    public IReadOnlyList<Harmonic> Harmonics
+    {
+        get => harmonics;
+        private set
+        {
+            if (SetProperty(ref harmonics, value))
+            {
+                RaisePropertyChanged(nameof(HarmonicsLeftText));
+                RaisePropertyChanged(nameof(HarmonicsRightText));
+            }
+        }
+    }
+
+    public double? FundamentalHertz => distortion?.FrequencyHertz;
+
+    public string DistortionStateText =>
+        distortion switch
+        {
+            null => string.Empty,
+            { State: DistortionStatus.Failed } => "failed: no clock on the DSP's serial output",
+            { Results: 0, IsRunning: true } => "measuring …",
+            { Results: 0 } => "not measured yet",
+            _ => string.Format(CultureInfo.CurrentCulture, "{0:#,0.00} Hz at {1:0.00} / {2:0.00} dBFS · result {3}{4}",
+                distortion.FrequencyHertz, distortion.Left?.LevelDecibel, distortion.Right?.LevelDecibel,
+                distortion.Results, distortion.IsRunning ? string.Empty : " · stopped")
+        };
+
+    public string ThdLeftText => PercentText(distortion?.Left?.ThdDecibel);
+
+    public string ThdLeftDecibelText => DecibelText(distortion?.Left?.ThdDecibel, "dB");
+
+    public string ThdnLeftText => PercentText(distortion?.Left?.ThdnDecibel);
+
+    public string ThdnLeftDecibelText => DecibelText(distortion?.Left?.ThdnDecibel, "dB");
+
+    public string ThdRightText => PercentText(distortion?.Right?.ThdDecibel);
+
+    public string ThdRightDecibelText => DecibelText(distortion?.Right?.ThdDecibel, "dB");
+
+    public string ThdnRightText => PercentText(distortion?.Right?.ThdnDecibel);
+
+    public string ThdnRightDecibelText => DecibelText(distortion?.Right?.ThdnDecibel, "dB");
+
+    public string FundamentalLeftText => DecibelText(distortion?.Left?.LevelDecibel, "dBFS");
+
+    public string FundamentalRightText => DecibelText(distortion?.Right?.LevelDecibel, "dBFS");
+
+    public string HarmonicsLeftText => HarmonicsText(harmonic => harmonic.LeftDecibel);
+
+    public string HarmonicsRightText => HarmonicsText(harmonic => harmonic.RightDecibel);
 
     internal bool IsBusy
     {
@@ -171,6 +268,74 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
 
     public bool CanStart => IsRunning && !isBusy && !IsSweeping && PlannedPoints is not null;
 
+    public Task StartDistortionAsync() =>
+        CanStartDistortion
+            ? Run(async client =>
+            {
+                IsDistortionMode = true;
+                await ApplyDistortionAsync(client, await client.StartDistortionAsync().ConfigureAwait(true)).ConfigureAwait(true);
+                Output.Apply(await client.GetAsync("output").ConfigureAwait(true), fromBoard: false);
+                ApplySweep(await client.GetSweepAsync().ConfigureAwait(true));
+            }, "Distortion measurement started.")
+            : Task.CompletedTask;
+
+    public Task StopDistortionAsync() =>
+        CanStopDistortion
+            ? Run(async client => await ApplyDistortionAsync(client, await client.StopDistortionAsync().ConfigureAwait(true))
+                .ConfigureAwait(true), "Distortion measurement stopped.")
+            : Task.CompletedTask;
+
+    /// <summary>
+    /// The measurement's state; a result not yet shown brings its spectrum
+    /// and harmonics along (read once at a time; a newer one waits for the
+    /// next result).
+    /// </summary>
+    internal async Task ApplyDistortionAsync(BoardClient client, DistortionStatus status)
+    {
+        distortion = status;
+        foreach (string name in new[]
+                 {
+                     nameof(IsMeasuringDistortion), nameof(FundamentalHertz), nameof(DistortionStateText),
+                     nameof(ThdLeftText), nameof(ThdLeftDecibelText), nameof(ThdnLeftText), nameof(ThdnLeftDecibelText),
+                     nameof(ThdRightText), nameof(ThdRightDecibelText), nameof(ThdnRightText), nameof(ThdnRightDecibelText),
+                     nameof(FundamentalLeftText), nameof(FundamentalRightText),
+                 })
+        {
+            RaisePropertyChanged(name);
+        }
+
+        CommandManager.InvalidateRequerySuggested();
+        if (status.Results == 0)
+        {
+            shownResults = 0;
+            Spectrum = [];
+            Harmonics = [];
+            return;
+        }
+
+        if (status.Results == shownResults || isFetching)
+        {
+            return;
+        }
+
+        isFetching = true;
+        try
+        {
+            IReadOnlyList<SpectrumPoint> read = await client.GetSpectrumAsync().ConfigureAwait(true);
+            Harmonics = await client.GetHarmonicsAsync().ConfigureAwait(true);
+            Spectrum = read;
+            shownResults = status.Results;
+        }
+        catch (Exception exception) when (exception is BoardErrorException or IOException or TimeoutException)
+        {
+            // the next result tries again
+        }
+        finally
+        {
+            isFetching = false;
+        }
+    }
+
     public bool CanStop => IsRunning && !isBusy && IsSweeping;
 
     public bool CanKeepReference => IsRunning && !isBusy && sweep?.State == SweepStatus.Done && isReferenceConfirmed;
@@ -216,6 +381,14 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
         IReadOnlyList<SweepPoint> read = await client.GetPointsAsync().ConfigureAwait(true);
         Points = read;
         Reference = await client.GetReferenceAsync().ConfigureAwait(true);
+        shownResults = 0;
+        DistortionStatus status = await client.GetDistortionAsync().ConfigureAwait(true);
+        if (status.IsRunning)
+        {
+            IsDistortionMode = true;
+        }
+
+        await ApplyDistortionAsync(client, status).ConfigureAwait(true);
     }
 
     internal void ApplySweep(SweepStatus status)
@@ -249,6 +422,11 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
         sweep = null;
         Points = [];
         Reference = null;
+        distortion = null;
+        shownResults = 0;
+        Spectrum = [];
+        Harmonics = [];
+        RaisePropertyChanged(nameof(DistortionStateText));
         ApplyInput(null, null);
         RaisePropertyChanged(nameof(ProgressText));
         RaisePropertyChanged(nameof(Progress));
@@ -257,4 +435,28 @@ public sealed class AnalyzerPageViewModel : ApplicationPageViewModel
 
     private static string LevelText(double? decibel) =>
         decibel is double value ? value.ToString("0.00", CultureInfo.CurrentCulture) : "-----";
+
+    /// <summary>A ratio in dB as a percentage with three significant digits: 0.0123, 0.123, 1.23.</summary>
+    internal static string PercentText(double? decibel)
+    {
+        if (decibel is not double value)
+        {
+            return "-----";
+        }
+
+        double percent = DistortionChannel.Percent(value);
+        int decimals = Math.Clamp(2 - (int)Math.Floor(Math.Log10(Math.Max(percent, 1e-6))), 0, 6);
+        return percent.ToString("F" + decimals.ToString(CultureInfo.InvariantCulture), CultureInfo.CurrentCulture);
+    }
+
+    private static string DecibelText(double? decibel, string unit) =>
+        decibel is double value ? value.ToString("0.00", CultureInfo.CurrentCulture) + " " + unit : "-- " + unit + " --";
+
+    private string HarmonicsText(Func<Harmonic, double?> level) =>
+        harmonics.Count == 0
+            ? "harmonics: --"
+            : string.Join("  ", harmonics.Select(harmonic =>
+                string.Format(CultureInfo.CurrentCulture, "H{0} {1}", harmonic.Order,
+                    level(harmonic) is double value ? value.ToString("0", CultureInfo.CurrentCulture) : "--")))
+              + " dBc";
 }

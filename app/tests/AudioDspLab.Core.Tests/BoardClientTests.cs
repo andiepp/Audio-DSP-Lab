@@ -110,6 +110,59 @@ public sealed class BoardClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Distortion_ReportsResultsHarmonicsAndSpectrum()
+    {
+        await client.SelectApplicationAsync(Applications.Analyzer);
+        await client.SetAsync("tone", "1000");
+        var result = new TaskCompletionSource<DistortionStatus>();
+        client.DistortionChanged += status =>
+        {
+            if (status.Results > 0)
+            {
+                result.TrySetResult(status);
+            }
+        };
+
+        DistortionStatus started = await client.StartDistortionAsync();
+        Assert.Equal((DistortionStatus.Running, 0), (started.State, started.Results));
+        Assert.Null(started.Left);
+        Assert.Equal("on", await client.GetAsync("output"));
+
+        DistortionStatus first = await result.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1001.95, first.FrequencyHertz);           // the tone on the nearest FFT bin
+        Assert.NotNull(first.Left);
+        Assert.InRange(first.Left.ThdDecibel!.Value, -80, -70);
+        Assert.True(first.Left.ThdnDecibel >= first.Left.ThdDecibel);   // the noise on top of the harmonics
+
+        IReadOnlyList<Harmonic> harmonics = await client.GetHarmonicsAsync();
+        Assert.Equal(Enumerable.Range(2, 9), harmonics.Select(harmonic => harmonic.Order));
+        Assert.Equal(2003.9, harmonics[0].FrequencyHertz);
+
+        IReadOnlyList<SpectrumPoint> spectrum = await client.GetSpectrumAsync();
+        Assert.Equal(256, spectrum.Count);
+        SpectrumPoint peak = spectrum.MaxBy(point => point.LeftDecibel)!;
+        Assert.InRange(peak.FrequencyHertz, 950, 1050);
+        Assert.Equal(first.Left.LevelDecibel, peak.LeftDecibel);
+        Assert.Equal(32, (await client.GetSpectrumAsync(32)).Count);
+
+        DistortionStatus stopped = await client.StopDistortionAsync();
+        Assert.Equal(DistortionStatus.Idle, stopped.State);
+        Assert.NotNull(stopped.Left);                          // the last result stays
+    }
+
+    [Fact]
+    public void DistortionStatus_ParsesTheBoardsLine()
+    {
+        DistortionStatus status = DistortionStatus.Parse(
+            ["running", "4", "1007.81", "-27.37", "-81.10", "-66.37", "-27.40", "-", "-67.01"]);
+        Assert.True(status.IsRunning);
+        Assert.Equal(new DistortionChannel(-27.37, -81.10, -66.37), status.Left);
+        Assert.Equal(new DistortionChannel(-27.40, null, -67.01), status.Right);
+        Assert.Null(DistortionStatus.Parse(["idle", "0", "-", "-", "-", "-", "-", "-", "-"]).Left);
+        Assert.Equal(0.01, DistortionChannel.Percent(-80), 6);
+    }
+
+    [Fact]
     public async Task Stations_RoundTripQuotedTexts()
     {
         await client.SetStationNameAsync(2, "Radio \"Drei\"");

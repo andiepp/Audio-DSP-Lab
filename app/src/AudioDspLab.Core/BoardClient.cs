@@ -40,6 +40,9 @@ public sealed class BoardClient : IDisposable
 
     public event Action<SynthVoice>? VoiceChanged;
 
+    /// <summary>The distortion measurement has a new result, or its state changed.</summary>
+    public event Action<DistortionStatus>? DistortionChanged;
+
     public event Action<Exception>? Disconnected;
 
     /// <summary>Every event line as it came, for a console.</summary>
@@ -240,6 +243,30 @@ public sealed class BoardClient : IDisposable
     public Task KeepReferenceAsync(CancellationToken cancellationToken = default) =>
         SendAsync("reference keep", cancellationToken);
 
+    public async Task<DistortionStatus> GetDistortionAsync(CancellationToken cancellationToken = default) =>
+        DistortionStatus.Parse((await SendAsync("thd", cancellationToken).ConfigureAwait(false)).Values);
+
+    /// <summary>Measures continuously; switches the output on, stops a sweep, puts the tone on an FFT bin.</summary>
+    public async Task<DistortionStatus> StartDistortionAsync(CancellationToken cancellationToken = default) =>
+        DistortionStatus.Parse((await SendAsync("thd start", cancellationToken).ConfigureAwait(false)).Values);
+
+    public async Task<DistortionStatus> StopDistortionAsync(CancellationToken cancellationToken = default) =>
+        DistortionStatus.Parse((await SendAsync("thd stop", cancellationToken).ConfigureAwait(false)).Values);
+
+    public async Task<IReadOnlyList<Harmonic>> GetHarmonicsAsync(CancellationToken cancellationToken = default)
+    {
+        BoardResponse response = await SendAsync("harmonics", cancellationToken).ConfigureAwait(false);
+        return [.. response.Data.Select(Harmonic.Parse)];
+    }
+
+    /// <summary>The latest result's spectrum in 16 to 256 points (a power of two).</summary>
+    public async Task<IReadOnlyList<SpectrumPoint>> GetSpectrumAsync(int points = 256, CancellationToken cancellationToken = default)
+    {
+        BoardResponse response = await SendAsync(points == 256 ? "spectrum" : Invariant($"spectrum {points}"), cancellationToken)
+            .ConfigureAwait(false);
+        return [.. response.Data.Select(SpectrumPoint.Parse)];
+    }
+
     /// <summary>The input levels at the tone playing now, in dBFS.</summary>
     public async Task<(double? Left, double? Right)> MeasureLevelAsync(CancellationToken cancellationToken = default)
     {
@@ -337,6 +364,9 @@ public sealed class BoardClient : IDisposable
                     break;
                 case "voice" when values.Count >= 6:
                     VoiceChanged?.Invoke(SynthVoice.Parse(values));
+                    break;
+                case "thd" when values.Count >= 2:
+                    DistortionChanged?.Invoke(DistortionStatus.Parse(values));
                     break;
             }
         }

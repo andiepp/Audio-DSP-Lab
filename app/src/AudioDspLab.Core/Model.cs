@@ -157,6 +157,64 @@ public sealed record SweepStatus(string State, int Measured, int Total, int Refe
             ProtocolText.ParseInteger(values[3]));
 }
 
+/// <summary>
+/// The distortion measurement (<c>thd</c>, <c>! thd</c>): its state, the
+/// results so far and the latest result, null before the first.
+/// </summary>
+public sealed record DistortionStatus(
+    string State,
+    int Results,
+    double? FrequencyHertz,
+    DistortionChannel? Left,
+    DistortionChannel? Right)
+{
+    public const string Idle = "idle";
+    public const string Running = "running";
+    public const string Failed = "failed";
+
+    public bool IsRunning => State == Running;
+
+    public static DistortionStatus Parse(IReadOnlyList<string> values) =>
+        new(values[0],
+            ProtocolText.ParseInteger(values[1]),
+            values.Count > 2 ? ProtocolText.ParseNumberOrNone(values[2]) : null,
+            values.Count > 5 ? DistortionChannel.Parse(values, 3) : null,
+            values.Count > 8 ? DistortionChannel.Parse(values, 6) : null);
+}
+
+/// <summary>One channel's result: the fundamental's peak in dBFS, THD and THD+N in dB.</summary>
+public sealed record DistortionChannel(double LevelDecibel, double? ThdDecibel, double? ThdnDecibel)
+{
+    /// <summary>A ratio in dB as a percentage.</summary>
+    public static double Percent(double decibel) => 100.0 * Math.Pow(10.0, decibel / 20.0);
+
+    internal static DistortionChannel? Parse(IReadOnlyList<string> values, int first) =>
+        ProtocolText.ParseNumberOrNone(values[first]) is double level
+            ? new DistortionChannel(level, ProtocolText.ParseNumberOrNone(values[first + 1]),
+                ProtocolText.ParseNumberOrNone(values[first + 2]))
+            : null;
+}
+
+/// <summary>A harmonic of the latest result (<c>harmonics</c>), in dB against the fundamental.</summary>
+public sealed record Harmonic(int Order, double FrequencyHertz, double? LeftDecibel, double? RightDecibel)
+{
+    public static Harmonic Parse(IReadOnlyList<string> words) =>
+        new(ProtocolText.ParseInteger(words[0]),
+            ProtocolText.ParseNumberOrNone(words[1]) ?? 0,
+            ProtocolText.ParseNumberOrNone(words[2]),
+            ProtocolText.ParseNumberOrNone(words[3]));
+}
+
+/// <summary>A point of the latest result's spectrum (<c>spectrum</c>): the strongest bin as a sine's peak in dBFS.</summary>
+public sealed record SpectrumPoint(int Index, double FrequencyHertz, double LeftDecibel, double RightDecibel)
+{
+    public static SpectrumPoint Parse(IReadOnlyList<string> words) =>
+        new(ProtocolText.ParseInteger(words[0]),
+            ProtocolText.ParseNumberOrNone(words[1]) ?? 0,
+            ProtocolText.ParseNumberOrNone(words[2]) ?? double.NaN,
+            ProtocolText.ParseNumberOrNone(words[3]) ?? double.NaN);
+}
+
 /// <summary>One point of a sweep: levels in dBFS, relative levels in dB against the reference.</summary>
 public sealed record SweepPoint(
     int Index,

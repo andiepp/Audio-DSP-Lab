@@ -54,6 +54,13 @@
 #define LINK_BAUD_RATE                115200
 #define LINK_LINE_MAX                 512
 #define LINK_SYNC_MS                  400     // between two resync echoes
+// the TX line is driven only while the board's own TX line lives: a running
+// UART holds it high between characters, a board without power cannot. A
+// TX line held at 3.3 V would feed an unplugged board's ESP32 through
+// GPIO37, and its next power-up would not be a clean one.
+#define LINK_LINE_CHECK_MS            40      // the board's line is looked at this often
+#define LINK_LINE_SAMPLES             30      // ... 10 us apart: low all through, longer than two characters
+#define LINK_LINE_DEAD_CHECKS         2       // low at this many checks in a row: the board is gone
 #define LINK_IDLE_ECHO_MS             3000    // a quiet link is checked this often
 #define LINK_ANSWER_MS                2500    // a request unanswered this long loses the link
 #define LINK_SLOW_ANSWER_MS           8000    // an application start writes the EEPROM

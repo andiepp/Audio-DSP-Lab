@@ -1,6 +1,9 @@
 #include "Link.h"
 #include "Config.h"
 #include "Wireless.h"
+#include <driver/gpio.h>
+#include <esp_rom_gpio.h>
+#include <soc/gpio_sig_map.h>
 
 Board board;
 
@@ -33,9 +36,42 @@ static uint32_t syncSentAt = 0;
 static uint32_t heardAt = 0;            // the last line from the board
 static bool remoteEvents = false;       // the PC on the network asked for events
 static uint32_t reportedNetwork = 0xFFFFFFFF;
+static bool txDriven = false;           // the TX line is driven, not let go
+static uint32_t lineCheckedAt = 0;
+static uint8_t deadChecks = 0;          // checks in a row that found the board's line low
 
 static void changed() {
   board.version++;
+}
+
+// --- the line ---------------------------------------------------------------------------
+
+// the TX line to the board's GPIO37: driven by UART2, or let go (high-Z),
+// so that nothing feeds a board without power
+static void driveTx(bool drive) {
+  const gpio_num_t pin = (gpio_num_t)PIN_LINK_TX;
+  if (drive) {
+    gpio_set_level(pin, 1);             // idle high from the first moment
+    gpio_set_direction(pin, GPIO_MODE_OUTPUT);
+    esp_rom_gpio_connect_out_signal(PIN_LINK_TX, U2TXD_OUT_IDX, false, false);
+  } else {
+    esp_rom_gpio_connect_out_signal(PIN_LINK_TX, SIG_GPIO_OUT_IDX, false, false);
+    gpio_set_direction(pin, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(pin, GPIO_FLOATING);
+  }
+  txDriven = drive;
+  Serial.printf("board line %s: TX %s\n", drive ? "up" : "down", drive ? "driven" : "let go");
+}
+
+// the board's TX line: a running UART holds it high at least once a
+// character (its stop bit); low all through two characters, it has no power
+// (or its firmware has not started the port yet)
+static bool boardLineLives() {
+  for (int i = 0; i < LINK_LINE_SAMPLES; i++) {
+    if (gpio_get_level((gpio_num_t)PIN_LINK_RX) != 0) return true;
+    delayMicroseconds(10);
+  }
+  return false;
 }
 
 // --- words ------------------------------------------------------------------------------
@@ -394,11 +430,23 @@ static void readLines() {
 void linkBegin() {
   Serial2.setRxBufferSize(4096);
   Serial2.begin(LINK_BAUD_RATE, SERIAL_8N1, PIN_LINK_RX, PIN_LINK_TX);
+  driveTx(false);                       // until the board's line lives
 }
 
 void linkPoll() {
   readLines();
   const uint32_t now = millis();
+  if (now - lineCheckedAt >= LINK_LINE_CHECK_MS) {
+    lineCheckedAt = now;
+    if (boardLineLives()) {
+      deadChecks = 0;
+      if (!txDriven) driveTx(true);
+    } else if (deadChecks < LINK_LINE_DEAD_CHECKS && ++deadChecks == LINK_LINE_DEAD_CHECKS) {
+      if (board.linked) loseLink("the board's line went low");
+      if (txDriven) driveTx(false);
+    }
+  }
+  if (!txDriven) return;
   if (!board.linked) {
     // a fresh line end first: whatever noise came before ends there
     if (now - syncSentAt >= LINK_SYNC_MS) {

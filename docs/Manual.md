@@ -1,6 +1,6 @@
 # Manual
 
-As of 2026-10-19.
+As of 2026-10-21.
 
 Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.1 and application 1.1, and the optional front panel (panel firmware 1.1).
 
@@ -12,7 +12,7 @@ Audio-DSP-Lab has three parts:
 
 - **The firmware** runs on the board's ESP32. It writes each application's DSP program into the ADAU1701's EEPROM, computes filter coefficients, reads the pots and MIDI, streams the radio, makes the generator's signal and the synthesizer's sound, and analyses the spectrum of the line input for the analysis' THD and Spectrum. It talks to the PC over the board's USB port with a simple text protocol.
 - **The application** (`AudioDspLab.exe`) is the PC's front panel. It shows one page per application, sets every value, and shows what the board reports, including the changes you make with the board's pots.
-- **The front panel** (optional) is a small touch display on a cable to the board, an ESP32 "CYD". It runs the applications without a PC, and it lets the PC application work over WiFi, without a USB cable. See the chapter [The front panel](#the-front-panel).
+- **The front panel** (optional) is a small touch display on a cable to the board, an ESP32 "CYD". It runs the applications without a PC, and it lets the PC application work over WiFi, without a USB cable. See the chapter [The front panel](#the-front-panel); the chapter [Mechanical design](#mechanical-design) shows a printed enclosure for the board and the panel.
 
 The board keeps working without the PC: once an application runs, you can close the window and keep playing. The board can also start an application by itself at power-up.
 
@@ -751,6 +751,60 @@ Anyone on your network can reach the board this way, as anyone with the USB cabl
 | Settings shows "WiFi: none" | No network stored on the board | Enter one in **WiFi networks …** (it serves the radio too) |
 | Settings shows "WiFi: failed" | Neither network answers, or a 5 GHz-only network | The panel tries again every 30 s; use a 2.4 GHz network |
 | "Network: …" does not connect | The panel's address changed, or the PC is on another network | Read its address in Settings or the WiFi dialog; try audio-dsp-lab.local |
+
+## Mechanical design
+
+The Audio-MiniLab as built: the Elektor board in a two-part 3D-printed box, the pots' shafts coming through its lid with knob caps in the knob colours (P1 blue, P2 green, P3 yellow, P4 red), and the front panel in a wedge-shaped case in front of it, its display tilted towards you. The parts were designed in Onshape; the files to print them are in the repository's `CAD` folder as STL.
+
+![The Audio-MiniLab from above: the box with its four knobs, the front panel in its case in front of it, SigmaStudio's USBi on its cable](images/mechanical/photo-top.jpg)
+
+![The Audio-MiniLab on the desk: the display slopes towards you, the jacks come out of the box's sides](images/mechanical/photo-front.jpg)
+
+### The parts
+
+| Part | File in `CAD` | Size (mm) | Printed in | What it does |
+| --- | --- | --- | --- | --- |
+| Box base | `Audio-Lab-DSP-Base.stl` | 108 × 71.5 × 22.5 | black | Holds the board on four stand-offs at its mounting holes; openings in its walls for the jacks, the USB socket and the two connectors |
+| Box lid | `Audio-Lab-DSP-Top.stl` | 108 × 71.5 × 17.5 | black | Closes the box; four holes, each in a recess, for the pots' shafts |
+| Panel case | `Audio-Lab-PanelCase.stl` | 111.4 × 136.9 × 39 | blue | A wedge that holds the CYD at about 27°, with a passage for the panel's cable in its back wall and a tray behind it in which the box stands |
+| Panel front | `Audio-Lab-PanelFront.stl` | 109.7 × 61.7 × 3 | black | The front plate: the display's window and four holes for the screws that hold the CYD behind it |
+
+### The box
+
+![The box's base: the four stand-offs for the board, the openings in its walls](images/mechanical/dsp-base.png)
+
+![One long side of the base: the half-round openings at the top of the walls take the jacks, together with the lid's](images/mechanical/dsp-base-left.png)
+
+![The base's other long side and an end wall with their openings](images/mechanical/dsp-base-right.png)
+
+![The lid from outside: the four holes for the pots, each in a recess](images/mechanical/dsp-top.png)
+
+![The lid from inside](images/mechanical/dsp-top-inside.png)
+
+The board sits on the four stand-offs of the base, screwed to them through its mounting holes. The lid closes the box from above; the pots' shafts come through its four holes, and the knobs sit on them. The half-round openings at the top of the base's walls and at the lid's edges meet around the jacks K2 to K5.
+
+![The box from above: the knobs P1 to P4 in their colours](images/mechanical/photo-knobs.jpg)
+
+![The empty base: the panel connector (the 5-pin header at the top) and the USBi connector (bottom left)](images/mechanical/photo-box-empty.jpg)
+
+![The board in the base: the wires from the board to the two connectors](images/mechanical/photo-box-board.jpg)
+
+Two connectors in the base are wired to the board, so the front panel's cable and SigmaStudio's USBi plug into the box rather than into the board:
+
+- the **panel connector**, a 5-pin header, for the front panel's cable: the board's panel port, GPIO37, GPIO4 and GND (see the front panel's [Wiring](#wiring));
+- the **USBi connector**, for SigmaStudio's USBi: the board's I2C header K1.
+
+### The front panel's case
+
+![The panel case: the front opens at about 27° for the front plate; its back wall has the passage for the cable, and the tray behind it takes the box](images/mechanical/panel-case.png)
+
+![The panel's front plate: the display's window and the four screw holes](images/mechanical/panel-front.png)
+
+The CYD sits behind the front plate, held by four screws, its display in the window. The plate closes the case's sloping front; the panel's cable runs through the passage in the case's back wall to the box's panel connector. The box stands in the tray behind the wedge, so the two parts form one unit, as in the photos.
+
+### Printing
+
+The STL files are in millimetres and lie as they print: the lid and the front plate with their visible face down, so the build plate's surface becomes their outside (the textured finish in the photos comes from a textured plate). The pictures of the parts in this chapter are drawn from the STL files with `tools/Render-Cad.py`; run it again after changing a part.
 
 ## Troubleshooting
 

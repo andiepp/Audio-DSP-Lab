@@ -70,6 +70,7 @@ Scripting works on any system: [tools/adl.py](tools/adl.py) is a Python client (
 | [sigmastudio](sigmastudio) | The DSP programs as SigmaStudio projects |
 | [tools](tools) | Flash tool, release builder, Python client |
 | [docs](docs) | The documentation |
+| [CAD](CAD) | The 3D-printed enclosure for the board and the front panel as STL files (the manual's chapter "Mechanical design") |
 
 ## Licence
 

@@ -1,6 +1,12 @@
 # Building from source
 
-This guide is for developers: building the firmware and the application, running the tests, making a release, and finding your way in the code.
+This guide is for developers: building the firmware and the application, running the tests, making a release, and finding your way in the code. The repository is **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**:
+
+```
+git clone https://github.com/andiepp/Audio-DSP-Lab.git
+```
+
+It holds everything the builds need, the libraries included.
 
 ## Repository layout
 

@@ -1,8 +1,8 @@
 # Installation guide
 
-As of 2026-10-19, for firmware 1.1 and application 1.1.
+As of 2026-10-21, for firmware 1.1 and application 1.1.
 
-This guide takes you from an Elektor Audio-DSP-FX board to a running Audio-DSP-Lab: prepare the board, flash the firmware, install the application, connect. Plan about 20 minutes.
+This guide takes you from an Elektor Audio-DSP-FX board to a running Audio-DSP-Lab: prepare the board, flash the firmware, install the application, connect. Plan about 20 minutes. Everything you need to download is at **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**.
 
 ![What goes where](images/overview.png)
 
@@ -39,7 +39,7 @@ No such entry, or a yellow warning sign? Install the **CP210x Universal Windows 
 
 ## 3. Flash the firmware
 
-Download the latest release from the repository's **Releases** page: `Audio-DSP-Lab-<version>-windows-x64.zip` holds the application, the firmware and the documents. Unzip it into a folder of your choice, for example `Documents\Audio-DSP-Lab`.
+Download the latest release from the project's **Releases** page, **[github.com/andiepp/Audio-DSP-Lab/releases](https://github.com/andiepp/Audio-DSP-Lab/releases)**: `Audio-DSP-Lab-<version>-windows-x64.zip` holds the application, the firmware and the documents. Unzip it into a folder of your choice, for example `Documents\Audio-DSP-Lab`.
 
 Close every program that might use the board's port: the Arduino IDE's serial monitor, a terminal, the Audio-DSP-Lab application.
 

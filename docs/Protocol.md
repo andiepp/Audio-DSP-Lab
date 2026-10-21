@@ -1,6 +1,6 @@
 # Audio-DSP-Lab serial protocol
 
-Protocol version 1, firmware 1.1.
+Protocol version 1, firmware 1.1. The project: **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**.
 
 The board speaks a line-based text protocol on its USB serial port. You can use it from the Audio-DSP-Lab application, from a serial terminal, or from your own scripts. [`tools/adl.py`](../tools/adl.py) is a small Python client.
 

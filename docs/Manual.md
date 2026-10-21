@@ -4,6 +4,8 @@ As of 2026-10-21.
 
 Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.1 and application 1.1, and the optional front panel (panel firmware 1.1).
 
+Audio-DSP-Lab lives on GitHub at **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**: the source code, the releases (application, firmware and these documents to download) and the documentation, this manual among it.
+
 ![Audio-DSP-Lab: the PC over USB, or the optional front panel on its own or as the PC's WiFi link, sets the values; the board does the audio](images/overview.png)
 
 ## At a glance

@@ -1,6 +1,6 @@
 # SigmaStudio
 
-Audio-DSP-Lab works with Analog Devices **SigmaStudio 4.7** in two ways: you can run **your own programs** on the board in SigmaStudio mode, and the five built-in applications are SigmaStudio projects you can study and change.
+Audio-DSP-Lab (**[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**) works with Analog Devices **SigmaStudio 4.7** in two ways: you can run **your own programs** on the board in SigmaStudio mode, and the five built-in applications are SigmaStudio projects you can study and change.
 
 ## Your own programs: SigmaStudio mode
 
@@ -45,7 +45,7 @@ Service mode is for working on an application's own project while that applicati
 
 ## The built-in applications' projects
 
-Each application's DSP program is a SigmaStudio project in `sigmastudio/`. The ESP32 sets every value through the DSP's safeload registers, by the parameter addresses SigmaStudio exported; the projects only provide the blocks.
+Each application's DSP program is a SigmaStudio project in `sigmastudio/` of the repository (https://github.com/andiepp/Audio-DSP-Lab/tree/main/sigmastudio). The ESP32 sets every value through the DSP's safeload registers, by the parameter addresses SigmaStudio exported; the projects only provide the blocks.
 
 | Folder | Application | What the project contains | Recipe |
 | --- | --- | --- | --- |

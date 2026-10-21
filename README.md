@@ -2,6 +2,8 @@
 
 Six audio instruments for the **Elektor Audio-DSP-FX board** (ADAU1701 DSP + ESP32), run from a Windows PC over USB.
 
+The project's home is **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**: the source, the [releases](https://github.com/andiepp/Audio-DSP-Lab/releases) and the documentation.
+
 ![Audio-DSP-Lab: the analysis application's Frequency Response measuring a low-pass](docs/images/screenshots/analyzer.png)
 
 | Application | What it does |

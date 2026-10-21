@@ -1,6 +1,6 @@
 # The front panel
 
-A touch front panel for the board, and the PC application's way to the board over WiFi: an **ESP32-2432S028R** display board (the "CYD", "cheap yellow display": 2.8″, 320 × 240, resistive touch) on a cable to the board's panel port. With it the board works without a PC: choose an application, switch the output, and set every value. The panel and the PC application can work side by side; what one changes, the other shows.
+Part of Audio-DSP-Lab, **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**. A touch front panel for the board, and the PC application's way to the board over WiFi: an **ESP32-2432S028R** display board (the "CYD", "cheap yellow display": 2.8″, 320 × 240, resistive touch) on a cable to the board's panel port. With it the board works without a PC: choose an application, switch the output, and set every value. The panel and the PC application can work side by side; what one changes, the other shows.
 
 ![What goes where: the panel on its own, or as the PC's WiFi link](images/overview.png)
 

@@ -40,6 +40,7 @@ VIEWS = [
     ('Audio-Lab-DSP-Top.stl', 'dsp-top-inside.png', DARK, -30, 55, False),
     ('Audio-Lab-PanelCase.stl', 'panel-case.png', BLUE, -30, 30, False),
     ('Audio-Lab-PanelFront.stl', 'panel-front.png', DARK, -20, 40, False),
+    ('Audio-Lab-PanelFront.stl', 'panel-front-bottom.png', DARK, -20, 40, True),
 ]
 
 

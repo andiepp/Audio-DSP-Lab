@@ -665,7 +665,7 @@ The panel does two jobs, as the overview at the start of this manual shows: on i
 
 Both sides are 3.3 V logic; no level shifter is needed. Put the 10 kΩ resistor between GPIO37 and 3.3 V on the board: GPIO37 has no pull-up of its own, and its line floats while the panel is off or restarting. The panel works without it too.
 
-The panel needs 5 V, from its own USB port or from the board's 5 V if the board's supply is about 9 V or less (the panel draws up to about 250 mA; above 9 V the board's regulator gets hot). A panel on its own supply lets its TX line go while the board is unplugged, so it does not keep the board half powered; a panel still on the firmware of release 1.1 did, and the board then started badly (see [Troubleshooting](#troubleshooting)).
+The panel needs 5 V, from its own USB port or from the board's 5 V if the board's supply is about 9 V or less (the panel draws up to about 250 mA; above 9 V the board's regulator gets hot). From the board, connect its +5 V directly to the CYD's USB 5 V line; the chapter [Mechanical design](#mechanical-design) shows where. A panel on its own supply lets its TX line go while the board is unplugged, so it does not keep the board half powered; a panel still on the firmware of release 1.1 did, and the board then started badly (see [Troubleshooting](#troubleshooting)).
 
 ### Flashing
 
@@ -791,16 +791,24 @@ The board sits on the four stand-offs of the base, screwed to them through its m
 
 Two connectors in the base are wired to the board, so the front panel's cable and SigmaStudio's USBi plug into the box rather than into the board:
 
-- the **panel connector**, a 5-pin header, for the front panel's cable: the board's panel port, GPIO37, GPIO4 and GND (see the front panel's [Wiring](#wiring));
-- the **USBi connector**, for SigmaStudio's USBi: the board's I2C header K1.
+- the **panel connector**, a 5-pin header, for the front panel's cable: the board's panel port, GPIO37, GPIO4 and GND (see the front panel's [Wiring](#wiring)), and the board's +5 V, which supplies the panel;
+- the **USBi connector**, a 3.5 mm audio socket, for SigmaStudio's USBi: the board's I2C header K1.
+
+**Note: the USBi is connected through a 3.5 mm audio plug.** Its cable ends in a 3.5 mm audio plug that carries the three lines of the board's I2C header: SCL, SDA and GND. Plug it in only for working in SigmaStudio and pull it out afterwards: while the USBi sits on the I2C bus, the firmware cannot write the EEPROM.
 
 ### The front panel's case
 
 ![The panel case: the front opens at about 27° for the front plate; its back wall has the passage for the cable, and the tray behind it takes the box](images/mechanical/panel-case.png)
 
-![The panel's front plate: the display's window and the four screw holes](images/mechanical/panel-front.png)
+![The panel's front plate from above as it prints: its inside, against the CYD, with the display's window](images/mechanical/panel-front.png)
 
-The CYD sits behind the front plate, held by four screws, its display in the window. The plate closes the case's sloping front; the panel's cable runs through the passage in the case's back wall to the box's panel connector. The box stands in the tray behind the wedge, so the two parts form one unit, as in the photos.
+![The front plate from the bottom as it prints: its outer face, with the four countersunk holes for the CYD's screws](images/mechanical/panel-front-bottom.png)
+
+The CYD sits behind the front plate, held by four countersunk screws, its display in the window. The plate closes the case's sloping front; the panel's cable runs through the passage in the case's back wall to the box's panel connector. The box stands in the tray behind the wedge, so the two parts form one unit, as in the photos.
+
+**Note: the panel's supply.** The panel takes its +5 V from the board, through the cable from the panel connector. Connect the +5 V directly to the CYD's USB 5 V line: in the picture the red wire is soldered to that line at the diode just below the CYD's micro-USB socket, and the black wire is GND. The board then has to run from about 9 V or less, as the front panel's [Wiring](#wiring) explains.
+
+![The CYD's back: the board's +5 V (red) soldered to the CYD's USB 5 V line at the diode below the micro-USB socket; black is GND](images/mechanical/cyd-5v.jpg)
 
 ### Printing
 

@@ -1,6 +1,6 @@
 # Installation guide
 
-As of 2026-10-21, for firmware 1.1 and application 1.1.
+As of 2026-10-22, for firmware 1.2 and application 1.2.
 
 This guide takes you from an Elektor Audio-DSP-FX board to a running Audio-DSP-Lab: prepare the board, flash the firmware, install the application, connect. Plan about 20 minutes. Everything you need to download is at **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**.
 
@@ -84,7 +84,7 @@ There is no installer: `AudioDspLab.exe` in the unzipped folder is the whole app
 
 1. Double-click **AudioDspLab.exe**. The first time, Windows SmartScreen may warn about an unknown publisher (the program is not code-signed): choose **More info**, then **Run anyway**.
 2. Under **Board on**, choose the board's COM port and press **Connect**.
-3. The status line shows `Connected to COM5: Audio-DSP-Lab 1.1.` and the application row shows **SigmaStudio** running: the board starts in SigmaStudio mode at every power-up.
+3. The status line shows `Connected to COM5: Audio-DSP-Lab 1.2.` and the application row shows **SigmaStudio** running: the board starts in SigmaStudio mode at every power-up.
 
 The application remembers the port and connects by itself next time. It keeps its own files in `%LocalAppData%\Audio-DSP-Lab` (the stored settings and the last port). To uninstall, delete the folder you unzipped and that one.
 
@@ -132,6 +132,7 @@ A touch panel on an ESP32-2432S028R ("CYD") display board runs the applications 
 
 - **Firmware:** flash the new release with the flash tool (Option A). Stored settings stay.
 - **Application:** replace `AudioDspLab.exe` with the new one.
+- **Front panel:** flash its firmware from the same release (`Flash-Panel.cmd`); the panel shows what its board offers, so update both together.
 
 Firmware and application of the same release belong together; the application tells you if the board speaks another protocol version.
 

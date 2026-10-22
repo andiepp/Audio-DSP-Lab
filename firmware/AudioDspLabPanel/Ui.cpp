@@ -87,15 +87,20 @@ static std::vector<lv_obj_t *> stationKeys;
 #define PLOT_RANGE_DB                 60
 static lv_obj_t *sweepButton;
 static lv_obj_t *sweepLabel;
-// the THD view in the same plot: its key, the spectrum and the readouts
+// the THD and Spectrum views in the same plot: its key and the spectrum,
+// below the keys; their values take the tiles' place while they measure
 #define SPECTRUM_RANGE_DB             140     // 0 dBFS at the top
+#define SPECTRUM_TOP                  32      // the spectrum's top edge, below the keys
+#define VALUES_HEIGHT                 84      // two tile rows and their gap
 enum AnalysisView : uint8_t { VIEW_RESPONSE, VIEW_THD, VIEW_SPECTRUM, VIEW_COUNT };
 static AnalysisView view = VIEW_RESPONSE;
 static const char *const viewNames[VIEW_COUNT] = { "Resp", "THD", "Spec" };
 static lv_obj_t *modeButton;
 static lv_obj_t *specLeft;
 static lv_obj_t *specRight;
-static lv_obj_t *thdLabel;
+static lv_obj_t *valuesBox;
+static lv_obj_t *valueCells[4][3];      // rows: a heading and three values; columns: name, L, R
+static std::vector<lv_obj_t *> tiles;
 static std::vector<lv_point_precise_t> specLeftPoints;
 static std::vector<lv_point_precise_t> specRightPoints;
 static uint32_t drawnSpectrum = 0xFFFFFFFF;
@@ -742,19 +747,14 @@ static void buildAnalyzerHeader() {
     lv_obj_add_flag(part, LV_OBJ_FLAG_HIDDEN);
   }
 
-  // the THD view: the spectrum, 0 to -140 dBFS, and its readouts
+  // the THD and Spectrum views: the spectrum, 0 to -140 dBFS below the keys
   specRight = lv_line_create(plot);
   lv_obj_set_style_line_color(specRight, lv_color_hex(0x7AA7FF), 0);
   lv_obj_set_style_line_width(specRight, 1, 0);
   specLeft = lv_line_create(plot);
   lv_obj_set_style_line_color(specLeft, lv_color_hex(COLOUR_ACCENT), 0);
   lv_obj_set_style_line_width(specLeft, 1, 0);
-  thdLabel = label(plot, "", &lv_font_montserrat_12, COLOUR_TEXT);
-  lv_obj_set_style_bg_color(thdLabel, lv_color_hex(0x0E1116), 0);
-  lv_obj_set_style_bg_opa(thdLabel, LV_OPA_70, 0);
-  lv_obj_set_style_pad_hor(thdLabel, 3, 0);
-  lv_obj_set_pos(thdLabel, 2, 1);
-  for (lv_obj_t *part : { specLeft, specRight, thdLabel }) lv_obj_remove_flag(part, LV_OBJ_FLAG_CLICKABLE);
+  for (lv_obj_t *part : { specLeft, specRight }) lv_obj_remove_flag(part, LV_OBJ_FLAG_CLICKABLE);
 
   // the keys and the progress in the plot's top corner: the tiles get the room
   sweepButton = button(plot, "Start sweep", 96, 28);
@@ -766,8 +766,39 @@ static void buildAnalyzerHeader() {
   lv_obj_align(modeButton, LV_ALIGN_TOP_RIGHT, -102, 2);
   lv_obj_add_event_cb(modeButton, onMode, LV_EVENT_CLICKED, nullptr);
   sweepLabel = label(plot, "", &lv_font_montserrat_12, COLOUR_TEXT);
-  lv_obj_align(sweepLabel, LV_ALIGN_TOP_RIGHT, -2, 34);
+  lv_obj_align(sweepLabel, LV_ALIGN_TOP_RIGHT, -158, 8);
   drawnPoints = drawnSpectrum = 0xFFFFFFFF;
+
+  // the THD's and the Spectrum's values: a table in the tiles' place, shown while they measure
+  valuesBox = lv_obj_create(content);
+  plainBox(valuesBox, COLOUR_CARD);
+  lv_obj_set_size(valuesBox, PLOT_WIDTH, VALUES_HEIGHT);
+  lv_obj_set_style_radius(valuesBox, 6, 0);
+  lv_obj_add_flag(valuesBox, LV_OBJ_FLAG_HIDDEN);
+  const uint32_t headingColours[3] = { COLOUR_MUTED, COLOUR_ACCENT, 0x7AA7FF };
+  for (int row = 0; row < 4; row++) {
+    for (int column = 0; column < 3; column++) {
+      const bool value = row > 0 && column > 0;
+      lv_obj_t *cell = label(valuesBox, "", value ? &lv_font_montserrat_16 : &lv_font_montserrat_14,
+                             value ? COLOUR_TEXT : row == 0 ? headingColours[column] : COLOUR_MUTED);
+      static const int columnX[3] = { 8, 90, 198 };          // room for "-100.0 dBFS"
+      lv_obj_set_pos(cell, columnX[column], row == 0 ? 3 : row * 20);
+      valueCells[row][column] = cell;
+    }
+  }
+}
+
+static void setValues(const String cells[4][3]) {
+  for (int row = 0; row < 4; row++) {
+    for (int column = 0; column < 3; column++) lv_label_set_text(valueCells[row][column], cells[row][column].c_str());
+  }
+}
+
+static String levelText(float decibel) {
+  if (isnan(decibel)) return "--";
+  char text[24];
+  snprintf(text, sizeof(text), "%.1f dBFS", decibel);
+  return String(text);
 }
 
 // a ratio in dB as a percentage with three significant digits: 0.0123, 0.123, 1.23
@@ -791,22 +822,23 @@ static void refreshDistortion() {
   else if (board.thdResults > 0) status = String("#") + board.thdResults + (running ? "" : " stopped");
   else if (running) status = "measuring";
   lv_label_set_text(sweepLabel, status.c_str());
-  String text;
-  if (board.thdResults > 0) {
-    char line[96];
-    snprintf(line, sizeof(line), "THD %s / %s %%\nTHD+N %s / %s %%\n%s  %.1f / %.1f dBFS",
-             percentText(board.thd[0]).c_str(), percentText(board.thd[1]).c_str(),
-             percentText(board.thdn[0]).c_str(), percentText(board.thdn[1]).c_str(),
-             hertzText(board.thdHertz).c_str(), board.thdLevel[0], board.thdLevel[1]);
-    text = line;
-  } else {
-    text = "THD and THD+N, L / R:\nStart measures K2";
+  const bool shown = board.thdResults > 0;
+  String cells[4][3];
+  cells[0][0] = shown ? hertzText(board.thdHertz) : String("Tone");      // the tone's frequency
+  cells[1][0] = "THD";
+  cells[2][0] = "THD+N";
+  cells[3][0] = "Level";
+  for (int channel = 0; channel < 2; channel++) {
+    cells[0][channel + 1] = channel == 0 ? "L" : "R";
+    cells[1][channel + 1] = shown ? percentText(board.thd[channel]) + " %" : String("--");
+    cells[2][channel + 1] = shown ? percentText(board.thdn[channel]) + " %" : String("--");
+    cells[3][channel + 1] = shown ? levelText(board.thdLevel[channel]) : String("--");
   }
-  lv_label_set_text(thdLabel, text.c_str());
+  setValues(cells);
   drawSpectrum();
 }
 
-// the Spectrum's readouts: the RMS and the strongest peak of each channel
+// the Spectrum's values: the RMS and the strongest peak of each channel
 static void refreshSpectrumView() {
   const bool running = board.spectrumState == "running";
   lv_label_set_text(lv_obj_get_child(sweepButton, 0), running ? "Stop" : "Start");
@@ -816,17 +848,19 @@ static void refreshSpectrumView() {
   else if (board.spectrumResults > 0) status = String("#") + board.spectrumResults + (running ? "" : " stopped");
   else if (running) status = "measuring";
   lv_label_set_text(sweepLabel, status.c_str());
-  String text;
-  if (board.spectrumResults > 0) {
-    char line[112];
-    snprintf(line, sizeof(line), "RMS %.1f / %.1f dBFS\nL %s  %.1f dBFS\nR %s  %.1f dBFS",
-             board.rms[0], board.rms[1], hertzText(board.peakHertz[0]).c_str(), board.peakDb[0],
-             hertzText(board.peakHertz[1]).c_str(), board.peakDb[1]);
-    text = line;
-  } else {
-    text = "RMS and the strongest peak, L / R:\nStart measures K2, no tone";
+  const bool shown = board.spectrumResults > 0;
+  String cells[4][3];
+  cells[0][0] = "Input";
+  cells[1][0] = "RMS";
+  cells[2][0] = "Peak at";
+  cells[3][0] = "Peak";
+  for (int channel = 0; channel < 2; channel++) {
+    cells[0][channel + 1] = channel == 0 ? "L" : "R";
+    cells[1][channel + 1] = shown ? levelText(board.rms[channel]) : String("--");
+    cells[2][channel + 1] = shown ? hertzText(board.peakHertz[channel]) : String("--");
+    cells[3][channel + 1] = shown ? levelText(board.peakDb[channel]) : String("--");
   }
-  lv_label_set_text(thdLabel, text.c_str());
+  setValues(cells);
   drawSpectrum();
 }
 
@@ -838,7 +872,7 @@ static void drawSpectrum() {
   for (const SweepPoint &point : board.spectrum) {
     const int x = plotX(fminf(point.hertz, 20000));
     const auto y = [](float level) {
-      return (int32_t)lroundf(constrain(-level / SPECTRUM_RANGE_DB, 0.0f, 1.0f) * (PLOT_HEIGHT - 1));
+      return SPECTRUM_TOP + (int32_t)lroundf(constrain(-level / SPECTRUM_RANGE_DB, 0.0f, 1.0f) * (PLOT_HEIGHT - 1 - SPECTRUM_TOP));
     };
     specLeftPoints.push_back({ x, y(point.left) });
     specRightPoints.push_back({ x, y(point.right) });
@@ -871,16 +905,20 @@ static void refreshAnalyzer() {
     if (spectral) lv_obj_add_flag(part, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_remove_flag(part, LV_OBJ_FLAG_HIDDEN);
   }
-  for (lv_obj_t *part : { specLeft, specRight, thdLabel }) {
+  for (lv_obj_t *part : { specLeft, specRight }) {
     if (spectral) lv_obj_remove_flag(part, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(part, LV_OBJ_FLAG_HIDDEN);
   }
-  // the progress left of the keys; in the THD view, where the readouts take
-  // the left, below them
-  if (spectral) lv_obj_align(sweepLabel, LV_ALIGN_TOP_RIGHT, -2, 34);
-  else lv_obj_align(sweepLabel, LV_ALIGN_TOP_RIGHT, -158, 8);
+  // while THD or Spectrum measures, its values take the tiles' place
+  const bool measuring = (view == VIEW_THD && board.thdState == "running")
+                         || (view == VIEW_SPECTRUM && board.spectrumState == "running");
+  if (measuring == lv_obj_has_flag(valuesBox, LV_OBJ_FLAG_HIDDEN)) {
+    lv_obj_update_flag(valuesBox, LV_OBJ_FLAG_HIDDEN, !measuring);
+    for (lv_obj_t *tile : tiles) lv_obj_update_flag(tile, LV_OBJ_FLAG_HIDDEN, measuring);
+    lv_obj_scroll_to_y(content, 0, LV_ANIM_OFF);           // the tiles may have been scrolled
+  }
   if (spectral) {
-    // the readouts take the corner; the scale is 0 to -140 dBFS
+    // the scale is 0 to -140 dBFS, below the keys
     lv_obj_add_flag(plotTopLabel, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(plotBottomLabel, LV_OBJ_FLAG_HIDDEN);
     cursorIndex = -1;
@@ -1133,6 +1171,7 @@ static void buildRow(size_t i) {
   lv_obj_align(name, LV_ALIGN_TOP_LEFT, nameX, 0);
   valueLabels[i] = label(tile, "", &lv_font_montserrat_16, COLOUR_TEXT);
   lv_obj_align(valueLabels[i], LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  tiles.push_back(tile);
 }
 
 static void buildApplication() {
@@ -1189,7 +1228,8 @@ static void rebuild() {
   potControlSwitch = infoLabel = startingLabel = nullptr;
   radioStation = radioTitle = radioState = nullptr;
   sweepButton = sweepLabel = plotLeft = plotRight = plotTopLabel = plotBottomLabel = nullptr;
-  modeButton = specLeft = specRight = thdLabel = nullptr;
+  modeButton = specLeft = specRight = valuesBox = nullptr;
+  tiles.clear();
   cursorLine = cursorLabel = cursorDots[0] = cursorDots[1] = nullptr;
   for (lv_obj_t *&key : sectionKeys) key = nullptr;
   curve = CurvePlot();

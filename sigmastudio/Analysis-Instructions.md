@@ -142,7 +142,7 @@ settings already make that port a clock master; the ESP32 measured
 48 kHz and 64 bit clocks a frame (`diag clocks`). The only thing the
 project lacks is something on the port, so this step adds two output
 blocks and changes nothing else. Allow about 20 minutes. The board needs
-firmware with `diag capture` (after 1.1), the USBi on the I2C header, and
+firmware with `diag capture` (1.2 or later), the USBi on the I2C header, and
 the stereo cable from K3 to K2.
 
 1. Open `sigmastudio\Analysis\ADAU1701_Analysis.dspproj`.

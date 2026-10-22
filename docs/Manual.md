@@ -1,8 +1,8 @@
 # Manual
 
-As of 2026-10-21.
+As of 2026-10-22.
 
-Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.1 and application 1.1, and the optional front panel (panel firmware 1.1).
+Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.2 and application 1.2, and the optional front panel (panel firmware 1.2).
 
 Audio-DSP-Lab lives on GitHub at **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**: the source code, the releases (application, firmware and these documents to download) and the documentation, this manual among it.
 
@@ -406,7 +406,7 @@ The window follows what you do in the console: after a request that changes some
 
 ```
 > info
-ok Audio-DSP-Lab 1.1 1 esp32-pico-kit
+ok Audio-DSP-Lab 1.2 1 esp32-pico-kit
 > status
 ok sigmastudio running none
 > apps
@@ -715,13 +715,13 @@ In the editor **−** and **+** step the value; hold them to repeat, and after a
 
 **Analysis.** The key in the plot's corner names the part on show, **Resp** (the Frequency Response), **THD** or **Spec** (the Spectrum); a tap goes to the next. **Frequency Response:** the plot of the last sweep, the left channel teal and the right blue, from 20 Hz to 20 kHz, scaled to the 60 dB below its loudest point. **Start sweep** in the plot's corner starts a sweep and switches the output on; it reads **Stop** while the sweep runs, and the points measured stand beside it. The start and stop frequencies, the points per decade and the level are the tiles below.
 
-![Analysis, THD: the spectrum, THD and THD+N of both channels, the tone and its levels; Stop in the plot's corner](images/panel/analysis-thd.png)
+![Analysis, THD while it measures: the spectrum below the keys; THD, THD+N and the levels of both channels in the tiles' place](images/panel/analysis-thd.png)
 
-**THD** shows the spectrum of both channels from 0 to −140 dBFS and, in the plot's corner, THD and THD+N of the left and the right channel in %, the tone and its levels. **Start** measures continuously and switches the output on; a measurement started on the PC shows itself here.
+**THD** shows the spectrum of both channels from 0 to −140 dBFS below the keys. **Start** measures continuously and switches the output on. While it measures, its values take the tiles' place: the tone's frequency, and THD and THD+N in % and the level of the left and the right channel; the number of results stands beside the keys. **Stop** brings the tiles back. A measurement started on the PC shows itself here.
 
-![Analysis, Spectrum: the spectrum of the open input, the RMS and the strongest peak of each channel](images/panel/analysis-spectrum.png)
+![Analysis, Spectrum while it measures music on K2: the spectrum below the keys; the RMS and the strongest peak of each channel in the tiles' place](images/panel/analysis-spectrum.png)
 
-**Spec** shows the spectrum in the same way and, in the corner, the RMS of both channels and each channel's strongest peak with its frequency. **Start** measures without a tone of its own and leaves the output as it is.
+**Spec** shows the spectrum in the same way. **Start** measures without a tone of its own and leaves the output as it is; while it measures, the tiles give way to the RMS of both channels and each channel's strongest peak with its frequency.
 
 **The cursor.** Touch the plot, or move a finger along it: a line jumps to the nearest measured point, a dot marks it on each channel, and a box beside the line gives the point's frequency and both levels. The cursor stays where you leave it; during the next sweep it shows again as soon as the sweep reaches its point. (In the PC application, the mouse over the plot does the same.)
 
@@ -758,6 +758,10 @@ Anyone on your network can reach the board this way, as anyone with the USB cabl
 
 The Audio-MiniLab as built: the Elektor board in a two-part 3D-printed box, the pots' shafts coming through its lid with knob caps in the knob colours (P1 blue, P2 green, P3 yellow, P4 red), and the front panel in a wedge-shaped case in front of it, its display tilted towards you. The parts were designed in Onshape; the files to print them are in the repository's `CAD` folder as STL.
 
+![The box on its own, without the front panel: the knobs P1 to P4 on its lid, the jacks and the supply at its sides, SigmaStudio's USBi behind it on its cable](images/mechanical/photo-box.jpg)
+
+![The complete Audio-MiniLab: the box standing in the front panel's case, the panel showing the synthesizer's envelopes](images/mechanical/photo-assembly.jpg)
+
 ![The Audio-MiniLab from above: the box with its four knobs, the front panel in its case in front of it, SigmaStudio's USBi on its cable](images/mechanical/photo-top.jpg)
 
 ![The Audio-MiniLab on the desk: the display slopes towards you, the jacks come out of the box's sides](images/mechanical/photo-front.jpg)
@@ -770,6 +774,8 @@ The Audio-MiniLab as built: the Elektor board in a two-part 3D-printed box, the 
 | Box lid | `Audio-Lab-DSP-Top.stl` | 108 × 71.5 × 17.5 | black | Closes the box; four holes, each in a recess, for the pots' shafts |
 | Panel case | `Audio-Lab-PanelCase.stl` | 111.4 × 136.9 × 39 | blue | A wedge that holds the CYD at about 27°, with a passage for the panel's cable in its back wall and a tray behind it in which the box stands |
 | Panel front | `Audio-Lab-PanelFront.stl` | 109.7 × 61.7 × 3 | black | The front plate: the display's window and four holes for the screws that hold the CYD behind it |
+
+![All the parts: the closed box (its panel connector in the end wall, labelled "Panel"), the panel case with the panel's cable and its 5-pin plug, and the front plate with the CYD screwed behind it](images/mechanical/photo-parts.jpg)
 
 ### The box
 
@@ -806,7 +812,9 @@ Two connectors in the base are wired to the board, so the front panel's cable an
 
 ![The front plate from the bottom as it prints: its outer face, with the four countersunk holes for the CYD's screws](images/mechanical/panel-front-bottom.png)
 
-The CYD sits behind the front plate, held by four countersunk screws, its display in the window. The plate closes the case's sloping front; the panel's cable runs through the passage in the case's back wall to the box's panel connector. The box stands in the tray behind the wedge, so the two parts form one unit, as in the photos.
+![The panel case without its front plate, the box standing in its tray: the box's panel connector shows through the passage in the case's back wall; the panel's cable plugs in there](images/mechanical/photo-panel-empty.jpg)
+
+The CYD sits behind the front plate, held by four countersunk screws, its display in the window. The plate closes the case's sloping front; the panel's cable runs through the passage in the case's back wall to the box's panel connector. The box stands in the tray behind the wedge, so the two parts form one unit, as in the photos. To put it together: stand the box in the tray, plug the panel's cable into the box's panel connector through the passage, and lay the front plate with the CYD into the case's sloping front.
 
 **Note: the panel's supply.** The panel takes its +5 V from the board, through the cable from the panel connector. Connect the +5 V directly to the CYD's USB 5 V line: in the picture the red wire is soldered to that line at the diode just below the CYD's micro-USB socket, and the black wire is GND. The board then has to run from about 9 V or less, as the front panel's [Wiring](#wiring) explains.
 

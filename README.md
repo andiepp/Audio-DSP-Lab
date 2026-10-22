@@ -36,7 +36,7 @@ The ESP32 runs the Audio-DSP-Lab firmware. It writes each application's DSP prog
 ## Get started
 
 1. Set the board's jumpers: **JP1 on ext. MCLK**, **JP2 on Selfboot**.
-2. Download the latest **[release](https://github.com/andiepp/Audio-DSP-Lab/releases)** and unzip it.
+2. Download the latest **[release](https://github.com/andiepp/Audio-DSP-Lab/releases)**, `Audio-DSP-Lab-<version>-windows-x64.zip` under its **Assets** (not the green **Code** button: that is the source code, without the application), and unzip it.
 3. Flash the firmware: `firmware\Flash-Firmware.cmd`, or in the browser with Espressif's web flasher.
 4. Start `AudioDspLab.exe`, choose the board's COM port, **Connect**.
 

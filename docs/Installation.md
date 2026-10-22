@@ -39,7 +39,9 @@ No such entry, or a yellow warning sign? Install the **CP210x Universal Windows 
 
 ## 3. Flash the firmware
 
-Download the latest release from the project's **Releases** page, **[github.com/andiepp/Audio-DSP-Lab/releases](https://github.com/andiepp/Audio-DSP-Lab/releases)**: `Audio-DSP-Lab-<version>-windows-x64.zip` holds the application, the firmware and the documents. Unzip it into a folder of your choice, for example `Documents\Audio-DSP-Lab`.
+Download the latest release from the project's **Releases** page, **[github.com/andiepp/Audio-DSP-Lab/releases](https://github.com/andiepp/Audio-DSP-Lab/releases)**: under the release's **Assets**, `Audio-DSP-Lab-<version>-windows-x64.zip` holds the application, the firmware and the documents. Unzip it into a folder of your choice, for example `Documents\Audio-DSP-Lab`. The folder then holds `AudioDspLab.exe`, `firmware` and `docs`.
+
+**Not the source code.** GitHub's green **Code** button (**Download ZIP**) and the release's **Source code (zip)** give you the repository, with folders such as `app`, `CAD` and `sigmastudio`. It has no built application and no firmware images; you need it only for [building from source](Building.md).
 
 Close every program that might use the board's port: the Arduino IDE's serial monitor, a terminal, the Audio-DSP-Lab application.
 
@@ -80,7 +82,7 @@ See [Building.md](Building.md): Arduino IDE 2 with the ESP32 core 3.3.10, board 
 
 ## 4. Install and start the application
 
-There is no installer: `AudioDspLab.exe` in the unzipped folder is the whole application.
+There is no installer: `AudioDspLab.exe` in the unzipped release folder is the whole application. No `AudioDspLab.exe` in your folder? Then you unzipped the source code: download `Audio-DSP-Lab-<version>-windows-x64.zip` from the release's **Assets** (step 3).
 
 1. Double-click **AudioDspLab.exe**. The first time, Windows SmartScreen may warn about an unknown publisher (the program is not code-signed): choose **More info**, then **Run anyway**.
 2. Under **Board on**, choose the board's COM port and press **Connect**.
@@ -144,6 +146,7 @@ Audio-DSP-Lab does not lock the board: flash any other sketch (Elektor's demos, 
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
+| No `AudioDspLab.exe` in the unzipped folder, only `app`, `CAD`, `docs`, `firmware`, `sigmastudio`, `tools` | The source code was downloaded (the **Code** button or **Source code (zip)**), not the release | Download `Audio-DSP-Lab-<version>-windows-x64.zip` from the release's **Assets** |
 | No COM port appears | Charge-only cable, or no driver | Use a data cable; install the CP210x driver |
 | Flash tool: "esptool was not found" | No Arduino IDE, no Python | Put `esptool.exe` into the `firmware` folder, or `pip install esptool` |
 | Flash tool: "Failed to connect to ESP32" | The port is held by another program, or the kit did not enter its boot loader | Close the other program; hold BOOT while flashing starts; try `-Baud 115200` |

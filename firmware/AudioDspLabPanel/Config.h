@@ -12,7 +12,7 @@
 #define PANEL_CONFIG_H
 
 #define PANEL_NAME                    "Audio-DSP-Lab panel"
-#define PANEL_VERSION                 "1.2"
+#define PANEL_VERSION                 "1.3"
 
 // display: the one-USB ESP32-2432S028R carries an ILI9341, the two-USB
 // (USB-C) version an ST7789; 1 selects the ST7789

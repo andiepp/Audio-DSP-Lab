@@ -20,7 +20,7 @@
 // --- firmware ---------------------------------------------------------------
 #define FIRMWARE_NAME                 "Audio-DSP-Lab"
 #define FIRMWARE_VERSION_MAJOR        1
-#define FIRMWARE_VERSION_MINOR        2
+#define FIRMWARE_VERSION_MINOR        3
 #define PROTOCOL_VERSION              1
 
 // --- serial protocol (docs/Protocol.md) ---------------------------------------

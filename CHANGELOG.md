@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.3 — the front panel's spectrum
+
+Firmware 1.3 (unchanged but for its number), protocol 1, application 1.3 (unchanged but for its number), panel firmware 1.3.
 
 - Panel: the THD and Spectrum views draw the whole spectrum, all 256 points instead of 64, from 0 to −120 dBFS (was −140) with a grid line every 20 dB, and the plot grows while the values show; the values in a smaller font. Harmonics now stand as spikes of their own.
 - Panel: the plots' grid lines are a little brighter, on every page with a plot (equalizer, analysis, synthesizer).

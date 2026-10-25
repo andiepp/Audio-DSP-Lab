@@ -40,14 +40,16 @@ struct Port {
   char line[PROTOCOL_LINE_MAX + 1];
   uint16_t lineLength;
   bool lineOverflow;
+  bool afterCr;                              // a CR ended the line: an LF right after it is its pair
+  bool terminal;                             // a person at a terminal: echo, Backspace, lines end CR LF
   bool eventsOn;
   uint64_t pendingValues;                    // bit = parameter index
   uint32_t valuesSentAt;
 };
 
 static Port ports[] = {
-  { Serial, {}, 0, false, false, 0, 0 },
-  { Serial2, {}, 0, false, false, 0, 0 },
+  { Serial, {}, 0, false, false, false, false, 0, 0 },
+  { Serial2, {}, 0, false, false, false, false, 0, 0 },
 };
 static const uint8_t portCount = sizeof(ports) / sizeof(ports[0]);
 static Port *out = &ports[0];               // the port whose request is answered
@@ -57,10 +59,15 @@ static bool broadcasting = false;           // events: to every port with events
 //  Output
 // ----------------------------------------------------------------------------
 
+// a line's end: LF, or CR LF for a terminal, which would start the next line further right
+static void endLine(Port &port) {
+  port.serial.print(port.terminal ? "\r\n" : "\n");
+}
+
 static void writeTo(Port &port, const char *prefix, const char *text) {
   port.serial.print(prefix);
   port.serial.print(text);
-  port.serial.print('\n');
+  endLine(port);
 }
 
 static void writeLine(const char *prefix, const char *format, va_list args) {
@@ -76,7 +83,8 @@ static void writeLine(const char *prefix, const char *format, va_list args) {
 }
 
 static void ok() {
-  out->serial.print("ok\n");
+  out->serial.print("ok");
+  endLine(*out);
 }
 
 static void okf(const char *format, ...) {
@@ -146,7 +154,8 @@ static const char *errorText(uint8_t code) {
 }
 
 static void fail(uint8_t code) {
-  out->serial.printf("err %s %s\n", errorWord(code), errorText(code));
+  out->serial.printf("err %s %s", errorWord(code), errorText(code));
+  endLine(*out);
 }
 
 // ok, or the error the module reported
@@ -660,8 +669,9 @@ static void cmdSet() {
     char minimum[24], maximum[24];
     formatFixed(minimum, sizeof(minimum), def->minimum, decimals);
     formatFixed(maximum, sizeof(maximum), def->maximum, decimals);
-    out->serial.printf("err out-of-range %s %s..%s %s\n", tokens[1], minimum, maximum,
+    out->serial.printf("err out-of-range %s %s..%s %s", tokens[1], minimum, maximum,
                   info != nullptr ? info->unit : "");
+    endLine(*out);
     return;
   }
   if (error != ERR_NONE) return fail(error);
@@ -1577,8 +1587,22 @@ static void readRequests(Port &port) {
   out = &port;
   while (port.serial.available() > 0) {
     const int c = port.serial.read();
-    if (c == '\r') continue;
-    if (c == '\n') {
+    // CR, LF or CR LF ends a line: a terminal's Enter key sends CR alone
+    const bool pairedLf = c == '\n' && port.afterCr;
+    port.afterCr = c == '\r';
+    if (pairedLf) continue;
+    if (c == '\r' || c == '\n') {
+      if (c == '\r') {
+        // a terminal's Enter: from now on the port echoes what is typed and ends
+        // its lines CR LF; the line typed before it knew is echoed whole
+        if (!port.terminal) port.serial.write((const uint8_t *)port.line, port.lineLength);
+        port.terminal = true;
+        port.serial.print("\r\n");
+      } else if (port.terminal) {
+        // a program took the port over: its echoed request ends on a line of its own
+        port.serial.print("\r\n");
+        port.terminal = false;
+      }
       if (port.lineOverflow) {
         fail(ERR_LINE_TOO_LONG);
       } else {
@@ -1589,8 +1613,19 @@ static void readRequests(Port &port) {
       port.lineOverflow = false;
       continue;
     }
-    if (port.lineLength < PROTOCOL_LINE_MAX) port.line[port.lineLength++] = (char)c;
-    else port.lineOverflow = true;
+    if (c == 0x08 || c == 0x7F) {                // Backspace: BS from Tera Term, DEL from PuTTY
+      if (port.lineLength > 0 && !port.lineOverflow) {
+        port.lineLength--;
+        if (port.terminal) port.serial.print("\b \b");
+      }
+      continue;
+    }
+    if (port.lineLength < PROTOCOL_LINE_MAX) {
+      port.line[port.lineLength++] = (char)c;
+      if (port.terminal) port.serial.write((uint8_t)c);
+    } else {
+      port.lineOverflow = true;
+    }
   }
 }
 

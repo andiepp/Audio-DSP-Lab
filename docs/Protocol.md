@@ -22,11 +22,13 @@ The board speaks a line-based text protocol on its USB serial port. You can use 
 | --- | --- |
 | Baud rate | 921600 |
 | Format | 8 data bits, no parity, 1 stop bit, no flow control |
-| DTR, RTS | **both deasserted**: on the ESP32-PICO-KIT they drive the reset and boot circuit, so asserting them resets the board |
+| DTR, RTS | **both deasserted, or both asserted** (as PuTTY and Tera Term do): on the ESP32-PICO-KIT they drive the reset and boot circuit, which resets the board when one is asserted without the other |
 | Encoding | UTF-8 |
-| Line end | LF (`\n`); a CR before it is ignored |
+| Line end | A request may end with LF, CR or CR LF; an empty line is ignored. The board ends its lines with LF (`\n`), or with CR LF while the port serves a terminal (below). |
 
 Only one program can own the port at a time: the application, a terminal or a script.
+
+**A terminal.** A request that ends with CR alone comes from a person at a terminal: its Enter key sends CR, a program sends LF. From such a request on, the port serves a terminal: it echoes the characters it receives, takes Backspace (BS or DEL) by erasing the last one on the screen and in the request, and ends its lines with CR LF. The request that switched it on is echoed whole before its answer. A request that ends with LF switches the port back: its echo so far ends with CR LF on a line of its own, and its answer and everything after end with LF again. A host that follows this protocol ignores that line, as it ignores every line that does not start with `ok`, `err`, `* ` or `! `. Each port keeps its own setting.
 
 After a reset the ESP32's boot ROM prints a few lines at 115200 baud, which look like garbage at 921600. Then the firmware sends `! ready ...`. A host ignores every line that does not start with `ok`, `err`, `* ` or `! `.
 

@@ -72,8 +72,7 @@ static void serveClient() {
   if (!connected) return;
   while (client.available() > 0) {
     const char c = (char)client.read();
-    if (c == 0x0D) continue;
-    if (c == 0x0A) {
+    if (c == 0x0D || c == 0x0A) {                         // CR, LF or CR LF: a terminal's Enter sends CR alone
       if (clientLine.length() > 0) linkRemoteLine(clientLine);
       clientLine = "";
     } else if (clientLine.length() < NETWORK_LINE_MAX) {

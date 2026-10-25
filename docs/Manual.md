@@ -643,7 +643,15 @@ with Board("COM5") as board:
 
 ### A serial terminal
 
-Any serial terminal works too: 921600 baud, 8N1, **DTR and RTS off** (asserting them resets the ESP32), line end LF. Type `events on` to see the board's events.
+Any serial terminal works too, PuTTY or Tera Term for example, with their default settings and the port set to 921600 baud:
+
+| | PuTTY | Tera Term |
+| --- | --- | --- |
+| Port | Session: Connection type **Serial**, Serial line `COM5`, Speed `921600` | Setup → Serial port: `COM5`, speed `921600` |
+
+The board recognises a terminal by its Enter key, which sends CR alone, and from then on serves it as one: it echoes what you type, Backspace erases, and its lines end with CR LF, so each answer starts at the left. The first line you type is echoed when you press Enter; from then on every key shows as you type. Type `info` for a first answer, `help` for the requests, and `events on` to see the board's events.
+
+Opening the port, both terminals switch DTR and RTS on together. The kit's reset circuit ignores that: it resets the ESP32 only when one of the two is on without the other.
 
 ## The front panel
 

@@ -1,6 +1,6 @@
 # Audio-DSP-Lab serial protocol
 
-Protocol version 1, firmware 1.3. The project: **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**.
+Protocol version 1, firmware 1.4. The project: **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**.
 
 The board speaks a line-based text protocol on its USB serial port. You can use it from the Audio-DSP-Lab application, from a serial terminal, or from your own scripts. [`tools/adl.py`](../tools/adl.py) is a small Python client.
 
@@ -124,7 +124,7 @@ The board keeps numbers in hundredths. A request with more decimals is rounded, 
 | `help` | `* <usage>` per command, `ok` | |
 | `ping` | `ok` | |
 | `echo <word>` | `ok <word>` | for resynchronising |
-| `info` | `ok Audio-DSP-Lab <firmware> <protocol> <kit>` | e.g. `ok Audio-DSP-Lab 1.3 1 esp32-pico-kit`; kit `esp32-pico-kit` (PICO-D4) or `esp32-pico-kit-1` (PICO-V3) |
+| `info` | `ok Audio-DSP-Lab <firmware> <protocol> <kit>` | e.g. `ok Audio-DSP-Lab 1.4 1 esp32-pico-kit`; kit `esp32-pico-kit` (PICO-D4) or `esp32-pico-kit-1` (PICO-V3) |
 | `events [on\|off]` | `ok on\|off` | [events](#events) are off after every reset |
 | `status` | `ok <application> <state> <last-error>` | state: `idle`, `loading`, `running`, `failed`, `service`; last error: an error code or `none` |
 | `led [on\|off]` | `ok on\|off` | the ESP32 kit's LED |
@@ -261,7 +261,7 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 
 ## Parameters per application
 
-`params` is the authoritative list; this table gives the firmware 1.3 ranges.
+`params` is the authoritative list; this table gives the firmware 1.4 ranges.
 
 ### generator
 
@@ -345,7 +345,7 @@ The SigmaStudio mode has no parameters.
 
 ```
 > info
-< ok Audio-DSP-Lab 1.3 1 esp32-pico-kit
+< ok Audio-DSP-Lab 1.4 1 esp32-pico-kit
 > events on
 < ok on
 > app generator

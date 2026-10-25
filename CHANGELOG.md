@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.4 — serial terminals
+
+Firmware 1.4, protocol 1 (requests may also end with CR; terminal mode), application 1.4 (unchanged but for its number), panel firmware 1.4.
 
 - Serial terminals such as PuTTY and Tera Term work with their default settings. A request may end with CR alone, as their Enter key sends it, besides LF and CR LF; before, the board waited for an LF and stayed silent. The same holds over WiFi through the panel. A request ending with CR alone puts the port into terminal mode: the board echoes what is typed, takes Backspace and ends its lines with CR LF. A request ending with LF, as programs send it, switches the port back.
 

@@ -240,7 +240,7 @@ static void readThd(const std::vector<String> &w, size_t from) {
     shownResults = 0;
   } else if (board.thdResults != shownResults && !spectrumAsked) {
     spectrumAsked = true;
-    enqueue("spectrum points 64", REQ_SPECTRUM, 0);
+    enqueue("spectrum points " LINK_SPECTRUM_POINTS_TEXT, REQ_SPECTRUM, 0);
   }
 }
 
@@ -258,7 +258,7 @@ static void readSpectrumState(const std::vector<String> &w, size_t from) {
     shownSpectrumResults = 0;
   } else if (board.spectrumResults != shownSpectrumResults && !spectrumAsked) {
     spectrumAsked = true;
-    enqueue("spectrum points 64", REQ_SPECTRUM, 1);
+    enqueue("spectrum points " LINK_SPECTRUM_POINTS_TEXT, REQ_SPECTRUM, 1);
     enqueue("spectrum peaks", REQ_PEAKS);
   }
 }
@@ -405,11 +405,18 @@ static void answered(bool ok, const std::vector<String> &w) {
       spectrumAsked = false;
       if (current.param == 1) shownSpectrumResults = board.spectrumResults;
       else shownResults = board.thdResults;
-      board.spectrum.clear();
+      // every point in its place, or the spectrum shown stays (a line lost on the way)
+      std::vector<SweepPoint> spectrum;
       for (const String &line : dataLines) {
         std::vector<String> d = words(line.c_str());
-        if (d.size() >= 4) board.spectrum.push_back({ d[1].toFloat(), d[2].toFloat(), d[3].toFloat() });
+        if (d.size() < 4 || d[0].toInt() != (int)spectrum.size()) break;
+        spectrum.push_back({ d[1].toFloat(), d[2].toFloat(), d[3].toFloat() });
       }
+      if (spectrum.size() != LINK_SPECTRUM_POINTS) {
+        Serial.printf("spectrum incomplete: %u of %u points\n", (unsigned)spectrum.size(), (unsigned)dataLines.size());
+        break;
+      }
+      board.spectrum.swap(spectrum);
       board.spectrumVersion++;
       break;
     }
@@ -524,7 +531,7 @@ static void readLines() {
 // --- public -------------------------------------------------------------------------------
 
 void linkBegin() {
-  Serial2.setRxBufferSize(4096);
+  Serial2.setRxBufferSize(LINK_RX_BUFFER);
   Serial2.begin(LINK_BAUD_RATE, SERIAL_8N1, PIN_LINK_RX, PIN_LINK_TX);
   driveTx(false);                       // until the board's line lives
 }

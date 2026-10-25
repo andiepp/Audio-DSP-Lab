@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Panel: the THD and Spectrum views draw the whole spectrum, all 256 points instead of 64, from 0 to −120 dBFS (was −140) with a grid line every 20 dB, and the plot grows while the values show; the values in a smaller font. Harmonics now stand as spikes of their own.
+- Panel: the plots' grid lines are a little brighter, on every page with a plot (equalizer, analysis, synthesizer).
+- Panel: a spectrum answer the panel could not take in whole no longer shows with points missing (a straight line across them): the panel's receive buffer holds a whole answer (16 KB), and an answer with a line lost keeps the spectrum shown.
+
 ## 1.2 — analysis with THD and spectrum, the DSP's true clock
 
 Firmware 1.2, protocol 1 (new requests and events only), application 1.2, panel firmware 1.2.

@@ -53,6 +53,9 @@
 #define PIN_LINK_TX                   22
 #define LINK_BAUD_RATE                115200
 #define LINK_LINE_MAX                 512
+#define LINK_RX_BUFFER                16384   // a whole spectrum answer (about 7 KB) while the screen draws
+#define LINK_SPECTRUM_POINTS          256     // the board's whole spectrum, 20 Hz to 24 kHz
+#define LINK_SPECTRUM_POINTS_TEXT     "256"
 #define LINK_SYNC_MS                  400     // between two resync echoes
 // the TX line is driven only while the board's own TX line lives: a running
 // UART holds it high between characters, a board without power cannot. A

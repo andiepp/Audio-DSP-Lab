@@ -717,9 +717,9 @@ In the editor **−** and **+** step the value; hold them to repeat, and after a
 
 ![Analysis, THD while it measures: the spectrum below the keys; THD, THD+N and the levels of both channels in the tiles' place](images/panel/analysis-thd.png)
 
-**THD** shows the spectrum of both channels from 0 to −140 dBFS below the keys. **Start** measures continuously and switches the output on. While it measures, its values take the tiles' place: the tone's frequency, and THD and THD+N in % and the level of the left and the right channel; the number of results stands beside the keys. **Stop** brings the tiles back. A measurement started on the PC shows itself here.
+**THD** shows the spectrum of both channels below the keys, all 256 points from 20 Hz to 20 kHz, from 0 to −120 dBFS with a grid line every 20 dB (labelled −20, −60 and −100); each point is the strongest FFT bin in its stretch, so a harmonic stands as a spike of its own. While it measures, the plot grows into the room the tiles leave. **Start** measures continuously and switches the output on. While it measures, its values take the tiles' place: the tone's frequency, and THD and THD+N in % and the level of the left and the right channel; the number of results stands beside the keys. **Stop** brings the tiles back. A measurement started on the PC shows itself here.
 
-![Analysis, Spectrum while it measures music on K2: the spectrum below the keys; the RMS and the strongest peak of each channel in the tiles' place](images/panel/analysis-spectrum.png)
+![Analysis, Spectrum while it measures a 1.23 kHz tone on K2: the tone at −20 dBFS and its odd harmonics at 3.7, 6.2 and 8.6 kHz; the RMS and the strongest peak of each channel in the tiles' place](images/panel/analysis-spectrum.png)
 
 **Spec** shows the spectrum in the same way. **Start** measures without a tone of its own and leaves the output as it is; while it measures, the tiles give way to the RMS of both channels and each channel's strongest peak with its frequency.
 

@@ -13,6 +13,7 @@
 #define COLOUR_BAR                    0x161B22
 #define COLOUR_CARD                   0x1A2028
 #define COLOUR_LINE                   0x2B3440
+#define COLOUR_GRID                   0x36414F      // a plot's grid lines
 #define COLOUR_TEXT                   0xE7EBF1
 #define COLOUR_MUTED                  0x8B97A8
 #define COLOUR_ACCENT                 0x2FC4B2
@@ -89,9 +90,18 @@ static lv_obj_t *sweepButton;
 static lv_obj_t *sweepLabel;
 // the THD and Spectrum views in the same plot: its key and the spectrum,
 // below the keys; their values take the tiles' place while they measure
-#define SPECTRUM_RANGE_DB             140     // 0 dBFS at the top
+#define SPECTRUM_RANGE_DB             120     // 0 dBFS at the top, a grid line every 20 dB
 #define SPECTRUM_TOP                  32      // the spectrum's top edge, below the keys
-#define VALUES_HEIGHT                 84      // two tile rows and their gap
+#define TILE_ROWS_HEIGHT              84      // two tile rows and their gap
+#define VALUES_HEIGHT                 68      // four rows of small text
+#define PLOT_HEIGHT_MEASURING         (PLOT_HEIGHT + TILE_ROWS_HEIGHT - VALUES_HEIGHT)
+static lv_obj_t *plotBox;
+static int plotHeight = PLOT_HEIGHT;    // taller while THD or Spectrum measures
+static lv_obj_t *frequencyLines[3];
+static lv_obj_t *frequencyMarks[3];
+static lv_obj_t *levelLines[2];         // the Frequency Response's, 20 dB apart
+static lv_obj_t *spectrumLines[5];      // -20 to -100 dBFS
+static lv_obj_t *spectrumMarks[3];      // -20, -60, -100
 enum AnalysisView : uint8_t { VIEW_RESPONSE, VIEW_THD, VIEW_SPECTRUM, VIEW_COUNT };
 static AnalysisView view = VIEW_RESPONSE;
 static const char *const viewNames[VIEW_COUNT] = { "Resp", "THD", "Spec" };
@@ -633,7 +643,7 @@ static void onMode(lv_event_t *) {
 
 static lv_obj_t *gridLine(lv_obj_t *parent, int x, int y, int width, int height) {
   lv_obj_t *line = lv_obj_create(parent);
-  plainBox(line, 0x232B35);
+  plainBox(line, COLOUR_GRID);
   lv_obj_set_size(line, width, height);
   lv_obj_set_pos(line, x, y);
   return line;
@@ -645,6 +655,29 @@ static int plotX(float hertz) {
 
 static int plotY(float level) {
   return (int)lroundf(constrain((plotTop - level) / PLOT_RANGE_DB, 0.0f, 1.0f) * (PLOT_HEIGHT - 1));
+}
+
+// the spectrum's level on the plot: 0 dBFS below the keys, -120 at the bottom
+static int spectrumY(float level) {
+  return SPECTRUM_TOP + (int)lroundf(constrain(-level / SPECTRUM_RANGE_DB, 0.0f, 1.0f) * (plotHeight - 1 - SPECTRUM_TOP));
+}
+
+static void placeSpectrumGrid() {
+  for (int i = 0; i < 5; i++) lv_obj_set_y(spectrumLines[i], spectrumY(-20.0f * (i + 1)));
+  for (int i = 0; i < 3; i++) lv_obj_set_pos(spectrumMarks[i], 3, spectrumY(-20.0f - 40.0f * i) - 15);
+}
+
+// the plot's height: taller while THD's or the Spectrum's values take the tiles' place
+static void layoutPlot(int height) {
+  if (height == plotHeight) return;
+  plotHeight = height;
+  lv_obj_set_height(plotBox, height);
+  for (int i = 0; i < 3; i++) {
+    lv_obj_set_height(frequencyLines[i], height);
+    lv_obj_set_y(frequencyMarks[i], height - 16);
+  }
+  placeSpectrumGrid();
+  drawnSpectrum = 0xFFFFFFFF;                               // drawn again at the new height
 }
 
 static String hertzText(float hertz) {
@@ -700,7 +733,8 @@ static void onPlot(lv_event_t *e) {
 }
 
 static void buildAnalyzerHeader() {
-  lv_obj_t *plot = lv_obj_create(content);
+  lv_obj_t *plot = plotBox = lv_obj_create(content);
+  plotHeight = PLOT_HEIGHT;
   plainBox(plot, 0x141920);
   lv_obj_set_size(plot, PLOT_WIDTH, PLOT_HEIGHT);
   // the plot takes touches for its cursor; a finger moving on it does not scroll the page
@@ -708,14 +742,18 @@ static void buildAnalyzerHeader() {
   lv_obj_remove_flag(plot, LV_OBJ_FLAG_SCROLL_CHAIN);
   lv_obj_add_event_cb(plot, onPlot, LV_EVENT_PRESSED, nullptr);
   lv_obj_add_event_cb(plot, onPlot, LV_EVENT_PRESSING, nullptr);
-  for (float hertz : { 100.0f, 1000.0f, 10000.0f }) gridLine(plot, plotX(hertz), 0, 1, PLOT_HEIGHT);
-  for (int i = 1; i < 3; i++) gridLine(plot, 0, i * PLOT_HEIGHT / 3, PLOT_WIDTH, 1);
   const char *const marks[] = { "100", "1k", "10k" };
   const float hertz[] = { 100, 1000, 10000 };
   for (int i = 0; i < 3; i++) {
-    lv_obj_t *mark = label(plot, marks[i], &lv_font_montserrat_12, COLOUR_MUTED);
-    lv_obj_set_pos(mark, plotX(hertz[i]) + 3, PLOT_HEIGHT - 16);
+    frequencyLines[i] = gridLine(plot, plotX(hertz[i]), 0, 1, PLOT_HEIGHT);
+    frequencyMarks[i] = label(plot, marks[i], &lv_font_montserrat_12, COLOUR_MUTED);
+    lv_obj_set_pos(frequencyMarks[i], plotX(hertz[i]) + 3, PLOT_HEIGHT - 16);
   }
+  for (int i = 0; i < 2; i++) levelLines[i] = gridLine(plot, 0, (i + 1) * PLOT_HEIGHT / 3, PLOT_WIDTH, 1);
+  // the spectrum's grid: placed by layoutPlot
+  for (lv_obj_t *&line : spectrumLines) line = gridLine(plot, 0, 0, PLOT_WIDTH, 1);
+  const char *const levels[] = { "-20", "-60", "-100" };
+  for (int i = 0; i < 3; i++) spectrumMarks[i] = label(plot, levels[i], &lv_font_montserrat_12, COLOUR_MUTED);
   plotTopLabel = label(plot, "", &lv_font_montserrat_12, COLOUR_MUTED);
   lv_obj_set_pos(plotTopLabel, 3, 1);
   plotBottomLabel = label(plot, "", &lv_font_montserrat_12, COLOUR_MUTED);
@@ -768,6 +806,7 @@ static void buildAnalyzerHeader() {
   sweepLabel = label(plot, "", &lv_font_montserrat_12, COLOUR_TEXT);
   lv_obj_align(sweepLabel, LV_ALIGN_TOP_RIGHT, -158, 8);
   drawnPoints = drawnSpectrum = 0xFFFFFFFF;
+  placeSpectrumGrid();
 
   // the THD's and the Spectrum's values: a table in the tiles' place, shown while they measure
   valuesBox = lv_obj_create(content);
@@ -779,10 +818,10 @@ static void buildAnalyzerHeader() {
   for (int row = 0; row < 4; row++) {
     for (int column = 0; column < 3; column++) {
       const bool value = row > 0 && column > 0;
-      lv_obj_t *cell = label(valuesBox, "", value ? &lv_font_montserrat_16 : &lv_font_montserrat_14,
+      lv_obj_t *cell = label(valuesBox, "", value ? &lv_font_montserrat_14 : &lv_font_montserrat_12,
                              value ? COLOUR_TEXT : row == 0 ? headingColours[column] : COLOUR_MUTED);
       static const int columnX[3] = { 8, 90, 198 };          // room for "-100.0 dBFS"
-      lv_obj_set_pos(cell, columnX[column], row == 0 ? 3 : row * 20);
+      lv_obj_set_pos(cell, columnX[column], 1 + row * 16 + (value ? 0 : 1));
       valueCells[row][column] = cell;
     }
   }
@@ -870,12 +909,10 @@ static void drawSpectrum() {
   specLeftPoints.clear();
   specRightPoints.clear();
   for (const SweepPoint &point : board.spectrum) {
-    const int x = plotX(fminf(point.hertz, 20000));
-    const auto y = [](float level) {
-      return SPECTRUM_TOP + (int32_t)lroundf(constrain(-level / SPECTRUM_RANGE_DB, 0.0f, 1.0f) * (PLOT_HEIGHT - 1 - SPECTRUM_TOP));
-    };
-    specLeftPoints.push_back({ x, y(point.left) });
-    specRightPoints.push_back({ x, y(point.right) });
+    if (point.hertz > 20000) break;                         // beyond the plot's right edge
+    const int x = plotX(point.hertz);
+    specLeftPoints.push_back({ x, spectrumY(point.left) });
+    specRightPoints.push_back({ x, spectrumY(point.right) });
   }
   lv_line_set_points(specLeft, specLeftPoints.data(), specLeftPoints.size());
   lv_line_set_points(specRight, specRightPoints.data(), specRightPoints.size());
@@ -901,14 +938,10 @@ static void refreshAnalyzer() {
   const bool spectral = view != VIEW_RESPONSE;
   // the key names the view on show; a tap changes it
   lv_label_set_text(lv_obj_get_child(modeButton, 0), viewNames[view]);
-  for (lv_obj_t *part : { plotLeft, plotRight }) {
-    if (spectral) lv_obj_add_flag(part, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_remove_flag(part, LV_OBJ_FLAG_HIDDEN);
-  }
-  for (lv_obj_t *part : { specLeft, specRight }) {
-    if (spectral) lv_obj_remove_flag(part, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(part, LV_OBJ_FLAG_HIDDEN);
-  }
+  for (lv_obj_t *part : { plotLeft, plotRight, levelLines[0], levelLines[1] }) lv_obj_update_flag(part, LV_OBJ_FLAG_HIDDEN, spectral);
+  for (lv_obj_t *part : { specLeft, specRight }) lv_obj_update_flag(part, LV_OBJ_FLAG_HIDDEN, !spectral);
+  for (lv_obj_t *part : spectrumLines) lv_obj_update_flag(part, LV_OBJ_FLAG_HIDDEN, !spectral);
+  for (lv_obj_t *part : spectrumMarks) lv_obj_update_flag(part, LV_OBJ_FLAG_HIDDEN, !spectral);
   // while THD or Spectrum measures, its values take the tiles' place
   const bool measuring = (view == VIEW_THD && board.thdState == "running")
                          || (view == VIEW_SPECTRUM && board.spectrumState == "running");
@@ -917,8 +950,9 @@ static void refreshAnalyzer() {
     for (lv_obj_t *tile : tiles) lv_obj_update_flag(tile, LV_OBJ_FLAG_HIDDEN, measuring);
     lv_obj_scroll_to_y(content, 0, LV_ANIM_OFF);           // the tiles may have been scrolled
   }
+  layoutPlot(measuring ? PLOT_HEIGHT_MEASURING : PLOT_HEIGHT);
   if (spectral) {
-    // the scale is 0 to -140 dBFS, below the keys
+    // the scale is 0 to -120 dBFS, below the keys
     lv_obj_add_flag(plotTopLabel, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(plotBottomLabel, LV_OBJ_FLAG_HIDDEN);
     cursorIndex = -1;

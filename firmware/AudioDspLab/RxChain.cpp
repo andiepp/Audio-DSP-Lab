@@ -37,6 +37,16 @@
 #define DESIGN_TASK_STACK             4096
 #define DESIGN_TASK_PRIORITY          1                   // below the audio task's 4
 #define DESIGN_TASK_CORE              0
+#define NR_N                          256                 // spectral NR: FFT length
+#define NR_BINS                       (NR_N / 2 + 1)
+#define NR_SUBS                       8                   // minimum statistics: sub-windows
+#define NR_SUBL                       32                  // ... of this many frames (1.37 s in all)
+#define NR_ALPHA                      0.85f               // power smoothing per frame
+#define NR_BIAS                       2.0f                // minimum -> mean noise power
+#define NR_DD                         0.98f               // decision-directed weight
+#define NR_XIMIN                      0.003f              // -25 dB: the least a-priori SNR
+#define LMS_L                         64                  // LMS taps
+#define LMS_D                         16                  // LMS decorrelation delay
 
 struct cfloat { float re, im; };
 
@@ -75,6 +85,8 @@ struct Demod {
 struct TestGen {
   uint32_t phase, inc;
   float amp, noise;                       // counts re 32768: peak, RMS
+  float qGain;                            // I/Q: Q's gain (a front end's error), linear
+  uint32_t qPhase;                        // I/Q: Q's phase error, 2^32 a turn
   uint32_t keyPeriod, keyPos;             // samples; 0 = steady
   float keyEnv;
   uint32_t noiseSeed;
@@ -100,6 +112,23 @@ struct Chain {
   float transition[2];
 };
 
+// the noise reduction (nr.c), on the heap of its own (about 12 KB)
+struct Nr {
+  uint8_t mode;
+  float level;
+  // spectral
+  float in[NR_N], acc[NR_N];
+  float smooth[NR_BINS], cur[NR_BINS], sub[NR_SUBS][NR_BINS], noise[NR_BINS];
+  float gPrev[NR_BINS], gamPrev[NR_BINS];
+  int frame, subIdx, filled;
+  float window[NR_N];                     // square-root Hann
+  float fft[2 * NR_N];                    // interleaved, for esp-dsp
+  float gainDb;                           // the average gain, for the meter
+  // LMS
+  float x[LMS_L + LMS_D + RXB];
+  float w[LMS_L];
+};
+
 // the design's request and its result (the loop and the audio task write
 // the request, the design task the result)
 struct Design {
@@ -114,6 +143,7 @@ static float *sineTable = nullptr;        // NCO_TABLE + 1
 static float *spectra[2][UP_PMAX];        // partition spectra of both sets, 2 x UP_N interleaved
 static float *inputSpectra[UP_PMAX];      // the frequency-domain delay line
 static Design *design = nullptr;
+static Nr *nr = nullptr;
 static TaskHandle_t designTask = nullptr;
 static volatile bool designStop = false;
 static volatile bool designBusy = false;
@@ -559,6 +589,154 @@ static void demodProcess(Demod &d, uint8_t mode, const cfloat *in, cfloat *audio
 }
 
 // ----------------------------------------------------------------------------
+//  Noise reduction (nr.c)
+// ----------------------------------------------------------------------------
+
+static void nrReset(Nr &n) {
+  memset(n.in, 0, sizeof n.in);
+  memset(n.acc, 0, sizeof n.acc);
+  memset(n.smooth, 0, sizeof n.smooth);
+  memset(n.cur, 0, sizeof n.cur);
+  memset(n.sub, 0, sizeof n.sub);
+  memset(n.noise, 0, sizeof n.noise);
+  for (int i = 0; i < NR_BINS; i++) {
+    n.gPrev[i] = 1.0f;
+    n.gamPrev[i] = 1.0f;
+  }
+  n.frame = n.subIdx = n.filled = 0;
+  n.gainDb = 0.0f;
+  memset(n.x, 0, sizeof n.x);
+  memset(n.w, 0, sizeof n.w);
+}
+
+static void nrInit(Nr &n) {
+  for (int i = 0; i < NR_N; i++) n.window[i] = sqrtf(0.5f - 0.5f * cosf(2.0f * PI_F * i / NR_N));
+  n.mode = RX_NR_OFF;
+  n.level = 0.0f;
+  nrReset(n);
+}
+
+// a new method starts afresh: no stale estimates
+static void nrConfig(Nr &n, uint8_t mode, float levelDb) {
+  if (mode != n.mode) nrReset(n);
+  n.mode = mode;
+  n.level = levelDb;
+}
+
+static void fft256(float *data) {
+  dsps_fft2r_fc32(data, NR_N);
+  dsps_bit_rev_fc32(data, NR_N);
+}
+
+// short-time spectral gain: FFT 256 every 64 samples (75 % overlap), square-
+// root Hann for analysis and synthesis (the product adds up to 2 at this
+// hop: the output is halved); per bin the noise by minimum statistics, the
+// Wiener gain from the decision-directed a-priori SNR, never below the
+// floor 10^(-level/20). Delay 192 samples (16 ms)
+static void nrSpectral(Nr &n, cfloat *audio) {
+  const float gMin = powf(10.0f, -n.level / 20.0f);
+  float gSum = 0.0f;
+  float *f = n.fft;
+  memmove(n.in, n.in + RXB, (NR_N - RXB) * sizeof(float));
+  for (int i = 0; i < RXB; i++) n.in[NR_N - RXB + i] = audio[i].re;
+  for (int i = 0; i < NR_N; i++) {
+    f[2 * i] = n.in[i] * n.window[i];
+    f[2 * i + 1] = 0.0f;
+  }
+  fft256(f);
+
+  // minimum statistics: a new sub-window every NR_SUBL frames
+  if (++n.frame >= NR_SUBL) {
+    n.frame = 0;
+    memcpy(n.sub[n.subIdx], n.cur, sizeof n.cur);
+    n.subIdx = (n.subIdx + 1) % NR_SUBS;
+    if (n.filled < NR_SUBS) n.filled++;
+    memcpy(n.cur, n.smooth, sizeof n.cur);
+  }
+
+  for (int i = 0; i < NR_BINS; i++) {
+    const float p = f[2 * i] * f[2 * i] + f[2 * i + 1] * f[2 * i + 1];
+    n.smooth[i] = n.filled == 0 && n.frame == 1 ? p : NR_ALPHA * n.smooth[i] + (1.0f - NR_ALPHA) * p;
+    if (n.smooth[i] < n.cur[i] || n.cur[i] == 0.0f) n.cur[i] = n.smooth[i];
+    float mn = n.cur[i];
+    for (int s = 0; s < n.filled; s++) {
+      if (n.sub[s][i] < mn) mn = n.sub[s][i];
+    }
+    n.noise[i] = NR_BIAS * mn + 1e-6f;
+    const float gam = p / n.noise[i];
+    float xi = NR_DD * n.gPrev[i] * n.gPrev[i] * n.gamPrev[i] + (1.0f - NR_DD) * (gam > 1.0f ? gam - 1.0f : 0.0f);
+    if (xi < NR_XIMIN) xi = NR_XIMIN;
+    float g = xi / (1.0f + xi);
+    if (g < gMin) g = gMin;
+    n.gPrev[i] = g;
+    n.gamPrev[i] = gam;
+    gSum += g;
+    f[2 * i] *= g;
+    f[2 * i + 1] *= g;
+    if (i > 0 && i < NR_N / 2) {          // the mirror half, conjugate
+      f[2 * (NR_N - i)] = f[2 * i];
+      f[2 * (NR_N - i) + 1] = -f[2 * i + 1];
+    }
+  }
+  n.gainDb = 20.0f * log10f(gSum / NR_BINS + 1e-9f);
+
+  // the inverse by conjugation, the synthesis window, overlap-add
+  for (int i = 0; i < NR_N; i++) f[2 * i + 1] = -f[2 * i + 1];
+  fft256(f);
+  for (int i = 0; i < NR_N; i++) n.acc[i] += f[2 * i] * (1.0f / NR_N) * n.window[i];
+  for (int i = 0; i < RXB; i++) {
+    audio[i].re = 0.5f * n.acc[i];
+    audio[i].im = 0.0f;
+  }
+  memmove(n.acc, n.acc + RXB, (NR_N - RXB) * sizeof(float));
+  memset(n.acc + NR_N - RXB, 0, RXB * sizeof(float));
+}
+
+// adaptive line enhancer: an NLMS predictor of 64 taps looks 16 samples
+// (1.3 ms) back and predicts the present; tones, CW and voiced speech come
+// out, the noise does not. Step 0.25 x 10^(-level/20). No delay
+static void nrLms(Nr &n, cfloat *audio) {
+  const int h = LMS_L + LMS_D;            // history kept before the block
+  const float mu = 0.25f * powf(10.0f, -n.level / 20.0f);
+  float *x = n.x, *w = n.w;
+  for (int i = 0; i < RXB; i++) x[h + i] = audio[i].re;
+  // the taps' power, exact at the block start (a running sum drifts in
+  // float when a strong signal stops), then sliding within the block
+  float p = 0.0f;
+  {
+    const float *r = x + h - LMS_D - 1;
+    for (int k = 0; k < LMS_L; k++) p += r[-k] * r[-k];
+  }
+  for (int i = 0; i < RXB; i++) {
+    const float *r = x + h + i - LMS_D;   // r[-k], k = 0 .. L-1: the reference taps
+    const float newest = r[0], oldest = r[-LMS_L];
+    p += newest * newest - oldest * oldest;
+    if (p < 0.0f) p = 0.0f;
+    float y = 0.0f;
+    for (int k = 0; k < LMS_L; k++) y += w[k] * r[-k];
+    const float e = x[h + i] - y;
+    const float g = mu * e / (p + 1.0f);
+    for (int k = 0; k < LMS_L; k++) w[k] = 0.99995f * w[k] + g * r[-k];
+    audio[i].re = y;
+    audio[i].im = 0.0f;
+  }
+  // a non-finite output (should not happen) starts the predictor afresh
+  const float last = audio[RXB - 1].re;
+  if (!(last == last) || fabsf(last) > 1e9f) {
+    memset(w, 0, LMS_L * sizeof(float));
+    for (int i = 0; i < RXB; i++) audio[i].re = 0.0f;
+  }
+  memmove(x, x + RXB, h * sizeof(float));
+}
+
+// level 0: the spectral path still runs (gain 1, its estimate stays
+// current, its delay does not jump); the LMS passes the audio
+static void nrProcess(Nr &n, cfloat *audio) {
+  if (n.mode == RX_NR_SPECTRAL) nrSpectral(n, audio);
+  else if (n.mode == RX_NR_LMS && n.level > 0.0f) nrLms(n, audio);
+}
+
+// ----------------------------------------------------------------------------
 //  The internal test signal (selftest.c): a tone, I/Q or real, with
 //  noise and keying
 // ----------------------------------------------------------------------------
@@ -568,6 +746,8 @@ static void testConfigure(TestGen &t, const RxConfig &c) {
   t.amp = 32768.0f * powf(10.0f, c.testLevel / 20.0f);
   t.noise = c.testNoise <= -150.0f ? 0.0f : 32768.0f * powf(10.0f, c.testNoise / 20.0f);
   t.keyPeriod = c.testKey > 0.0f ? (uint32_t)(c.testKey * (FS / 1000.0f)) : 0;
+  t.qGain = powf(10.0f, c.testIqGain / 20.0f);
+  t.qPhase = (uint32_t)(int32_t)lroundf(c.testIqPhase / 360.0f * 4294967296.0f);
 }
 
 static inline float testNoise(TestGen &t) {
@@ -595,7 +775,7 @@ static void testGenerate(TestGen &t, bool iq, float *i, float *q) {
     const float a = t.amp * key;
     if (iq) {
       i[n] = a * ncoSin(t.phase + 0x40000000u);                  // cos
-      q[n] = a * ncoSin(t.phase);                                // sin
+      q[n] = a * t.qGain * ncoSin(t.phase + t.qPhase);           // G sin(+p)
     } else {
       i[n] = a * ncoSin(t.phase);
       q[n] = 0.0f;
@@ -625,6 +805,7 @@ static void apply(Chain &c, uint32_t dirty) {
   if (dirty & RX_DIRTY_INPUT) ddcIqConfig(c.ddc, cfg.iqGain, cfg.iqPhase);
   if (dirty & RX_DIRTY_AGC) agcConfig(c.agc, cfg.agc != 0, cfg.agcGain, cfg.hang, cfg.decay);
   if (dirty & (RX_DIRTY_TEST | RX_DIRTY_TUNE)) testConfigure(c.test, cfg);
+  if (dirty & RX_DIRTY_NR) nrConfig(*nr, cfg.nr, cfg.nrLevel);
   if (dirty & RX_DIRTY_FILTER) requestDesign(cfg.low, cfg.high, cfg.stopband);
 }
 
@@ -639,6 +820,8 @@ static void freeAll() {
   sineTable = nullptr;
   free(design);
   design = nullptr;
+  free(nr);
+  nr = nullptr;
   for (int s = 0; s < 2; s++) {
     for (int p = 0; p < UP_PMAX; p++) {
       free(spectra[s][p]);
@@ -658,13 +841,15 @@ bool rxChainBegin(const RxConfig &config) {
   chain = (Chain *)calloc(1, sizeof(Chain));
   sineTable = (float *)malloc((NCO_TABLE + 1) * sizeof(float));
   design = (Design *)calloc(1, sizeof(Design));
-  bool ok = chain != nullptr && sineTable != nullptr && design != nullptr;
+  nr = (Nr *)calloc(1, sizeof(Nr));
+  bool ok = chain != nullptr && sineTable != nullptr && design != nullptr && nr != nullptr;
   for (int s = 0; s < 2 && ok; s++) {
     for (int p = 0; p < UP_PMAX && ok; p++) ok = (spectra[s][p] = (float *)calloc(1, spectrum)) != nullptr;
   }
   for (int p = 0; p < UP_PMAX && ok; p++) ok = (inputSpectra[p] = (float *)calloc(1, spectrum)) != nullptr;
   if (ok) {
-    const esp_err_t fft = dsps_fft2r_init_fc32(NULL, UP_N);
+    // one table serves every length up to its own
+    const esp_err_t fft = dsps_fft2r_init_fc32(NULL, NR_N);
     ok = fft == ESP_OK || fft == ESP_ERR_DSP_REINITIALIZED;
   }
   if (!ok) {
@@ -679,6 +864,7 @@ bool rxChainBegin(const RxConfig &config) {
   ducInit(c.duc);
   agcInit(c.agc);
   demodInit(c.demod);
+  nrInit(*nr);
   c.test.noiseSeed = 12345u;
   c.test.keyEnv = 1.0f;
   c.squelchGain = 1.0f;
@@ -714,7 +900,7 @@ void rxChainEnd() {
     xTaskNotifyGive(designTask);
     for (int i = 0; i < 50 && designTask != nullptr; i++) delay(10);
   }
-  if (chain != nullptr || sineTable != nullptr || design != nullptr) freeAll();
+  if (chain != nullptr || sineTable != nullptr || design != nullptr || nr != nullptr) freeAll();
 }
 
 // RX_DIRTY_TAKE: the task takes the configuration even when nothing it
@@ -766,6 +952,7 @@ void rxChainProcess(const int32_t *in, int16_t *out) {
   filterProcess(c.bb, c.bbf);
   agcProcess(c.agc, c.bbf, c.bba);
   demodProcess(c.demod, cfg.mode, c.bba, c.aud);
+  if (cfg.mode != RX_OFF) nrProcess(*nr, c.aud);   // off carries the complex baseband
 
   float energy = 0.0f;
   for (int i = 0; i < RXB; i++) energy += c.aud[i].re * c.aud[i].re;
@@ -798,6 +985,7 @@ void rxChainProcess(const int32_t *in, int16_t *out) {
   meter.transition = c.transition[c.act];
   meter.designs = designs;
   meter.designing = designBusy || swapReady;
+  meter.nrGainDb = nr->mode == RX_NR_SPECTRAL ? nr->gainDb : 0.0f;
 }
 
 void rxChainGetMeter(RxMeter &out) {
@@ -810,4 +998,5 @@ void rxChainGetMeter(RxMeter &out) {
   out.transition = meter.transition;
   out.designs = meter.designs;
   out.designing = meter.designing;
+  out.nrGainDb = meter.nrGainDb;
 }

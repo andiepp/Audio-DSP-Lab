@@ -631,6 +631,11 @@ static const PotMap synthPots[] = {
 #define RX_P_TEST_LEVEL               29      // 0.01 dBFS
 #define RX_P_TEST_NOISE               30      // dBFS RMS, -150 none
 #define RX_P_TEST_KEY                 31      // ms, 0 steady
+#define RX_P_NR                       32      // RxNr: off, lms, spectral
+#define RX_P_NR_LEVEL                 33      // dB, 0 passes
+#define RX_P_TEST_IQ_GAIN             34      // 0.01 dB: the test tone's Q gain error
+#define RX_P_TEST_IQ_PHASE            35      // 0.01 degree: its Q phase error
+#define RX_P_LAST                     RX_P_TEST_IQ_PHASE
 
 #define RX_SSB_LOW_EDGE               300     // Hz: where USB and LSB filters start
 #define RX_EDGE_GAP                   50      // Hz: the least width
@@ -639,10 +644,9 @@ static const PotMap synthPots[] = {
 // (defined below, with the values)
 static void setDependent(uint8_t paramId, int32_t value);
 
-// the chain's configuration from the values, one of them about to change
-// (an apply receives its value before it is stored)
-static RxConfig rxConfigWith(uint8_t paramId, int32_t value) {
-  auto v = [&](uint8_t id) { return id == paramId ? value : currentValue(id); };
+// the chain's configuration from values by id
+template <typename Values>
+static RxConfig rxConfigOf(Values v) {
   RxConfig c;
   c.mode = (uint8_t)v(RX_P_MODE);
   c.offset = (float)v(RX_P_OFFSET);
@@ -665,7 +669,17 @@ static RxConfig rxConfigWith(uint8_t paramId, int32_t value) {
   c.testLevel = v(RX_P_TEST_LEVEL) / 100.0f;
   c.testNoise = (float)v(RX_P_TEST_NOISE);
   c.testKey = (float)v(RX_P_TEST_KEY);
+  c.nr = (uint8_t)v(RX_P_NR);
+  c.nrLevel = (float)v(RX_P_NR_LEVEL);
+  c.testIqGain = v(RX_P_TEST_IQ_GAIN) / 100.0f;
+  c.testIqPhase = v(RX_P_TEST_IQ_PHASE) / 100.0f;
   return c;
+}
+
+// the running values, one of them about to change (an apply receives its
+// value before it is stored)
+static RxConfig rxConfigWith(uint8_t paramId, int32_t value) {
+  return rxConfigOf([&](uint8_t id) { return id == paramId ? value : currentValue(id); });
 }
 
 static bool rxApply(uint8_t paramId, int32_t value, uint32_t dirty) {
@@ -783,6 +797,10 @@ static bool rxTest(int32_t value) { return rxApply(RX_P_TEST, value, RX_DIRTY_TE
 static bool rxTestOffset(int32_t value) { return rxApply(RX_P_TEST_OFFSET, value, RX_DIRTY_TEST); }
 static bool rxTestLevel(int32_t value) { return rxApply(RX_P_TEST_LEVEL, value, RX_DIRTY_TEST); }
 static bool rxTestNoise(int32_t value) { return rxApply(RX_P_TEST_NOISE, value, RX_DIRTY_TEST); }
+static bool rxNr(int32_t value) { return rxApply(RX_P_NR, value, RX_DIRTY_NR); }
+static bool rxNrLevel(int32_t value) { return rxApply(RX_P_NR_LEVEL, value, RX_DIRTY_NR); }
+static bool rxTestIqGain(int32_t value) { return rxApply(RX_P_TEST_IQ_GAIN, value, RX_DIRTY_TEST); }
+static bool rxTestIqPhase(int32_t value) { return rxApply(RX_P_TEST_IQ_PHASE, value, RX_DIRTY_TEST); }
 
 static const ParamDef receiverParams[] = {
   { EQ_BASS_GAIN,        -1200, 1200,    0,       eqBassGain,        false },
@@ -815,36 +833,18 @@ static const ParamDef receiverParams[] = {
   { RX_P_TEST_LEVEL,     -12000, 0,      -2000,   rxTestLevel,       false },
   { RX_P_TEST_NOISE,     -150,  0,       -150,    rxTestNoise,       false },
   { RX_P_TEST_KEY,       0,     5000,    0,       rxTestKey,         false },
+  { RX_P_NR,             0,     RX_NR_SPECTRAL, RX_NR_LMS, rxNr,     false },
+  { RX_P_NR_LEVEL,       0,     30,      0,       rxNrLevel,         false },
+  { RX_P_TEST_IQ_GAIN,   -300,  300,     0,       rxTestIqGain,      false },
+  { RX_P_TEST_IQ_PHASE,  -1000, 1000,    0,       rxTestIqPhase,     false },
 };
 #define RECEIVER_PARAM_COUNT          (sizeof(receiverParams) / sizeof(receiverParams[0]))
 
 // the chain starts before the values are applied: with the defaults
 static RxConfig rxDefaults() {
-  int32_t v[RX_P_TEST_KEY + 1] = {};
+  int32_t v[RX_P_LAST + 1] = {};
   for (const ParamDef &p : receiverParams) v[p.id] = p.initial;
-  RxConfig c;
-  c.mode = (uint8_t)v[RX_P_MODE];
-  c.offset = (float)v[RX_P_OFFSET];
-  c.low = (float)v[RX_P_LOW];
-  c.high = (float)v[RX_P_HIGH];
-  c.stopband = (float)v[RX_P_STOPBAND];
-  c.pitch = (float)v[RX_P_PITCH];
-  c.agc = (uint8_t)v[RX_P_AGC];
-  c.agcGain = (float)v[RX_P_AGC_GAIN];
-  c.hang = v[RX_P_HANG] / 100.0f;
-  c.decay = (float)v[RX_P_DECAY];
-  c.fmDeviation = (float)v[RX_P_FM_DEVIATION];
-  c.deemphasis = (float)v[RX_P_DEEMPHASIS];
-  c.squelch = (float)v[RX_P_SQUELCH];
-  c.input = (uint8_t)v[RX_P_INPUT];
-  c.iqGain = v[RX_P_IQ_GAIN] / 100.0f;
-  c.iqPhase = v[RX_P_IQ_PHASE] / 100.0f;
-  c.test = v[RX_P_TEST] != 0;
-  c.testOffset = (float)v[RX_P_TEST_OFFSET];
-  c.testLevel = v[RX_P_TEST_LEVEL] / 100.0f;
-  c.testNoise = (float)v[RX_P_TEST_NOISE];
-  c.testKey = (float)v[RX_P_TEST_KEY];
-  return c;
+  return rxConfigOf([&](uint8_t id) { return v[id]; });
 }
 
 static bool rxTakeClock() {

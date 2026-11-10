@@ -273,7 +273,11 @@ parameter tiles and knob strip below. Optional: panadapter plot from
 `! rxspectrum` with the tuned frequency marked. Layout rules as before
 (content 182 px, tiles 150 x 40, ASCII fonts).
 
-## 10 Sensitivity: a preamplifier is needed
+## 10 Sensitivity: a preamplifier is needed (superseded)
+
+*R3 measured the opposite on this board (section 14): about -133 dBm in
+2.4 kHz through K2, clipping above about -50 dBm. The preamplifier is
+dropped (section 13). The text below is the proposal as it stood.*
 
 The QRP Labs front end delivers I / Q at microvolt to millivolt level;
 the measured requirement on the DSP-Box was about **+30 dB of low-noise
@@ -358,6 +362,11 @@ follows at the release. Nothing is committed or pushed without your OK.
 checked before R4 wires it to K1); 3 new project "Receiver"; 4 pots as
 proposed; 5 preamp separate, firmware steps go ahead without it.
 
+**Revised 2026-11-10 (R3):** decision 5 dropped -- no preamplifier. The
+front end into K2 reaches about -133 dBm in 2.4 kHz and clips above
+about -50 dBm (section 14, R3); an attenuator ahead of the front end is
+the useful addition, if any.
+
 ## 14 Results
 
 **Benchmark (2026-11-09, COM10).** Section 3. Sketch and raw output in
@@ -424,3 +433,71 @@ Checks with the internal test tone:
   the ADCs' and not the DACs'; R3 measures the real one).
 
 R2 done.
+
+**R3, internal part (2026-11-10, COM10).** Noise reduction ported from
+`nr.c` (LMS line enhancer; spectral gain with the esp-dsp FFT 256 in
+place of the DSP-Box's radix-2), on its own heap block (12 KB);
+parameters 32 `nr` (off, lms, spectral; default lms), 33 `nr-level`
+(0 .. 30 dB, default 0 = pass), 34 / 35 `test-iq-gain` / `test-iq-phase`
+(the test tone's Q errors, as the DSP-Box's 26 / 27); `meter` gains a
+seventh field, the spectral NR's average gain. Firmware 1,269,016 bytes.
+
+- CPU, FM with 511 taps and the test tone: NR off 19.6 %, LMS 26.4 %,
+  spectral 30.9 % (longest block 31.1 %).
+- Image (tone on the mirror, test-offset -25000, S-meter without hang):
+  errors 1 dB / 5 deg uncorrected 22.8 dB (theory 22.8); corrected
+  exactly: below the S-meter's -150 dBFS floor (> 130 dB); corrected
+  0.1 dB off 44.7 dB, 0.5 deg off 47.2 dB (both as theory).
+- NR, USB, AGC off at 20 dB, tone -40 dBFS keyed 1 s on / 1 s off, noise
+  -50 dBFS: key-down level -24.7 dBFS with every method; the noise
+  between keys drops 10.4 dB (LMS 12), 11.3 dB (spectral 12), 21.2 dB
+  (spectral 24). A steady tone, by contrast, the spectral method lowers
+  by its whole floor (minimum statistics take a carrier that never stops
+  for noise) -- as on the DSP-Box, where it "dulls" the sound.
+
+**R3, bench (2026-11-10, COM10).** QRP Labs front end (SDRFrontend 1.0
+on the Uno, COM24, crystal correction 325 ppb) with its I/Q on K2, RIGOL
+DG4162 at 14.100 MHz, 100 mVpp into 50 ohms (-16 dBm) through 30 dB, the
+20 m filter bridged as in the DSP-Box's S4. The Uno resets when a
+program opens COM24 with DTR: open it with DTR and RTS low.
+
+- Sense: `input iq` (I left) is right; the carrier at +12 kHz, 0.7 Hz
+  from its nominal frequency (the FM tuning indicator).
+- At -46 dBm the carrier read -8.5 dBFS and **clipped**: second-order
+  products -22 dBc, third-order -26 / -30 dBc, I compressed about 1 dB
+  more than Q. With 10 dB more attenuation (-56 dBm, carrier -18 dBFS)
+  the second order fell 45 dB to -67 dBc, the third order (+30 kHz,
+  folded to -18 kHz) 24 dB to -54 dBc, as distortion does; a product at
+  -30 kHz (folded to +18 kHz, -28 dBc) fell dB for dB -- an out-of-band
+  product of the front end aliased in: the path is not band-limited at
+  24 kHz (section 14, R2: no cutoff up to 23 kHz).
+- **12 kHz is fs/4**: the third-order product at +36 kHz folds exactly
+  onto the -12 kHz mirror, where no I/Q correction removes it. At -46 dBm
+  the null stopped at 29.5 dB with the carrier at +12 kHz but reached
+  55.4 dB at +10 kHz.
+- Image null at -56 dBm, ±150 Hz filter on the mirror: carrier at +10 kHz
+  **66.6 dB** (+0.41 dB, +1.05 deg), at +12 kHz **56.0 dB** (+0.41 dB,
+  +1.00 deg; the third-order product at -54 dBc sets the limit there).
+  Uncorrected 31.9 dB. The DSP-Box found 0.52 dB / 1.53 deg with its
+  codec: the phase is the front end's, the gain also the boards'.
+- Noise with the generator off, USB 2.4 kHz, AGC off at 0 dB: -97 ..
+  -102 dBFS at offsets of 8 .. 19 kHz (mean -98.6), -93.5 dBFS at 4 kHz
+  (noise near the LO). With the carrier at -56 dBm reading -21.4 dBFS
+  as USB audio: **S/N 77 dB, noise-equivalent input about -133 dBm in
+  2.4 kHz** (10 dB S/N at about -123 dBm); the DSP-Box reached -89 dBm.
+  K2 is a plain 22.5 kOhm input to the ADC; the front end into it is
+  about 30 dB hotter than into the DSK's LINE IN, and the cause of that
+  difference is not established. The absolute dBm rest on the
+  generator's setting and the two attenuators.
+
+Consequences: (1) **no preamplifier** -- section 10's +30 dB came from
+the DSK's codec; here the problem is the other end: the path clips
+above about -50 dBm at the front end, which a strong station on 20 m
+(S9+20 .. +40, -53 .. -33 dBm) reaches. An attenuator ahead of the
+front end (or the 20 m filter, 28 dB down until it is aligned) is the
+safer addition. (2) The tuning should avoid an offset of 12 kHz (fs/4:
+third order onto the image) and 16 kHz (second order: 2 x 16 = 32 kHz
+folds to -16 kHz) and stay above about 8 kHz (noise near the LO): R4's
+tuner split takes 10 kHz as its centre.
+
+R3 done.

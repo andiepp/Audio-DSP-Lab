@@ -62,6 +62,10 @@ static const ParamInfo receiverInfo[] = {
   { 29, "test-level",        KIND_NUMBER,  2, "dBFS",  nullptr },
   { 30, "test-noise",        KIND_INTEGER, 0, "dBFS",  nullptr },
   { 31, "test-key",          KIND_INTEGER, 0, "ms",    nullptr },
+  { 32, "nr",                KIND_CHOICE,  0, "",      "off,lms,spectral" },
+  { 33, "nr-level",          KIND_INTEGER, 0, "dB",    nullptr },
+  { 34, "test-iq-gain",      KIND_NUMBER,  2, "dB",    nullptr },
+  { 35, "test-iq-phase",     KIND_NUMBER,  2, "deg",   nullptr },
 };
 
 // application 0x04 - analysis: Frequency Response and THD

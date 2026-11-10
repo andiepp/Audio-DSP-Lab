@@ -19,6 +19,9 @@
 //  AGC     hang AGC with 5.3 ms look-ahead, S-meter = its detector (agc.c)
 //  demod   AM, USB, LSB, CW, FM (demod.c); "off" passes the filtered
 //          baseband, mixed back up to the offset
+//  NR      noise reduction on the audio (nr.c): an LMS line enhancer (64
+//          taps, 16 samples back) or a spectral gain (FFT 256, minimum
+//          statistics, decision-directed Wiener gain); level 0 passes
 //  squelch mutes below an S-meter level, a one-block ramp (main.c)
 //  DUC     x4 interpolation, 43 taps (rx.c)
 //
@@ -42,6 +45,7 @@
 
 enum RxMode : uint8_t { RX_OFF = 0, RX_AM = 1, RX_USB = 2, RX_LSB = 3, RX_CW = 4, RX_FM = 5 };
 enum RxInput : uint8_t { RX_INPUT_IQ = 0, RX_INPUT_QI = 1, RX_INPUT_IF = 2 };
+enum RxNr : uint8_t { RX_NR_OFF = 0, RX_NR_LMS = 1, RX_NR_SPECTRAL = 2 };
 
 struct RxConfig {
   uint8_t mode;             // RxMode
@@ -59,11 +63,15 @@ struct RxConfig {
   uint8_t input;            // RxInput
   float iqGain;             // dB: Q's gain error of the front end
   float iqPhase;            // degrees: Q's phase error
+  uint8_t nr;               // RxNr
+  float nrLevel;            // dB: the spectral gain floor; LMS step 0.25 x 10^(-level/20); 0 passes
   bool test;                // the internal test signal replaces the input
   float testOffset;         // Hz from the offset
   float testLevel;          // dBFS
   float testNoise;          // dBFS RMS, -150 none
   float testKey;            // ms: keying period (half on), 0 steady
+  float testIqGain;         // dB: the test tone's Q gain error (a front end's, simulated)
+  float testIqPhase;        // degrees: its Q phase error
 };
 
 // what changed (rxChainConfigure)
@@ -74,7 +82,8 @@ struct RxConfig {
 #define RX_DIRTY_FM                   0x10
 #define RX_DIRTY_TEST                 0x20
 #define RX_DIRTY_INPUT                0x40
-#define RX_DIRTY_ALL                  0x7F
+#define RX_DIRTY_NR                   0x80
+#define RX_DIRTY_ALL                  0xFF
 
 struct RxMeter {
   float sMeter;             // dBFS: the AGC detector at the channel filter's output
@@ -86,9 +95,10 @@ struct RxMeter {
   float transition;         // Hz: its transition width
   uint32_t designs;         // filters switched in since the start
   bool designing;           // a design is in progress
+  float nrGainDb;           // spectral NR: its average gain over the bins, dB
 };
 
-// allocates (about 40 KB of heap, no piece over 8 KB), starts the design
+// allocates (about 53 KB of heap, no piece over 13 KB), starts the design
 // task and designs the first filter (a few ms); false without memory
 bool rxChainBegin(const RxConfig &config);
 void rxChainEnd();

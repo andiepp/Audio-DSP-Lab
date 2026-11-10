@@ -1049,12 +1049,13 @@ static void cmdLevel() {
 
 // --- receiver -------------------------------------------------------------------
 
-// S-meter dBFS, AGC gain dB, FM offset Hz, squelch open, audio dBFS, CPU %
+// S-meter dBFS, AGC gain dB, FM offset Hz, squelch open, audio dBFS, CPU %,
+// the spectral NR's average gain dB
 static void meterText(char *out, size_t size) {
   RxMeter m;
   rxChainGetMeter(m);
-  snprintf(out, size, "%.1f %.1f %.0f %d %.1f %.1f", m.sMeter, m.agcGain, m.fmOffset, m.squelchOpen ? 1 : 0,
-           m.audioDb, receiverCpuPercent());
+  snprintf(out, size, "%.1f %.1f %.0f %d %.1f %.1f %.1f", m.sMeter, m.agcGain, m.fmOffset, m.squelchOpen ? 1 : 0,
+           m.audioDb, receiverCpuPercent(), m.nrGainDb);
 }
 
 static void cmdMeter() {

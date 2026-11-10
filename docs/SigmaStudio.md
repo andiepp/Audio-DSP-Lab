@@ -1,6 +1,6 @@
 # SigmaStudio
 
-Audio-DSP-Lab (**[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**) works with Analog Devices **SigmaStudio 4.7** in two ways: you can run **your own programs** on the board in SigmaStudio mode, and the five built-in applications are SigmaStudio projects you can study and change.
+Audio-DSP-Lab (**[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**) works with Analog Devices **SigmaStudio 4.7** in two ways: you can run **your own programs** on the board in SigmaStudio mode, and the built-in applications' DSP programs are SigmaStudio projects you can study and change.
 
 ## Your own programs: SigmaStudio mode
 
@@ -53,6 +53,7 @@ Each application's DSP program is a SigmaStudio project in `sigmastudio/` of the
 | `Equalizer` | Equalizer | Line input; three general biquads per channel (bass, middle, treble); slewed volume | [Equalizer-Instructions.md](../sigmastudio/Equalizer-Instructions.md) |
 | `Radio` | Radio, Synthesizer, Generator | The equalizer with its input moved to the I2S serial input | [Radio-Instructions.md](../sigmastudio/Radio-Instructions.md) |
 | `Analysis` | Analysis | The generator's sine and gain; per input channel a band-pass, absolute value, smoothing low-pass and a readback (Frequency Response), and the line input to the serial output (THD) | [Analysis-Instructions.md](../sigmastudio/Analysis-Instructions.md) |
+| `Receiver` | Receiver | The Radio project, plus the line input (I on ADC0, Q on ADC1) straight to the serial output for the ESP32 | [Receiver-Instructions.md](../sigmastudio/Receiver-Instructions.md) |
 | `SigmaStudio` | (example) | A VCO controlled by P1 | – |
 
 Each folder holds the `.dspproj`, the self-boot image (`ADAU1701_<name>_IC 2/E2Prom.bin`) and SigmaStudio's export (`Export/`), all from the same compile. The firmware carries the images as C arrays (`firmware/AudioDspLab/DspImage*.h`, made with `tools/Convert-E2PromImage.ps1`) and the parameter addresses in `firmware/AudioDspLab/Applications.cpp`.

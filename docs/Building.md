@@ -67,9 +67,16 @@ The build takes a few minutes the first time and uses about 63 % of the applicat
 | `Distortion.cpp/.h` | Analysis, THD and Spectrum: capture, window, FFT (esp-dsp), THD, THD+N, harmonics, RMS, peaks, spectrum, in a task of its own |
 | `Capture.cpp/.h` | The DSP's serial output on the ESP32's second I2S port; `diag capture`, `diag record`, `diag clocks` |
 | `Synth.cpp/.h` | Synthesizer: MIDI, oscillators, filter, envelopes, LFOs, the audio task |
+| `AudioOut.cpp/.h` | The ESP32's first I2S port to the DSP's serial input, for the generator, the synthesizer and the receiver |
+| `Receiver.cpp/.h` | Receiver: its audio task (blocks of 256 frames from the serial output through the chain to `AudioOut`), its timing and input levels (`diag rx`) |
+| `RxChain.cpp/.h` | Receiver: the chain (down-converter, channel filter as a partitioned FFT convolution, AGC and S-meter, demodulators, noise reduction, squelch, interpolation, test signal), the filter design task and the filter download (`rxfilter`) |
 | `DspImage*.h` | The SigmaStudio self-boot images, generated |
 
-The loop alone talks to the DSP and the serial port; the radio and the synthesizer run their audio in FreeRTOS tasks on core 0, and THD and Spectrum their capture and FFT in a task of their own (the serial output and its memory only).
+The loop alone talks to the DSP and the serial port; the radio, the synthesizer and the receiver run their audio in FreeRTOS tasks on core 0, and THD and Spectrum their capture and FFT in a task of their own (the serial output and its memory only). The receiver's filter designs run in a second task on core 0 at a low priority, so a new filter never holds up a block.
+
+### The receiver's chain
+
+`RxChain.cpp` alone is compiled with `#pragma GCC optimize("O2")`; the rest of the firmware stays at the core's -Os. At -Os the chain took about a quarter more time (in the benchmark of the worst case, 34 % of a block instead of 26 %). The channel filter (up to 511 complex taps) runs as a uniformly partitioned overlap-save convolution with the block's own 64 samples at 12 kHz (an FFT of 128 points, up to eight partitions), about a tenth of the direct form's time and with its exact output; the spectral noise reduction uses an FFT of 256 points. Both FFTs are esp-dsp's radix-2 complex FFT (`dsps_fft2r_fc32`), part of the ESP32 core; a download's CRC-32 is the ROM's `esp_rom_crc32_le`. The chain takes about 53 KB of heap while the receiver runs, in pieces of at most 13 KB, and gives it back when the receiver stops.
 
 ### The DSP's clock
 
@@ -121,10 +128,11 @@ dotnet run --project src/AudioDspLab -- --simulator
 
 | Project | Role |
 | --- | --- |
-| `src/AudioDspLab.Core` | Protocol text, line transport (serial port), connection with request/response matching and resynchronisation, `BoardClient` (every command as a method, every event as a .NET event), the model, and `SimulatedBoard` |
+| `src/AudioDspLab.Core` | Protocol text, line transport (serial port), connection with request/response matching and resynchronisation, `BoardClient` (every command as a method, every event as a .NET event), the model, and `SimulatedBoard`; `Receiver` (the channel filter's design as the firmware makes it, the mask design, coefficient files, the filter measurement, the receiver's requests) and `FrontEnd` (`FrontEndClient` for the SDR front end's Uno, with a simulated one; `SdrTuner` and `ReceiverTuner`, the dial split between the front end and the receiver's offset; `ImageNull`) |
 | `src/AudioDspLab` | The WPF application: `MainViewModel`, one page view model per application, generic `ParameterViewModel`, the controls (digit dial, displays, pot knob, response curve, sweep chart, spectrum chart), stored settings, the themes |
 | `tests/AudioDspLab.Core.Tests` | Protocol text, the client against the simulator, and the firmware/simulator table comparison |
 | `tools/Screenshots` | Renders the manual's screenshots from the simulator in every theme: `dotnet run --project app/tools/Screenshots` writes Studio dark, the manual's theme, to `docs/images/screenshots` and Classic and Studio light to its `classic` and `studio-light` folders |
+| `tools/RxTuneCheck` | Bench check of the receiver's tuning with the board and the front end: `dotnet run --project app/tools/RxTuneCheck -- COM10 COM24 14100000` with a generator's carrier at 14.1 MHz on the front end; with `core` as a fourth argument it checks the image null, a filter measurement and a download on the board instead |
 
 The application binds each page to parameters by their protocol names; ranges, units and pots come from the board's `params`. Writes to one parameter are coalesced (a spinning dial sends only the newest value once the previous write is answered), and the board's events update the pages without polling.
 
@@ -134,7 +142,7 @@ The application binds each page to parameters by their protocol names; ranges, u
 
 ### The simulator
 
-`SimulatedBoard` answers the protocol as firmware 1.4 does, with made-up measurements: a 5 kHz low-pass as the device under test, harmonics, mains hum and noise for THD and Spectrum, a radio that "plays" when a network is set, an arpeggio on the synthesizer in demo mode. The tests run against it, and the application offers it as **Simulator (demo)**.
+`SimulatedBoard` answers the protocol as firmware 1.4 does, with made-up measurements: a 5 kHz low-pass as the device under test, harmonics, mains hum and noise for THD and Spectrum, a radio that "plays" when a network is set, an arpeggio on the synthesizer in demo mode, a receiver with its parameters, meters and filter download. The tests run against it, and the application offers it as **Simulator (demo)**.
 
 ## A release
 

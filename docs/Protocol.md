@@ -11,7 +11,7 @@ The board speaks a line-based text protocol on its USB serial port. You can use 
 - [Lines](#lines)
 - [Values](#values)
 - [Errors](#errors)
-- [Commands](#commands): [general](#general), [applications](#applications-and-parameters), [potentiometers and settings](#potentiometers-power-up-and-service-mode), [radio](#radio), [analysis](#analysis-frequency-response-thd-and-spectrum), [synthesizer](#synthesizer), [SigmaStudio mode](#sigmastudio-mode), [diagnostics](#diagnostics)
+- [Commands](#commands): [general](#general), [applications](#applications-and-parameters), [potentiometers and settings](#potentiometers-power-up-and-service-mode), [radio](#radio), [analysis](#analysis-frequency-response-thd-and-spectrum), [synthesizer](#synthesizer), [receiver](#receiver), [SigmaStudio mode](#sigmastudio-mode), [diagnostics](#diagnostics)
 - [Events](#events)
 - [Parameters per application](#parameters-per-application)
 - [A session](#a-session)
@@ -112,8 +112,11 @@ The board keeps numbers in hundredths. A request with more decimals is rounded, 
 | `no-sweep` | there is no complete sweep to keep as the reference |
 | `store-failed` | the ESP32's flash (NVS) refused the write |
 | `no-clock` | no clock arrives on the DSP's serial output (MP10, MP11) |
-| `busy` | the THD measurement or the receiver uses the serial output (`diag capture`, `diag record`) |
+| `busy` | the THD measurement or the receiver uses the serial output (`diag capture`, `diag record`); or the receiver is still taking up the filter downloaded before (`rxfilter load`) |
 | `no-memory` | not enough free memory for the THD measurement |
+| `count-wrong` | a filter download got more values than `rxfilter load` announced, half a complex tap, or fewer at its end |
+| `crc-wrong` | a filter download's CRC-32 does not match its values |
+| `not-loading` | `rxfilter data` or `rxfilter end` without an `rxfilter load` before |
 
 ## Commands
 
@@ -152,6 +155,7 @@ Applications:
 | `analyzer` | 4 | analysis: sine out on K3/K4, measured on K2; its Frequency Response (the sweep) and its THD |
 | `sigmastudio` | 5 | your own SigmaStudio program from the EEPROM |
 | `synthesizer` | 6 | monophonic synthesizer played from MIDI on K5 |
+| `receiver` | 7 | SDR receiver: I and Q from a front end on K2, demodulated on the ESP32, through the equalizer to K3 and K4 |
 
 ### Potentiometers, power-up and service mode
 
@@ -159,7 +163,7 @@ Applications:
 | --- | --- | --- |
 | `pots` | `ok <p1> <p2> <p3> <p4>` | 0 to 4095 from stop to stop (the readings scaled to the pots' real travel) |
 | `potctl [on\|off]` | `ok on\|off` | whether the pots set parameters; off after every reset. Turning it on takes the pots' positions at once: each pot-driven parameter goes to where its pot stands (a `! value` event for each that moves). After a `set`, the parameter's pot takes over again once it is turned by about 2 %. |
-| `startup [on\|off]` | `ok on\|off <application>` | off: every power-up starts the SigmaStudio mode; on: it starts the application selected last (radio and synthesizer with their output on) |
+| `startup [on\|off]` | `ok on\|off <application>` | off: every power-up starts the SigmaStudio mode; on: it starts the application selected last (radio, synthesizer and receiver with their output on) |
 | `service [on\|off]` | `ok on\|off` | on: the DSP keeps running, the EEPROM is writable and the firmware leaves the I2C bus to SigmaStudio and the USBi; off: the application is written back and restarted |
 
 ### Radio
@@ -211,6 +215,37 @@ The THD measurement takes the line input as the DSP sends it to its serial outpu
 | `midi` | `ok <note-messages> <other-channels> <bytes> <uart-errors>` | counts since the synthesizer started |
 | `load` | `ok <average> <peak>` | the audio task's share of its time budget in %, since the last `load` |
 
+### Receiver
+
+Each of these answers `err wrong-application` in another application.
+
+| Request | Response | Notes |
+| --- | --- | --- |
+| `meter` | `ok <s-meter> <agc-gain> <fm-offset> <squelch> <audio> <cpu> <nr-gain>` | the S-meter in dBFS (the AGC's detector after the channel filter); the AGC's gain in dB; the FM offset in Hz (the FM demodulator's tuning indicator); the squelch `1` open, `0` muting; the audio's RMS in dBFS (smoothed over about 0.1 s); the receiver task's share of one core in %; the spectral noise reduction's average gain in dB. One decimal, the FM offset none. Also `! meter` five times a second while events are on |
+| `rxfilter` | `ok <source> <taps> <transition> <state> <filters>` | the channel filter in force: source `designed` (from `low`, `high` and `stopband`) or `downloaded`; its taps; its transition width in Hz (0 for a download); `designing` while a newer filter is on its way, else `ready`; the filters switched in since the receiver started |
+| `rxfilter load <taps> real\|complex` | `ok` | begins a download of 1 to 511 taps; `err busy` while the download before is still being taken up |
+| `rxfilter data <v> ...` | `ok <received>` | 1 to 16 values a line: per tap its real part (`real`), or its real and imaginary part (`complex`); the taps received so far |
+| `rxfilter end <crc32>` | `ok <taps>` | checks the count and the CRC-32 and switches the filter in at the next block boundary; `err count-wrong`, `err crc-wrong` |
+
+**A filter download.** The taps go in natural order: tap k multiplies the sample k steps back, x[n − k], at the channel's rate of 12 kHz (complex). The board keeps them as 32-bit floats; write each value with nine significant digits (`%.9g`), which carries a float exactly. The CRC-32 is the one of zlib and PNG (IEEE 802.3: the reflected polynomial 0xEDB88320, initial value and final XOR 0xFFFFFFFF) over the values' float32 bytes, little-endian, in the order sent: re (`real`) or re, im per tap (`complex`). `end` takes it in decimal or, with `0x`, in hexadecimal. A data line that does not fit the announced count, a wrong count at the end or a wrong CRC leave the filter in force as it was; so does a `load` that is never ended. 511 complex taps take 64 data lines.
+
+The filter then runs as a download until a value that shapes the filter changes (`mode`, `low`, `high`, `width`, `stopband`, `pitch`) or `set filter designed`: the receiver designs its own again, and `filter` returns to `designed` (a `! value filter` event). A download sets `filter` to `downloaded`.
+
+```
+> rxfilter load 3 real
+ok
+> rxfilter data 0.25 0.5 0.25
+ok 3
+> rxfilter end 2729475737
+ok 3
+> rxfilter
+ok downloaded 3 0 ready 2
+```
+
+(In Python: `zlib.crc32(struct.pack("<3f", 0.25, 0.5, 0.25))` is 2729475737, 0xA2B07E99.)
+
+The receiver and the analysis' THD and Spectrum use the same port of the ESP32: while the receiver runs, `diag capture` and `diag record` answer `err busy`. `diag rx` (below) shows the receiver's input and timing.
+
 ### SigmaStudio mode
 
 | Request | Response | Notes |
@@ -232,7 +267,7 @@ The THD measurement takes the line input as the DSP sends it to its serial outpu
 | `diag raw` | `ok <left> <right>`: the analyzer's raw capture words (5.19) |
 | `diag heap` | `ok <free> <largest-block> <lowest-free>`: the ESP32's heap in bytes: free now, the largest block one allocation can get, the lowest free since the start |
 | `diag clocks` | `ok <lrclk-hz> <bclk-hz> <data-edges> <data-high>`: the DSP's serial output clocks (MP10 on GPIO13, MP11 on GPIO19), counted with the ESP32's pulse counter (the program images give about 48000 and 3072000; the DSP's sample rate shows its MCLK), the rising edges a second on the data pin (MP6 on GPIO32; 0 while the program sends nothing there) and the share of readings that found it high, in % |
-| `diag capture [<frames>]` | `ok <rate> <frames> <rms-L> <peak-L> <hz-L> <rms-R> <peak-R> <hz-R> <first-word> <dc-L> <dc-R>`: the DSP's serial output (MP6 on GPIO32) as the ESP32's second I2S port receives it, 9728 frames (0.2 s) or 256 to 48000: the frame rate timed by the ESP32's clock, per channel the RMS without the DC and the peak from it in dBFS (a full-scale sine: -3.01 RMS, 0 peak; -200 for silence) and the frequency of the crossings of the DC, the first left slot as received, and per channel the DC as a fraction of full scale; `err no-clock` without clocks. It uses no I2C, so it also works in service mode |
+| `diag capture [<frames>]` | `ok <rate> <frames> <rms-L> <peak-L> <hz-L> <rms-R> <peak-R> <hz-R> <first-word> <dc-L> <dc-R>`: the DSP's serial output (MP6 on GPIO32) as the ESP32's second I2S port receives it, 9728 frames (0.2 s) or 256 to 48000: the frame rate timed by the ESP32's clock, per channel the RMS without the DC and the peak from it in dBFS (a full-scale sine: -3.01 RMS, 0 peak; -200 for silence) and the frequency of the crossings of the DC, the first left slot as received, and per channel the DC as a fraction of full scale; `err no-clock` without clocks, `err busy` while THD, the Spectrum or the receiver uses the port. It uses no I2C, so it also works in service mode |
 | `diag blocks` | `ok <32k> <16k> <8k> <4k>`: how many blocks of 32, 16, 8 and 4 KB the heap gives, taken greedily, largest first, and given back at once |
 | `diag thd-test` | `ok <hz> <level-L> <thd-L> <thdn-L> <H2-L> <H3-L> <level-R> <thd-R> <thdn-R> <H2-R> <H3-R>`: the distortion analysis on a synthetic signal, -20 dBFS at 1001.95 Hz with H3 at -60 dBc on the left and H2 at -80 dBc on the right; the answer gives those back |
 | `diag record [<frames>]` | `* <frame> ...` 16 frames a line, each the left and right sample as 6 hex digits (24 bits, two's complement), then `ok <rate> <frames>`: 4096 contiguous frames (or 256 to 4096, rounded up to a multiple of 256) of the serial output |
@@ -248,7 +283,7 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | --- | --- |
 | `! ready Audio-DSP-Lab <firmware> <protocol>` | the board has started (power-up, reset, `reset`) |
 | `! status <application> <state> <last-error>` | the application, its state or its last error changed |
-| `! value <name> <value>` | a parameter changed without a `set` on this port: a pot turned it, the generator's frequency followed a new P2 range, or the other port set it. At most 20 per second for each parameter. |
+| `! value <name> <value>` | a parameter changed without a `set` on this port: a pot turned it, the generator's frequency followed a new P2 range, a receiver value followed another (also to the port that set that one), or the other port set it. At most 20 per second for each parameter. |
 | `! pots <p1> <p2> <p3> <p4>` | a pot moved by 80 counts (2 %) or more; at most 10 per second |
 | `! radio <state> <sample-rate>` | the radio's connection or sample rate changed |
 | `! wifi` | the WiFi networks were changed (the panel reads them again) |
@@ -259,6 +294,7 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | `! thd <state> <results> <hz> <level-L> <thd-L> <thdn-L> <level-R> <thd-R> <thdn-R>` | the THD measurement has a new result, or its state changed; as `thd` |
 | `! spectrum <state> <results> <rms-L> <rms-R>` | the Spectrum has a new result, or its state changed; as `spectrum` |
 | `! voice <note> <gate> <held> <channel> <mod-strip> <stage>` | the synthesizer's voice changed; at most 20 per second |
+| `! meter <s-meter> <agc-gain> <fm-offset> <squelch> <audio> <cpu> <nr-gain>` | five times a second while the receiver runs; as `meter` |
 
 ## Parameters per application
 
@@ -339,6 +375,42 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | `bend-range` | integer, semitones | 0 to 12 | 2 | |
 | `velocity-loudness` | integer, % | 0 to 100 | 0 | |
 | `velocity-brightness` | integer, % | 0 to 100 (100 = +3 octaves) | 0 | |
+
+### receiver
+
+The equalizer's eight parameters, `bass-gain` to `output`, with the same ranges and defaults (`volume` on P4), act on the receiver's audio. Then the receiver's own:
+
+| Name | Kind | Range | Default | Pot |
+| --- | --- | --- | --- | --- |
+| `mode` | choice | `off`, `am`, `usb`, `lsb`, `cw`, `fm` | `usb` | |
+| `offset` | integer, Hz | -21000 to 21000: the receiver's tuning from the front end's frequency (with `input if`, the IF) | 10000 | |
+| `low` | integer, Hz | -5500 to 5450: the channel filter's lower edge at -6 dB, re the carrier | 300 | |
+| `high` | integer, Hz | -5450 to 5500: its upper edge | 2700 | |
+| `width` | integer, Hz | 100 to 11000: `high` - `low`, placed by the mode | 2400 | P1 |
+| `stopband` | integer, dB | 40 to 100 | 80 | |
+| `pitch` | integer, Hz | 300 to 1000: the CW tone | 600 | |
+| `agc` | choice | `off`, `fast`, `medium`, `slow` | `medium` | |
+| `agc-gain` | integer, dB | 0 to 90: the largest gain, the fixed gain with `agc off` | 60 | |
+| `hang` | number, s | 0 to 5 | 0.5 | |
+| `decay` | integer, dB/s | 1 to 200 | 20 | |
+| `fm-deviation` | integer, Hz | 100 to 5000: the deviation that gives -12 dBFS of audio | 2500 | |
+| `deemphasis` | integer, us | 0 to 2000, 0 off | 0 | |
+| `squelch` | integer, dBFS | -150 to 0: mutes while the S-meter is below; -150 open | -150 | P3 |
+| `input` | choice | `iq` (I on ADC0, Q on ADC1), `qi` (swapped), `if` (a real IF on ADC0) | `iq` | |
+| `iq-gain` | number, dB | -3 to 3: the correction of Q's gain | 0 | |
+| `iq-phase` | number, deg | -10 to 10: the correction of Q's phase | 0 | |
+| `test` | switch | the internal test signal in place of the input | off | |
+| `test-offset` | integer, Hz | -45000 to 45000, from `offset` | 1000 | |
+| `test-level` | number, dBFS | -120 to 0 | -20 | |
+| `test-noise` | integer, dBFS | -150 to 0: white noise, RMS; -150 none | -150 | |
+| `test-key` | integer, ms | 0 to 5000: keying period, half on; 0 steady, 1 to 99 taken as 100 | 0 | |
+| `nr` | choice | `off`, `lms`, `spectral` | `lms` | |
+| `nr-level` | integer, dB | 0 to 30: LMS how hard it adapts, spectral how far it may lower; 0 passes | 0 | P2 |
+| `test-iq-gain` | number, dB | -3 to 3: a gain error given to the test signal's Q | 0 | |
+| `test-iq-phase` | number, deg | -10 to 10: a phase error given to its Q | 0 | |
+| `filter` | choice | `designed`, `downloaded`: only a download (`rxfilter`) makes it `downloaded`; `set filter designed` designs from the edges again, `set filter downloaded` is refused (`err dsp-write-failed`) unless it already is | `designed` | |
+
+Some values follow others, as on a receiver's front panel: `mode` loads its filter (`off` and `am` -3000 to 3000, `usb` 300 to 2700, `lsb` -2700 to -300, `cw` 500 Hz around `pitch`, `fm` -5500 to 5500); an `agc` speed loads `hang` and `decay` (`fast` 0.1 s and 100 dB/s, `medium` 0.5 and 20, `slow` 1.5 and 10); `low`, `high` and `width` follow each other (an edge that would pass the other pushes it to 50 Hz away); in CW the edges move with `pitch`; and every change to the filter's shape sets `filter` to `designed`. Each value that follows is reported as a `! value` event. P1 sets `width` from 100 Hz to 11 kHz logarithmically in 10 Hz steps; P3 sets `squelch` to -150 over the first 5 % of its travel, then -130 to -30 dBFS.
 
 The SigmaStudio mode has no parameters.
 

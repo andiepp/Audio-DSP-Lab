@@ -2,7 +2,7 @@
 
 As of 2026-10-25.
 
-Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into six audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, and a Minimoog-style synthesizer. This manual covers firmware 1.4 and application 1.4, and the optional front panel (panel firmware 1.4).
+Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into seven audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, a Minimoog-style synthesizer, and a receiver for the I/Q output of a short-wave SDR front end. This manual covers firmware 1.4 and application 1.4, and the optional front panel (panel firmware 1.4).
 
 Audio-DSP-Lab lives on GitHub at **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**: the source code, the releases (application, firmware and these documents to download) and the documentation, this manual among it.
 
@@ -12,7 +12,7 @@ Audio-DSP-Lab lives on GitHub at **[github.com/andiepp/Audio-DSP-Lab](https://gi
 
 Audio-DSP-Lab has three parts:
 
-- **The firmware** runs on the board's ESP32. It writes each application's DSP program into the ADAU1701's EEPROM, computes filter coefficients, reads the pots and MIDI, streams the radio, makes the generator's signal and the synthesizer's sound, and analyses the spectrum of the line input for the analysis' THD and Spectrum. It talks to the PC over the board's USB port with a simple text protocol.
+- **The firmware** runs on the board's ESP32. It writes each application's DSP program into the ADAU1701's EEPROM, computes filter coefficients, reads the pots and MIDI, streams the radio, makes the generator's signal and the synthesizer's sound, runs the receiver's filters and demodulators, and analyses the spectrum of the line input for the analysis' THD and Spectrum. It talks to the PC over the board's USB port with a simple text protocol.
 - **The application** (`AudioDspLab.exe`) is the PC's front panel. It shows one page per application, sets every value, and shows what the board reports, including the changes you make with the board's pots.
 - **The front panel** (optional) is a small touch display on a cable to the board, an ESP32 "CYD". It runs the applications without a PC, and it lets the PC application work over WiFi, without a USB cable. See the chapter [The front panel](#the-front-panel); the chapter [Mechanical design](#mechanical-design) shows a printed enclosure for the board and the panel.
 
@@ -26,6 +26,7 @@ The board keeps working without the PC: once an application runs, you can close 
 | Analysis | Frequency Response: sweeps a sine through a device under test and plots its response. THD: its harmonic distortion, THD+N and spectrum. Spectrum: what comes on the line input | out K3, K4, in K2 |
 | SigmaStudio | Runs your own SigmaStudio program from the EEPROM | as your program |
 | Synthesizer | A monophonic synthesizer played from a MIDI keyboard | MIDI in K5, out K3, K4 |
+| Receiver | An SDR receiver: AM, USB, LSB, CW and FM from the I/Q output of a short-wave front end, with channel filters of up to 511 taps, AGC, S-meter, noise reduction and squelch | I/Q in K2, out K3, K4 |
 
 Before you start, the board needs the firmware and two jumper settings: see the [installation guide](Installation.md).
 
@@ -208,6 +209,10 @@ Selecting another application writes its program over yours, but the firmware fi
 
 See the chapter [The synthesizer](#the-synthesizer) below.
 
+### Receiver
+
+The receiver takes I and Q from an SDR front end on K2, tunes, filters and demodulates them on the ESP32, and plays the audio through the equalizer's bands and volume on K3 and K4. Its page has three views: **Receiver** (tuning, meters, AGC, noise reduction, squelch, the input and the front end), **Filter** (the channel filter's response, measured on the board) and **Designer** (filters designed on the PC and downloaded). See the chapter [The receiver](#the-receiver) below.
+
 ## Pots, stored settings, power-up and service mode
 
 ### The pots
@@ -221,6 +226,7 @@ The pots set values only while **Pot control** is on, and it is off at every pow
 | Analysis | – | Output level | – | – |
 | SigmaStudio | ADC0 | ADC1 | ADC2 | ADC3 |
 | Synthesizer | Oscillator 1 width | Cutoff | Emphasis | Volume |
+| Receiver | Filter width | NR level | Squelch | Volume |
 
 - Switching Pot control on takes the pots' positions at once: every value a pot drives goes to where its pot stands, and the window shows it.
 - After the window writes a value, its pot takes the value back only once you move it by about 2 % of its travel: a pot that merely sits there never overwrites the window's value.
@@ -242,7 +248,8 @@ The **Power-up** key chooses what the board starts when it is switched on. The c
 | **SigmaStudio mode** (the default) | SigmaStudio mode, whatever ran before |
 | **Last application** | The application you selected last, with its defaults |
 
-- With **Last application**, the radio and the synthesizer come up sounding: their output is switched on, at the default volume of −20 dB. The generator and the analysis stay off, since they may drive a device under test.
+- With **Last application**, the radio, the synthesizer and the receiver come up sounding: their output is switched on, at the default volume of −20 dB. The generator and the analysis stay off, since they may drive a device under test.
+- The receiver comes up with its defaults (USB, offset +10 kHz). Its front end keeps the frequency it was last set to, so the station you hear is the front end's frequency plus 10 kHz until the PC application tunes again.
 - Service mode is never restored, and Pot control is off at every power-up.
 - Before another application's program replaces yours at power-up, the firmware keeps a copy of your SigmaStudio program. If the chosen application cannot start, the board starts SigmaStudio mode instead and the window shows the error.
 - **Last application** lets the board play the radio, or wait for the keyboard, as soon as it is powered, with no PC at all: a USB power supply is enough.
@@ -392,6 +399,193 @@ Save a sound you like with **Settings → Save**.
 - **Silence:** MIDI controllers 120 (all sound off) and 123 (all notes off) silence the voice; changing the MIDI channel does too.
 - **Load:** the voice takes about 4 % of the ESP32's audio time when silent and about 40 % at peak with two oscillators through the filter.
 
+## The receiver
+
+The receiver makes the board the back end of a software-defined short-wave receiver. An I/Q front end mixes a slice of the band, about 40 kHz wide, down to audio frequencies; the board's line input K2 takes its two outputs, I and Q, and the ESP32 does the rest: it tunes within the slice, filters the channel, keeps the level with an AGC, reads the S-meter, demodulates AM, USB, LSB, CW or FM, reduces the noise, mutes with the squelch, and sends the audio back to the DSP, through the equalizer's bands and volume to K3 and K4. The chain is the author's receiver for a TMS320C6713 DSP board, ported to the ESP32; it takes 15 to 31 % of one of the ESP32's cores.
+
+![The receiver page, Receiver view: the mode keys, the RF dial with the front end's frequency and the offset beneath it, the S-meter with AGC gain, audio level and CPU load, the filter, AGC, noise reduction and squelch, the input with its I/Q correction, the front end and the equalizer](images/screenshots/receiver.png)
+
+### What the receiver needs
+
+- **An I/Q front end.** The author's is a QRP Labs receiver module: a quadrature sampling detector whose local oscillator (LO) runs at four times the receive frequency, with QRP Labs' 20 m band-pass filter ahead of it. Any front end that delivers I and Q at audio frequencies will do.
+- **The front end's oscillator on its own USB port:** an Si5351A synthesizer driven by an Arduino Uno running the sketch SDRFrontend 1.0, which keeps the frequency, the drive and a crystal correction in the Uno's EEPROM. The PC application tunes it (see [The front end](#the-front-end) below).
+- **An antenna**, or for a bench check a signal generator into the front end's RF input, through attenuators.
+
+The receiver also runs without a front end: the dial then sets the receiver's own offset, and the internal test tone, or a generator's audio-frequency I and Q on K2, stands in for the band.
+
+### Connecting the front end
+
+| From | | To |
+| --- | --- | --- |
+| The front end's I output | → | K2 left (ADC0) |
+| The front end's Q output | → | K2 right (ADC1) |
+| The front end's ground | — | K2's sleeve |
+| The Uno's USB | → | The PC, a COM port of its own |
+| Antenna or generator | → | The front end's RF input |
+
+K2 is a plain line input of about 22.5 kΩ; nothing between the front end and the ADCs is needed. If I and Q are the wrong way round, choose the input **Q/I** instead of swapping the cables: with them swapped, USB and LSB change places and the tuning runs backwards.
+
+### Getting it going
+
+1. Select **Receiver**. It starts in USB with the offset at +10 kHz, the AGC at medium and the noise reduction LMS at level 0 (it passes the audio unchanged).
+2. Under **Front end on** choose the Uno's port and press **Connect**. The card shows the front end's identity, its frequency, LO drive and crystal correction; the dial turns into **Frequency**.
+3. Set the dial to a frequency, then press **Output on**.
+4. With a steady carrier in the channel (a generator, or a steady station), press **Null image** once: it finds the I/Q correction (see [Input and I/Q correction](#input-and-iq-correction)).
+
+### The Receiver view
+
+**Mode.** The keys **Off**, **AM**, **USB**, **LSB**, **CW** and **FM** choose the demodulator. A mode loads its own filter, as a receiver's mode keys do:
+
+| Mode | Filter, Hz re the carrier | What you hear |
+| --- | --- | --- |
+| Off | −3000 to +3000 | The input through the channel filter, at its own frequency: for tests |
+| AM | −3000 to +3000 | The envelope |
+| USB | +300 to +2700 | The upper sideband |
+| LSB | −2700 to −300 | The lower sideband |
+| CW | 500 Hz around the pitch (600 Hz: +350 to +850) | The carrier as a tone at the pitch |
+| FM | −5500 to +5500 | Narrow-band FM, with its deviation and de-emphasis |
+
+**The dial.** With the front end connected and the input I/Q, the dial is the RF frequency in Hz, and the line beneath it shows where the front end stands, its LO and the receiver's offset. The receiver tunes with two things: the front end's frequency (its LO divided by four) and the receiver's **offset** from it. The station sits 6 to 18 kHz above the front end's frequency. Tuning within that window moves only the offset, without a click; tuning out of it moves the front end so that the station sits at +10 kHz, the front end first and then the offset, so the station stays where it is on the dial. Turn the mouse wheel over a digit, or click its upper or lower half, as on every digit dial; a fast spin tunes once per answer, to the newest value. Outside 13.9 to 14.5 MHz a line warns that the station lies outside the 20 m band-pass filter.
+
+Without the front end, or with the input **IF**, the dial is the offset itself, −21000 to +21000 Hz.
+
+**S-meter and meters.** The S-meter reads the level in the channel, after the channel filter, in dBFS, on a bar from −130 to 0 dBFS with the squelch's threshold marked. The line below gives the AGC's gain, the audio's level and the receiver's share of the ESP32's core (**CPU**); the next one whether the squelch is open, in FM the **FM offset** (how far the carrier lies off the dial, a tuning indicator), and with the spectral noise reduction its average gain. The board reports them five times a second. The S-meter is the AGC's detector: it rises at once and falls after the hang time at the decay rate.
+
+**Filter.** The **Width** dial (P1) sets the channel filter's width; the mode places it: USB and LSB from 300 Hz off the carrier, CW around the pitch, the others around the carrier. **CW pitch** (300 to 1000 Hz, shown in CW) moves the CW filter with the tone. Beside them the filter's edges, whether it is the receiver's own design or a download, its taps, and a small picture of its response. The edges themselves are on the Filter view.
+
+The receiver designs its channel filter itself, from the two edges and the stop band: a complex FIR of up to 511 taps at 12 kHz, Kaiser-windowed, with a transition of a quarter of the width (60 to 300 Hz, wider when it would need more than 511 taps). USB at 2.4 kHz and 80 dB takes 203 taps. A new filter is designed in the background and switched in between two blocks of samples, without a click.
+
+**AGC, noise reduction, squelch.**
+
+| Control | Range | Default | Notes |
+| --- | --- | --- | --- |
+| AGC | Off, fast, medium, slow | Medium | A speed loads its hang and decay: fast 0.1 s and 100 dB/s, medium 0.5 s and 20 dB/s, slow 1.5 s and 10 dB/s |
+| Gain | 0 to 90 dB | 60 dB | The AGC's largest gain; with the AGC off, the fixed gain |
+| Hang, decay | 0 to 5 s, 1 to 200 dB/s | as the speed | Change them after choosing the speed |
+| NR | Off, LMS, spectral | LMS | The noise reduction on the audio |
+| NR level | 0 to 30 dB | 0 dB | P2; 0 passes the audio unchanged |
+| Squelch | −150 to 0 dBFS | −150 (open) | P3; mutes while the S-meter stays below it |
+| Deviation | 100 to 5000 Hz | 2500 Hz | FM only: the deviation that gives −12 dBFS of audio |
+| De-emphasis | 0 to 2000 µs | 0 (off) | FM only |
+
+The AGC aims at −12 dBFS of audio and looks ahead by one block (5.3 ms), so a sudden signal does not overshoot. **LMS** is a line enhancer: it keeps what repeats (a CW tone, a voice's harmonics) and lowers the hiss; the level sets how hard it adapts. **Spectral** lowers each part of the spectrum by how far it stands above the noise it has estimated; the level is how far it may lower. Keyed CW at −40 dBFS in noise at −50 dBFS: between the keys the noise fell by about 10 to 12 dB at a level of 12 dB with either method, and by 21 dB with the spectral method at 24 dB. The spectral method takes a carrier that never stops for noise, and lowers it with the noise: on a steady station it dulls the sound, LMS does not.
+
+#### Input and I/Q correction
+
+**Input** chooses what K2 carries: **I/Q** (I left, Q right), **Q/I** (swapped), or **IF**, a real intermediate frequency on the left channel alone, where the offset is the IF.
+
+A front end's I and Q are never exactly equal in level and never exactly 90° apart. What is left of the difference lets a station show also on the mirror side of the front end's frequency, its image: uncorrected, about 32 dB below it on the author's front end. **I/Q gain** (−3 to +3 dB) and **I/Q phase** (−10 to +10°) correct it.
+
+**Null image** finds the two values for you. Tune a steady carrier into the channel, ideally at an offset near +10 kHz, then press the key. The application tunes the receiver to the carrier's mirror, sets AM with a ±150 Hz filter and the AGC off, and searches phase and gain in turn, three rounds, for the lowest S-meter reading. Afterwards it puts mode, filter, offset and AGC back, also after **Cancel**, and keeps the corrections it found; the line beside the key gives the image rejection before and after and the values. On the author's bench it went from about 32 dB to 66 to 72 dB, with corrections of about +0.41 dB and +1.1°. The corrections are values of the receiver like any other: they go back to 0 at the next start, so keep them in a stored setting (**Settings → Save**).
+
+#### The front end
+
+The **Front end on** card drives the Uno: choose its port (↻ looks for ports again), **Connect**, **Disconnect**. The status line gives the front end's frequency, its LO drive and its crystal correction; the line below the card its identity, for example `SDRFrontend 1.0 Si5351A ok on COM24`, or what went wrong. **LO drive** sets the Si5351A's output current (off, 2, 4, 6 or 8 mA); **Correction** the crystal correction in ppb (−100000 to 100000; Enter or **Set**). The Uno keeps all three in its EEPROM, and the application remembers the port. With the simulator as the board, **Simulated front end** is in the list too.
+
+To find the correction, tune a carrier of known frequency in FM and change the correction until the FM offset reads near 0 Hz. The author's module needs 325 ppb.
+
+The Uno speaks a short text protocol at 115200 baud, lines ending with CR LF, if you want to build your own front end for it:
+
+| Command | Answer | Meaning |
+| --- | --- | --- |
+| `I?` | `I SDRFrontend 1.0 Si5351A ok` | The identity, also sent once at start-up; it ends in `ok` when the Si5351A answers, `missing` when not |
+| `S?` | `S F=14074000 D=8 C=325 LO=56296000` | Frequency in Hz, drive in mA, correction in ppb, the LO in Hz |
+| `F <Hz>` | `F <Hz>` | The receive frequency, 100 kHz to 50 MHz; the LO runs at four times it |
+| `D <mA>` | `D <mA>` | The drive: 0 (off), 2, 4, 6, 8 |
+| `C <ppb>` | `C <ppb>` | The crystal correction, −100000 to 100000 |
+| | `E <text>` | A command refused |
+
+The application opens the Uno's port without a pulse on DTR. Programs that pulse it (the Arduino IDE's serial monitor, pyserial by default) reset the Uno, and its first answer is lost in the reset.
+
+#### Equalizer
+
+Bass, middle and treble with their frequencies, and the volume (P4), as on the equalizer page; the **Output** key beside the volume. The audio is the same on both channels.
+
+### The Filter view
+
+![The receiver page, Filter view: the channel filter's response with its edges, the stop-band line and a measurement on top; the edges, width, stop band and pitch below; Measure and the test tone](images/screenshots/receiver-filter.png)
+
+The chart draws the channel filter from −6 to +6 kHz around the carrier, computed as the receiver designs it. Drag an edge, the passband between them (both edges move) or the dashed stop-band line: the receiver designs the new filter when you let go. Hover over the chart to read a point. The dials below set the same values by number:
+
+| Control | Range | Default | Notes |
+| --- | --- | --- | --- |
+| Low edge, high edge | −5500 to +5500 Hz | USB: 300, 2700 | At −6 dB, re the carrier; at least 50 Hz apart. An edge that would pass the other pushes it along |
+| Width | 100 to 11000 Hz | 2400 | High minus low, placed by the mode |
+| Stop band | 40 to 100 dB | 80 | How deep the filter blocks; more taps for more |
+| CW pitch | 300 to 1000 Hz | 600 | CW only |
+
+The lines below give the edges, the width and the centre, and the design the receiver makes of them: its taps, its transition and its delay (half the taps at 12 kHz: 203 taps delay by 8.4 ms).
+
+**Measure** checks the filter on the board. The internal test tone steps across −5900 to +5900 Hz in steps of 50, 100 or 200 Hz (**Step**), and the S-meter reads each step; the curve appears on the chart over the prediction, and the line beneath says how well they agree (on the board: within 0.00 dB in the passband, within 0.2 dB down to −100 dB). While it measures the AGC is off and the S-meter fast; afterwards the test tone and the AGC are as before, also after **Cancel**.
+
+**Test tone** puts the receiver's internal signal in place of the input, for trying the receiver without a front end:
+
+| Control | Range | Default | Notes |
+| --- | --- | --- | --- |
+| Test tone | Off, on | Off | Replaces the input while on |
+| Tone offset | −45000 to +45000 Hz | 1000 | From the receiver's offset |
+| Tone level | −120 to 0 dBFS | −20 | |
+| Noise | −150 to 0 dBFS | −150 (none) | White noise added, RMS |
+| Keying | 0 to 5000 ms | 0 (steady) | A period, half of it on, at least 100 ms |
+
+### The Designer view
+
+![The receiver page, Designer view: a mask of two passbands with a notch between them, the response designed from it, and the keys to download, import, export and keep designs](images/screenshots/receiver-designer.png)
+
+The Designer makes filters the receiver's own design cannot: notches, several passbands, slopes. It designs them on the PC and downloads them.
+
+**The mask** is a list of bands, each from and to a frequency (Hz re the carrier, within ±5500 Hz, edges at −6 dB) at a gain (−60 to +20 dB); outside the bands the filter blocks. **Add band** adds one, **✕** removes one; bands must not overlap. The keys beside start from a template: **Notch in USB**, **Two passbands**, **CW 200 Hz**, **Sloped speech**, or **Like the filter in force** (the receiver's own edges and stop band). **Stop band** (20 to 120 dB) and **Transition** (20 to 1000 Hz) set the window and the length, by Kaiser's formula, up to 511 taps; the line beneath gives the taps, whether the filter is real or complex, and its delay. The chart draws the mask and the response designed from it.
+
+**Download** sends the coefficients to the receiver, which switches them in between two blocks; the bar shows the progress (347 taps took 0.44 s). The receiver keeps a downloaded filter until a new edge, width, stop band, pitch or mode makes it design its own again; **Design again** goes back to its own design at once. The state shows at the top right of the page, and every start begins with the receiver's own design.
+
+**Import CSV …** reads coefficients from a file, one tap per line in natural order: `k,re,im` (as **Export CSV …** writes them), `re,im`, or one real value; lines starting with `#` or a letter are skipped, and 1 to 511 taps are taken. **Use the mask** returns from the imported coefficients to the mask.
+
+**Designs kept on this PC.** Type a name and press **Save**; **Load** and **Delete** work on the design chosen in the list. Each design is a JSON file in `%LocalAppData%\Audio-DSP-Lab\Filter designs`.
+
+### The receiver's pots
+
+| Pot | Sets | Range |
+| --- | --- | --- |
+| P1 | Filter width | 100 Hz to 11 kHz, logarithmic, in 10 Hz steps: about 480 Hz at a third of the travel, 2.3 kHz at two thirds. The mode places and limits it: USB and LSB reach 5.2 kHz |
+| P2 | NR level | 0 to 30 dB |
+| P3 | Squelch | Off over the first 5 % of the travel, then −130 to −30 dBFS |
+| P4 | Volume | −60 to 0 dB |
+
+Tuning stays with the PC application and the front panel: a pot's reading moves by about 0.7 %, too coarse for a sideband signal.
+
+### Levels and sensitivity
+
+Measured on the author's bench: the QRP Labs front end, a generator's carrier at 14.1 MHz through attenuators, the carrier at +10 kHz, the I/Q correction set, the AGC off at 0 dB. The levels belong to this front end; another one has its own gain.
+
+| | Measured |
+| --- | --- |
+| S-meter and input | A carrier of −50 dBm at the front end reads −40.5 dBFS: dBm ≈ dBFS − 9.5 |
+| Noise-equivalent input | About −102 dBm in 2.4 kHz (a noise figure of about 38 dB); 10 dB S/N at about −92 dBm |
+| Clipping | About −18 dBm at the front end (the carrier then at about −8.5 dBFS) |
+| Image rejection | About 32 dB uncorrected; 66 to 72 dB after **Null image** |
+| Across the window | The S-meter reads up to 4 dB lower with the station at 16.5 to 18 kHz than at 10 kHz, and jumps by that much when the front end re-centres; the AGC hides it in the audio |
+| Open input | About −98.5 dBFS (I) and −100 dBFS (Q) RMS |
+| Load | 15 % of one core (USB, 203 taps) to 31 % (FM, 511 taps, spectral noise reduction) |
+| Delay | About 25 to 45 ms, estimated from the blocks, the AGC's look-ahead and the channel filter's delay (8 to 21 ms) |
+
+So the receiver is about 15 dB short of hearing the 20 m band's own noise, and it has some 15 dB of headroom above the strongest stations (S9+40, about −33 dBm). **Recommended:** a wideband RF amplifier of about 10 dB with a high IP3 ahead of the front end. Expected with it: about −112 dBm in 2.4 kHz, clipping at about −28 dBm (S9+45), the S-meter reading dBm + 19.5. (The author's is not fitted yet; these are estimates.)
+
+**Offsets to avoid.** The tuning keeps stations between 6 and 18 kHz above the front end, at +10 kHz after a re-centre, for three reasons:
+
+- Below about 8 kHz the noise near the LO rises.
+- At **12 kHz**, a quarter of the 48 kHz sample rate, the front end's third-order products fold exactly onto the image, where no I/Q correction removes them: the null stopped at 56 dB there, against 67 dB at 10 kHz.
+- At **16 kHz** its second-order product (32 kHz) folds onto the image at −16 kHz.
+
+Nothing between the front end and the ADCs limits the band to 24 kHz: a strong signal, or a product of the front end, further than 24 kHz from its frequency can fold into the window.
+
+### Behaviour worth knowing
+
+- **The front end belongs to the PC.** The front panel tunes only the receiver's offset (±21 kHz), and the pots do not tune at all; the PC's dial follows, and the front end moves only when you tune on the PC.
+- **Values that follow each other.** A mode loads its filter, an AGC speed its hang and decay, the edges and the width follow each other, and in CW the filter moves with the pitch. The board reports each value it changed this way, so every window and the panel show it.
+- **One application at a time.** The receiver uses the DSP's serial output to the ESP32, as the analysis' THD does: `diag capture` and `diag record` answer `busy` while it runs.
+- **Mono.** The audio is the same on the left and the right channel.
+- **The simulator** runs the receiver too, with a simulated front end, so the page can be tried without hardware.
+
 ## Scripting and the console
 
 Everything the window does goes through the board's text protocol, described in [Protocol.md](Protocol.md). You can use it yourself: in the window's console, from a Python script, or from any serial terminal.
@@ -416,6 +610,7 @@ ok sigmastudio running none
 * analyzer 4 "Analysis"
 * sigmastudio 5 "SigmaStudio mode"
 * synthesizer 6 "Synthesizer"
+* receiver 7 "SDR receiver"
 ok
 ```
 
@@ -577,6 +772,25 @@ ok 80
 ok on
 ```
 
+**The receiver.** AM, with the filter the mode loads, and the meters read by hand:
+
+```
+> app receiver
+ok receiver running
+> set mode am
+ok am
+> get width
+ok 6000
+> set offset 9000
+ok 9000
+> meter
+ok -41.2 38.5 3 1 -12.3 21.4 0.0
+> rxfilter
+ok designed 203 300 ready 2
+```
+
+`meter` gives the S-meter in dBFS, the AGC's gain, the FM offset, whether the squelch is open, the audio level, the CPU load in % and the spectral noise reduction's gain; with **Show events** ticked the same comes five times a second as `! meter`. `rxfilter` names the filter in force, its taps, its transition, whether a new one is still being designed, and how many filters the receiver has switched in since it started. (The readings are examples.)
+
 ### Python
 
 [tools/adl.py](../tools/adl.py) is a small Python client for the same protocol. It needs Python 3 and pyserial (`pip install pyserial`). Close the Audio-DSP-Lab window first, or press **Disconnect**: only one program can own the port.
@@ -655,7 +869,7 @@ Opening the port, both terminals switch DTR and RTS on together. The kit's reset
 
 ## The front panel
 
-The board can have a front panel of its own: an **ESP32-2432S028R** display board, sold as the "CYD" (cheap yellow display), 2.8 inches, 320 × 240 pixels, with a resistive touch screen. It sits on a three-wire cable to the board's panel port and runs every application without a PC: choose an application, switch the output, set any value, start a sweep, measure THD or a spectrum, change the radio station. The panel and the PC application work side by side; what one changes, the other shows.
+The board can have a front panel of its own: an **ESP32-2432S028R** display board, sold as the "CYD" (cheap yellow display), 2.8 inches, 320 × 240 pixels, with a resistive touch screen. It sits on a three-wire cable to the board's panel port and runs every application without a PC: choose an application, switch the output, set any value, start a sweep, measure THD or a spectrum, change the radio station, tune the receiver. The panel and the PC application work side by side; what one changes, the other shows.
 
 The panel does two jobs, as the overview at the start of this manual shows: on its own it is the board's front panel, and on your WiFi it is the PC application's way to the board, without a USB cable (see [WiFi control](#wifi-control)). Everything about the panel is in this chapter; [the front panel guide](Panel.md) has the same with notes for building its firmware.
 
@@ -689,9 +903,9 @@ Connect the CYD by USB; it usually shows up as "USB-SERIAL CH340 (COMn)". In the
 
 ### Home and settings
 
-![Home: the six applications, the running one in teal, Pot control, and the knob strip](images/panel/home.png)
+![Home: the applications, the running one in teal, Pot control, and the knob strip](images/panel/home.png)
 
-The panel connects by itself: "Connecting to the board" until the board answers, then the home screen. It follows the board live: whatever the pots, the PC application or a script changes appears on the panel at once. The six keys start an application and open its page; the running one is teal. **Pot control** switches whether the board's pots set values.
+The panel connects by itself: "Connecting to the board" until the board answers, then the home screen. It follows the board live: whatever the pots, the PC application or a script changes appears on the panel at once. The seven keys start an application and open its page; the running one is teal. **Pot control** switches whether the board's pots set values.
 
 Every screen has the same frame. The top bar shows the page's name, a dot that is teal while the link stands (red without it), and, on an application's page, the **Output** switch and the house key back home. The **knob strip** at the bottom names what each pot plays now, in the knob colours: P1 blue, P2 green, P3 yellow, P4 red. Tap a knob there to set that value on the panel. The CYD's LED is green while the link stands, red without it, and amber while a synthesizer note sounds.
 
@@ -740,6 +954,10 @@ In the editor **−** and **+** step the value; hold them to repeat, and after a
 ![The synthesizer's envelope section: loudness solid, the filter's contour dashed](images/panel/synth-envelope.png)
 
 **Env** draws the loudness envelope, solid, and the filter's contour, dashed, from the key down through a held stretch to the end of the release, at one time scale.
+
+![The receiver: the offset dial with the chosen digit underlined, the S-meter with the squelch's mark, the mode keys, the width keys with the passband sketch, the noise reduction keys with the CPU load](images/panel/receiver.png)
+
+**Receiver.** The dial at the top tunes the receiver's **offset**, with a sign and five digits from 10 kHz down to 1 Hz. Tap a digit to choose it (it is underlined in teal, and its step shows on the left); **−** and **+** step it, and holding them repeats; or drag along the dial, one step for every 14 pixels, to the right to tune up. The front end belongs to the PC application: the panel moves only the offset, within ±21 kHz, and the PC's dial follows (see [The receiver](#the-receiver)). Below the dial, the S-meter: a bar from −130 to 0 dBFS with the squelch's threshold as a yellow mark, the level and the AGC's gain (in FM the FM offset instead), and a dot beside **Sql** that is teal while the squelch is open and grey while it mutes. Then three rows of keys: the modes **Off**, **AM**, **USB**, **LSB**, **CW** and **FM**; four widths that suit the mode (USB and LSB 1.8k, 2.4k, 2.7k, 3k; CW 200, 300, 500, 1k; FM 6k, 8k, 10k, 11k; AM and Off 4k, 6k, 8k, 10k), with a sketch of the passband around the carrier (the line), ±6 kHz across; and **NR off**, **LMS** and **Spectral**, with the receiver's CPU load beside them (and the spectral noise reduction's gain). The other parameters are tiles below, a scroll away: volume, squelch, NR level and the filter first, the equalizer and the test tone last. The meter's widgets redraw five times a second.
 
 **SigmaStudio.** The page says that your program runs; the knob strip shows the pots going to the DSP's ADC inputs.
 
@@ -854,12 +1072,22 @@ The STL files are in millimetres and lie as they print: the lid and the front pl
 | THD reads a fundamental of a few dozen Hz far below −60 dBFS | Nothing returns on K2: no cable, or the output off | Connect K3 to K2 or the device; press **Output on** |
 | THD or Spectrum shows `failed` | The DSP's serial output lost its clocks: the DSP runs another program (service mode) | Leave service mode and select **Analysis** again |
 | Spectrum shows a strong line at 50 Hz and its odd multiples | Mains hum: a ground loop between the board, the device and the PC | Power the device and the board from the same outlet; try a USB isolator or a laptop on battery |
+| Receiver: only noise from the generator's carrier, or levels some 28 dB off what the generator is set to | The cable is on the generator's sync output, or its main output is off: the sync output gives a square wave whose level does not follow the setting | Take the generator's main output and switch it on |
+| Receiver: a station also shows on the other side of the front end's frequency | The image: the I/Q correction is not set (it is 0 after every start) | Tune a steady carrier near +10 kHz and press **Null image**; keep the result in a stored setting |
+| Receiver: USB sounds like LSB, the tuning runs backwards | I and Q swapped on K2 | Choose the input **Q/I**, or swap the cables |
+| Receiver: the dial says **Offset**, not **Frequency** | The front end is not connected, or the input is **IF** | Connect the front end on its card; choose **I/Q** |
+| Receiver: "Not the SDR front end on COMn", or the front end does not answer | Another port, or another program holds or has just reset the Uno | Choose the Uno's port; close the Arduino IDE's serial monitor and press **Connect** again |
+| Receiver: "no Si5351A found!" | The Uno does not find the Si5351A on its I2C bus | Check the Si5351A's wiring and supply on the Uno |
+| Receiver: strong stations distort, extra carriers appear | The front end drives the ADCs into clipping, above about −18 dBm at its input | An attenuator ahead of the front end |
+| Receiver: the image null stops at about 56 dB | The station sits at an offset of 12 kHz, where the front end's third-order products fall onto the image | Tune so that the station sits near +10 kHz (a re-centre puts it there) |
+| `diag capture` or `diag record` answers `busy` | The receiver holds the DSP's serial output | Select another application first |
 
 ## Technical notes
 
 - **Signals from the ESP32.** The generator and the synthesizer compute their signal on the ESP32 at 48 kHz, 16 bits, and send it to the DSP over I2S; the DSP runs the radio's program for them (the equalizer, set flat, and the volume). The generator keeps its phase in 32 bits, so its frequency is exact to the 0.01 Hz set.
 - **The DSP's core rate.** The SigmaStudio projects run the ADAU1701's core twice per 48 kHz sample (96 kHz). Every frequency the firmware computes (oscillators, filters) is computed for that rate; frequencies typed into SigmaStudio's own controls for these projects act twice as high.
 - **The line input to the ESP32.** The analysis' DSP program sends both line inputs, untouched, to the DSP's serial output (MP6, with its clocks on MP10 and MP11), which the ESP32 receives on its second I2S port. THD and Spectrum take 8192 samples per channel from it, window them (Blackman-Harris) and transform them (an FFT of 5.86 Hz bins); four captures per channel are averaged. The board's own floor: about −97.5 dBFS RMS from 20 Hz to 20 kHz, about 0.016 % THD in a loopback at −7 dBFS.
+- **The receiver's path.** The receiver's DSP program (the radio's, plus the serial output) sends ADC0 (I) and ADC1 (Q) untouched to the DSP's serial output, which the ESP32 receives on its second I2S port, in blocks of 256 frames (5.33 ms). A task on core 0 runs the chain on each block: a down-converter with DC removal and the I/Q correction to 12 kHz complex, the channel filter as a partitioned FFT convolution (an FFT of 128 points; the direct form of 511 taps would take 40 % of the core), AGC and S-meter, demodulator, noise reduction, squelch, and an interpolation back to 48 kHz. The audio goes back to the DSP on the ESP32's first I2S port, as the generator's does. The ESP32 clocks both directions, so input and output never drift apart.
 - **The clock.** With JP1 on ext. MCLK the ESP32 supplies 12.288 MHz (256 × 48 kHz). The radio drives the clock from its stream's rate instead (256 × 44.1 kHz for most stations), and the equalizer's filters are recomputed for it.
 - **What the board stores** in the ESP32's flash: the WiFi networks, the stations, the analysis' Frequency Response reference, the power-up choice, and the copy of your SigmaStudio program. Flashing a firmware update with the flash tool keeps them; erasing the flash removes them.
 - **The pots** are read by the ESP32 (12-bit, smoothed). The DSP sees them only through the ESP32's DACs in SigmaStudio mode.

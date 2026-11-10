@@ -1,6 +1,6 @@
 # Audio-DSP-Lab
 
-Six audio instruments for the **Elektor Audio-DSP-FX board** (ADAU1701 DSP + ESP32), run from a Windows PC over USB.
+Seven audio instruments for the **Elektor Audio-DSP-FX board** (ADAU1701 DSP + ESP32), run from a Windows PC over USB.
 
 The project's home is **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**: the source, the [releases](https://github.com/andiepp/Audio-DSP-Lab/releases) and the documentation.
 
@@ -14,12 +14,13 @@ The project's home is **[github.com/andiepp/Audio-DSP-Lab](https://github.com/an
 | **Analysis** | **Frequency Response**: sweeps a device under test, with a reference to subtract the board's own response. **THD**: the harmonic distortion and THD+N of a device, with its spectrum. **Spectrum**: what comes on the line input, with its RMS and strongest peaks |
 | **SigmaStudio** | Runs your own SigmaStudio programs; the pots go to the DSP's auxiliary ADC, your program survives the other applications |
 | **Synthesizer** | A Minimoog-style monophonic synthesizer: three oscillators, ladder filter, envelopes, two LFOs, glide, played from any MIDI keyboard |
+| **Receiver** | An SDR receiver for the I/Q output of a short-wave front end: AM, USB, LSB, CW and FM, channel filters of up to 511 taps (designed on the board, or on the PC and downloaded), AGC, S-meter, noise reduction, squelch; the PC application tunes the front end's oscillator |
 
 The four pots on the board play the main values of each application, side by side with the PC. The board can start an application by itself at power-up and run without a PC. The window comes in three themes, Classic, Studio dark and Studio light.
 
 ## How it works
 
-The ESP32 runs the Audio-DSP-Lab firmware. It writes each application's DSP program into the ADAU1701's EEPROM, computes the filters, reads the pots and MIDI, streams the radio, makes the synthesizer's sound and computes the line input's spectrum for THD and Spectrum. The PC application sets values and shows what the board reports, over a simple **text protocol** on the USB serial port: you can use the same protocol from a terminal or a script.
+The ESP32 runs the Audio-DSP-Lab firmware. It writes each application's DSP program into the ADAU1701's EEPROM, computes the filters, reads the pots and MIDI, streams the radio, makes the synthesizer's sound, runs the receiver's filters and demodulators, and computes the line input's spectrum for THD and Spectrum. The PC application sets values and shows what the board reports, over a simple **text protocol** on the USB serial port: you can use the same protocol from a terminal or a script.
 
 ```
 > app generator
@@ -49,7 +50,7 @@ Step by step: **[Installation guide](docs/Installation.md)**.
 | Document | For |
 | --- | --- |
 | [Installation guide](docs/Installation.md) | Preparing the board, flashing, installing, first steps, WiFi, MIDI |
-| [Manual](docs/Manual.md) | Every application, the pots, stored settings, power-up, the synthesizer in depth, troubleshooting |
+| [Manual](docs/Manual.md) | Every application, the pots, stored settings, power-up, the synthesizer and the receiver in depth, troubleshooting |
 | [Protocol](docs/Protocol.md) | The serial protocol: commands, events, every parameter; for scripts and other front ends |
 | [SigmaStudio](docs/SigmaStudio.md) | Your own DSP programs on the board; the built-in applications' projects |
 | [Front panel](docs/Panel.md) | A touch panel on an ESP32 "CYD" display board, and WiFi control through it: wiring, flashing, use |
@@ -59,7 +60,7 @@ Step by step: **[Installation guide](docs/Installation.md)**.
 
 - Elektor Audio-DSP-FX board v2.2, with either ESP32 kit: ESP32-PICO-KIT V4 (PICO-D4) or ESP32-PICO-KIT-1 (PICO-V3)
 - Windows 10 or 11, 64-bit (the application is self-contained; nothing else to install)
-- Optional: 2.4 GHz WiFi for the radio; a MIDI keyboard with DIN MIDI Out for the synthesizer; SigmaStudio 4.7 and a USBi for your own programs
+- Optional: 2.4 GHz WiFi for the radio; a MIDI keyboard with DIN MIDI Out for the synthesizer; an I/Q front end (such as a QRP Labs receiver module with an Si5351A on an Arduino Uno) for the receiver; SigmaStudio 4.7 and a USBi for your own programs
 
 Scripting works on any system: [tools/adl.py](tools/adl.py) is a Python client (needs pyserial).
 

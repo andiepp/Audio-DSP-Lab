@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Description>Checks the receiver's tuning on the bench: the board with the receiver, the SDR front end's Uno, a generator carrier.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AudioDspLab.Core\AudioDspLab.Core.csproj" />
+  </ItemGroup>
+
+</Project>

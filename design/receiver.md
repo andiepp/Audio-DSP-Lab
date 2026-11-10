@@ -362,6 +362,13 @@ follows at the release. Nothing is committed or pushed without your OK.
 checked before R4 wires it to K1); 3 new project "Receiver"; 4 pots as
 proposed; 5 preamp separate, firmware steps go ahead without it.
 
+**Revised 2026-11-10 (R4):** decision 2 deferred -- for now the Uno on
+COM24 keeps driving the Si5351A (option B), the Windows application
+tunes it; the move to the board's I2C comes later. R4 therefore becomes
+the application's tuning core (`FrontEndClient`, `SdrTuner` centred on
+10 kHz, `ReceiverTuner`) instead of firmware; the firmware has no
+`frequency` parameter yet.
+
 **Revised 2026-11-10 (R3):** decision 5 dropped -- no preamplifier. The
 front end into K2 reaches about -133 dBm in 2.4 kHz and clips above
 about -50 dBm (section 14, R3); an attenuator ahead of the front end is
@@ -501,3 +508,30 @@ folds to -16 kHz) and stay above about 8 kHz (noise near the LO): R4's
 tuner split takes 10 kHz as its centre.
 
 R3 done.
+
+**R4 (2026-11-10), front end on the Uno (option B).** `AudioDspLab.Core`
+gets `FrontEnd\FrontEndClient` (SDRFrontend 1.0 text protocol, serial
+port opened without a DTR pulse, simulated front end), `SdrTuner`
+(window 6 .. 18 kHz, re-centre with the carrier at **+10 kHz**) and
+`ReceiverTuner` (dial -> front end + the board's `offset`; on a
+re-centre the front end first, then the offset). Six tests (49 in all).
+Bench check `app\tools\RxTuneCheck COM10 COM24 14100000`, carrier
+14.100 MHz at -56 dBm, I/Q correction +0.41 dB / +1 deg:
+
+- The carrier on the dial, FM tuning indicator in 300 Hz: front end at
+  14.088 MHz (offset 12 kHz, twice) and 14.090 MHz (10 kHz): +1.0, +0.8,
+  +1.0 Hz from the dial (spread 0.3 Hz). LO = 4 x f as reported, the
+  dial arithmetic holds wherever the front end sits.
+- USB, dial in 100 Hz steps from 14.0970 to 14.0996 MHz with the carrier
+  in the passband: the front end moved once, exactly when the offset
+  passed 18 kHz (14.0805 -> 14.0886 MHz); the station stayed at its
+  audio frequency throughout. Its level was -23.2 dBFS at offsets of
+  16.5 .. 18 kHz and -19.2 dBFS at about 10 kHz: **4 dB lower at the top
+  of the window**, the slope of the front end's audio output and of the
+  ADCs (R2: -2.4 dB at 18 kHz for DAC and ADC together). The AGC hides
+  it in the audio; the S-meter shows it, and a re-centre makes it jump.
+  A correction of the S-meter (and the AGC detector) over the offset
+  would remove it -- left open.
+
+R4 done (option B). The move of the Si5351A to the board's I2C, with
+the firmware's `frequency` and `frontend`, remains for later.

@@ -44,7 +44,7 @@ arduino-cli compile --fqbn esp32:esp32:pico32:PartitionScheme=min_spiffs --libra
 arduino-cli upload  --fqbn esp32:esp32:pico32:PartitionScheme=min_spiffs -p COM5 firmware/AudioDspLab
 ```
 
-The build takes a few minutes the first time and uses about 63 % of the application partition. Do not add the Elektor_AudioDSP library: its macros clash with arduino-audio-tools, and the firmware has its own DSP, EEPROM and clock drivers.
+The build takes a few minutes the first time and uses about 65 % of the application partition. Do not add the Elektor_AudioDSP library: its macros clash with arduino-audio-tools, and the firmware has its own DSP, EEPROM and clock drivers.
 
 ### Structure
 
@@ -142,7 +142,7 @@ The application binds each page to parameters by their protocol names; ranges, u
 
 ### The simulator
 
-`SimulatedBoard` answers the protocol as firmware 1.4 does, with made-up measurements: a 5 kHz low-pass as the device under test, harmonics, mains hum and noise for THD and Spectrum, a radio that "plays" when a network is set, an arpeggio on the synthesizer in demo mode, a receiver with its parameters, meters and filter download. The tests run against it, and the application offers it as **Simulator (demo)**.
+`SimulatedBoard` answers the protocol as firmware 1.5 does, with made-up measurements: a 5 kHz low-pass as the device under test, harmonics, mains hum and noise for THD and Spectrum, a radio that "plays" when a network is set, an arpeggio on the synthesizer in demo mode, a receiver with its parameters, meters and filter download. The tests run against it, and the application offers it as **Simulator (demo)**.
 
 ## A release
 

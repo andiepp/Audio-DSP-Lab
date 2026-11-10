@@ -81,7 +81,8 @@ bool receiverBegin(const RxConfig &config) {
   receiverEnd();
   stats.blocks = 0;
   stats.gaps = 0;
-  stats.inputDb[0] = stats.inputDb[1] = -200.0f;
+  stats.inputDb[0] = -200.0f;                 // two assignments: a chained one through volatile warns
+  stats.inputDb[1] = -200.0f;
   stats.processUs = 0;
   stats.processMaxUs = 0;
   stats.processAvgUs = 0.0f;

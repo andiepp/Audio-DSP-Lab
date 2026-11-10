@@ -1,8 +1,8 @@
 # Manual
 
-As of 2026-10-25.
+As of 2026-11-10.
 
-Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into seven audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, a Minimoog-style synthesizer, and an SDR receiver backend that takes a real IF or the I/Q output of your front end. This manual covers firmware 1.4 and application 1.4, and the optional front panel (panel firmware 1.4).
+Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into seven audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, a Minimoog-style synthesizer, and an SDR receiver backend that takes a real IF or the I/Q output of your front end. This manual covers firmware 1.5 and application 1.5, and the optional front panel (panel firmware 1.5).
 
 Audio-DSP-Lab lives on GitHub at **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**: the source code, the releases (application, firmware and these documents to download) and the documentation, this manual among it.
 
@@ -652,7 +652,7 @@ The window follows what you do in the console: after a request that changes some
 
 ```
 > info
-ok Audio-DSP-Lab 1.4 1 esp32-pico-kit
+ok Audio-DSP-Lab 1.5 1 esp32-pico-kit
 > status
 ok sigmastudio running none
 > apps

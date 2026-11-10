@@ -10,17 +10,17 @@
 #include <esp_rom_crc.h>
 
 #define FS                            48000.0f
-#define DEC                           4
-#define FSB                           (FS / DEC)          // 12 kHz baseband
+#define RX_DEC                        4
+#define FSB                           (FS / RX_DEC)          // 12 kHz baseband
 #define BLOCK                         RX_CHAIN_BLOCK
-#define RXB                           (BLOCK / DEC)       // 64 baseband samples a block
+#define RXB                           (BLOCK / RX_DEC)       // 64 baseband samples a block
 #define PI_D                          3.14159265358979
 #define PI_F                          3.14159265f
 
 #define NCO_TABLE                     1024
 #define DDC_TAPS                      43                  // 80 dB, pass 3 kHz, stop 9 kHz
 #define DUC_TAPS                      43
-#define DUC_HIST                      ((DUC_TAPS + DEC - 1) / DEC)
+#define DUC_HIST                      ((DUC_TAPS + RX_DEC - 1) / RX_DEC)
 #define UP_N                          128                 // overlap-save FFT
 #define UP_PMAX                       ((RX_TAPS_MAX + RXB) / RXB)   // 8 partitions
 #define AGC_LOOK                      64                  // 5.3 ms
@@ -258,7 +258,7 @@ static void ddcIqConfig(Ddc &d, float gainDb, float phaseDeg) {
 static void ddcFilter(Ddc &d, cfloat *out) {
   cfloat *z = d.buf + DDC_TAPS - 1;
   for (int m = 0; m < RXB; m++) {
-    const cfloat *p = z + DEC * m + (DEC - 1);
+    const cfloat *p = z + RX_DEC * m + (RX_DEC - 1);
     float re = 0.0f, im = 0.0f;
     for (int k = 0; k < DDC_TAPS; k++) {
       re += d.h[k] * p[-k].re;
@@ -315,7 +315,7 @@ static void ddcProcessReal(Ddc &d, const float *in, cfloat *out) {
 static void ducInit(Duc &u) {
   memset(&u, 0, sizeof u);
   // gain 4: zero-stuffing leaves a quarter of the energy in the passband
-  kaiserLowpass(u.h, DUC_TAPS, 6000.0f, FS, 80.0f, (float)DEC);
+  kaiserLowpass(u.h, DUC_TAPS, 6000.0f, FS, 80.0f, (float)RX_DEC);
 }
 
 static void ducProcess(Duc &u, const cfloat *in, float *out) {
@@ -324,18 +324,18 @@ static void ducProcess(Duc &u, const cfloat *in, float *out) {
   const uint32_t inc = u.inc;
   for (int m = 0; m < RXB; m++) x[m] = in[m];
   for (int m = 0; m < RXB; m++) {
-    for (int p = 0; p < DEC; p++) {
+    for (int p = 0; p < RX_DEC; p++) {
       float re = 0.0f, im = 0.0f;
-      for (int k = p, i = 0; k < DUC_TAPS; k += DEC, i++) {
+      for (int k = p, i = 0; k < DUC_TAPS; k += RX_DEC, i++) {
         re += u.h[k] * x[m - i].re;
         im += u.h[k] * x[m - i].im;
       }
       if (inc == 0) {
-        out[DEC * m + p] = re;
+        out[RX_DEC * m + p] = re;
       } else {
         float c, s;
         ncoCosSin(ph, c, s);
-        out[DEC * m + p] = re * c - im * s;
+        out[RX_DEC * m + p] = re * c - im * s;
         ph += inc;
       }
     }
@@ -505,7 +505,7 @@ static void requestDesign(float low, float high, float stopband) {
   design->high = high;
   design->stopband = stopband;
   design->fromLoad = false;
-  design->generation++;
+  design->generation = design->generation + 1;   // volatile: no ++
   portEXIT_CRITICAL(&lock);
   if (designTask != nullptr) xTaskNotifyGive(designTask);
 }
@@ -1097,7 +1097,7 @@ RxLoadResult rxChainLoadEnd(uint32_t crc, uint16_t &taps) {
   loadInUse = true;
   portENTER_CRITICAL(&lock);
   design->fromLoad = true;
-  design->generation++;
+  design->generation = design->generation + 1;   // volatile: no ++
   portEXIT_CRITICAL(&lock);
   if (designTask != nullptr) xTaskNotifyGive(designTask);
   return RX_LOAD_OK;

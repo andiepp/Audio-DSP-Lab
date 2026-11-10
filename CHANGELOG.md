@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased — the SDR receiver
+## 1.5 — the SDR receiver
 
-For release 1.5. Protocol 1 (new requests, events and errors only).
+Firmware 1.5, protocol 1 (new requests, events and errors only), application 1.5, panel firmware 1.5.
 
 - **The receiver**, application 0x07 (`receiver`, "SDR receiver"): an SDR receiver backend from the IF on, the receiver chain of the author's TMS320C6713 DSP-Box on the ESP32, defined at its input K2: a real IF on K2 left, or I and Q (I left, Q right), from your front end. At K2, in 2.4 kHz: full scale 2.98 Vpp (+2.7 dBu), noise-equivalent input 3.7 µV RMS (−106 dBu) per channel with I/Q and 5.4 µV RMS (−103 dBu) with an IF, 10 dB S/N at 12 and 17 µV RMS, a dynamic range of about 109 and 106 dB; the I/Q correction covers ±3 dB and ±10°, with an image rejection of its own above 130 dB. The IF or I and Q go untouched to the DSP's serial output; the ESP32 down-converts them to 12 kHz complex (DC removal, I/Q correction), filters the channel, runs a hang AGC with look-ahead and the S-meter, demodulates AM, USB, LSB, CW or FM, reduces the noise (LMS or spectral), mutes with the squelch and interpolates back to 48 kHz; the audio goes back to the DSP through the equalizer and volume to K3 and K4. Offset ±21 kHz, filter edges ±5.5 kHz; the internal test signal (tone, noise, keying, I/Q errors) for checks without a front end. 15 to 31 % of one core.
 - Channel filters of up to 511 complex taps, designed on the board from two edges and the stop band (Kaiser) in a background task and switched in without a click, run as a partitioned FFT convolution (`RxChain.cpp` at -O2, esp-dsp's FFT): a tenth of the direct form's time.

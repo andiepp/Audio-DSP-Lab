@@ -16,7 +16,7 @@ namespace AudioDspLab.Simulation;
 /// </remarks>
 public sealed partial class SimulatedBoard : ILineTransport
 {
-    public const string FirmwareVersion = "1.4";
+    public const string FirmwareVersion = "1.5";
 
     private static readonly string[] DefaultStationNames =
         ["Deutschlandfunk", "Classic FM UK", "SWR3", "NDR 2", "WDR 2", "Rock Antenne", "Oldies", "SWR1"];

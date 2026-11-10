@@ -1048,7 +1048,10 @@ void rxChainGetMeter(RxMeter &out) {
   out.taps = meter.taps;
   out.transition = meter.transition;
   out.designs = meter.designs;
-  out.designing = meter.designing;
+  // also a request the design task has not taken up yet: a download just
+  // ended, a design just asked for -- the answer must not call the old filter ready
+  out.designing = meter.designing || loadInUse || swapReady
+                  || (design != nullptr && design->generation != design->doneGeneration);
   out.nrGainDb = meter.nrGainDb;
   out.downloaded = meter.downloaded;
 }

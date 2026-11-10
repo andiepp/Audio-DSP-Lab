@@ -1021,6 +1021,497 @@
                 </Grid>
             </StackPanel>
 
+            <!-- Receiver page: three views, as the analysis page has its parts -->
+            <StackPanel x:Name="ReceiverPage" DataContext="{Binding Receiver}" IsEnabled="{Binding IsRunning}"
+                        Visibility="{Binding DataContext.IsReceiverSelected, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource VisibleWhen}}">
+                <DockPanel Margin="6,0,6,2">
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Margin="0,0,16,0">
+                        <TextBlock Foreground="{StaticResource AudioLabDimText}" VerticalAlignment="Center" Margin="0,0,8,0" Text="Show" />
+                        <RadioButton x:Name="ReceiverViewChoice" GroupName="ReceiverView" Foreground="{DynamicResource AudioLabText}" VerticalContentAlignment="Center"
+                                     Margin="0,0,10,0" Content="Receiver" FontWeight="Bold"
+                                     IsChecked="{Binding IsReceiverView, Mode=OneWay}"
+                                     Command="{Binding ShowViewCommand}" CommandParameter="receiver" />
+                        <RadioButton x:Name="FilterViewChoice" GroupName="ReceiverView" Foreground="{DynamicResource AudioLabText}" VerticalContentAlignment="Center"
+                                     Margin="0,0,10,0" Content="Filter" FontWeight="Bold"
+                                     IsChecked="{Binding IsFilterView, Mode=OneWay}"
+                                     Command="{Binding ShowViewCommand}" CommandParameter="filter" />
+                        <RadioButton x:Name="DesignerViewChoice" GroupName="ReceiverView" Foreground="{DynamicResource AudioLabText}" VerticalContentAlignment="Center"
+                                     Content="Designer" FontWeight="Bold"
+                                     IsChecked="{Binding IsDesignerView, Mode=OneWay}"
+                                     Command="{Binding ShowViewCommand}" CommandParameter="designer" />
+                    </StackPanel>
+                    <TextBlock x:Name="ReceiverFilterState" Foreground="{StaticResource AudioLabDimText}" VerticalAlignment="Center"
+                               HorizontalAlignment="Right" Text="{Binding FilterStatusText}" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
+
+                <!-- ===== Receiver view ===== -->
+                <StackPanel x:Name="ReceiverViewPanel" Visibility="{Binding IsReceiverView, Converter={StaticResource VisibleWhen}}">
+                    <ContentControl x:Name="ReceiverModeKeys" Margin="2,0,0,2"
+                                    Content="{Binding Mode}" ContentTemplate="{StaticResource ChoiceKeys}" />
+                    <Grid Margin="2,0,2,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="6" />
+                            <ColumnDefinition Width="270" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <controls:LabDisplay x:Name="ReceiverDialDisplay" Title="{Binding DialTitle}" TitleFontSize="14"
+                                                 DisplayBackground="{StaticResource AudioLabFrequencyBackground}">
+                                <controls:LabDisplay.Body>
+                                    <Grid>
+                                        <controls:DigitDial IntegerDigits="8" FractionDigits="0" DigitFontSize="40"
+                                                            Minimum="{Binding RfMinimum}" Maximum="{Binding RfMaximum}"
+                                                            Value="{Binding RfDialValue}"
+                                                            Visibility="{Binding IsRfDial, Converter={StaticResource VisibleWhen}}" />
+                                        <controls:DigitDial IntegerDigits="5" FractionDigits="0" DigitFontSize="40"
+                                                            ShowSign="True" ShowPlus="True" Minimum="-21000" Maximum="21000"
+                                                            Value="{Binding Offset.DialValue}"
+                                                            Visibility="{Binding IsOffsetDial, Converter={StaticResource VisibleWhen}}" />
+                                    </Grid>
+                                </controls:LabDisplay.Body>
+                            </controls:LabDisplay>
+                            <TextBlock Style="{StaticResource AudioLabUnitLineStyle}" Text="{Binding DialUnitLine}" />
+                            <TextBlock x:Name="TuningText" Margin="4,0" Foreground="{StaticResource AudioLabDimText}"
+                                       Text="{Binding TuningText}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="BandText" Margin="4,0" Foreground="{StaticResource AudioLabWarningText}"
+                                       Text="{Binding BandText}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <controls:LabDisplay x:Name="SMeterDisplay" Title="S-meter" TitleFontSize="14"
+                                                 DisplayBackground="{StaticResource AudioLabAmplitudeBackground}">
+                                <controls:LabDisplay.Body>
+                                    <StackPanel Width="236">
+                                        <TextBlock Text="{Binding SMeterText}" Foreground="{DynamicResource AudioLabDisplayValue}"
+                                                   FontSize="20" HorizontalAlignment="Right" />
+                                        <controls:LevelBar Margin="0,2,0,0" Minimum="-130" Maximum="0" TickStep="20"
+                                                           Value="{Binding SMeter}" Mark="{Binding SquelchMark}" />
+                                    </StackPanel>
+                                </controls:LabDisplay.Body>
+                            </controls:LabDisplay>
+                            <TextBlock x:Name="MeterText" Margin="4,2,4,0" Foreground="{StaticResource AudioLabDimText}" TextTrimming="CharacterEllipsis">
+                                <Run Text="AGC" /> <Run Text="{Binding AgcGainText, Mode=OneWay}" Foreground="{DynamicResource AudioLabText}" />
+                                <Run Text=" · audio" /> <Run Text="{Binding AudioText, Mode=OneWay}" Foreground="{DynamicResource AudioLabText}" />
+                                <Run Text=" · CPU" /> <Run Text="{Binding CpuText, Mode=OneWay}" Foreground="{DynamicResource AudioLabText}" />
+                            </TextBlock>
+                            <TextBlock x:Name="SquelchText" Margin="4,0" Foreground="{StaticResource AudioLabDimText}" TextTrimming="CharacterEllipsis">
+                                <Run Text="Squelch" /> <Run Text="{Binding SquelchText, Mode=OneWay}" Foreground="{DynamicResource AudioLabText}" />
+                                <Run Text="  " /> <Run Text="{Binding FmOffsetText, Mode=OneWay}" />
+                                <Run Text="  " /> <Run Text="{Binding NrGainText, Mode=OneWay}" />
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource HintStyle}" Text="P1 sets the width · edit the edges on the Filter view" />
+                            <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Filter" />
+                        </DockPanel>
+                    </Border>
+                    <Grid Margin="2,0,2,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="270" />
+                        </Grid.ColumnDefinitions>
+                        <ContentControl x:Name="ReceiverWidth" Grid.Column="0" Width="100" Content="{Binding Width}" ContentTemplate="{StaticResource SmallDial}" />
+                        <ContentControl x:Name="ReceiverPitch" Grid.Column="1" Width="90" Content="{Binding Pitch}" ContentTemplate="{StaticResource SmallDial}"
+                                        Visibility="{Binding IsCw, Converter={StaticResource VisibleWhen}}" />
+                        <StackPanel Grid.Column="2" Margin="4,2,6,0">
+                            <TextBlock x:Name="FilterSummary" Foreground="{DynamicResource AudioLabText}" TextWrapping="Wrap"
+                                       Text="{Binding FilterSummaryText}" />
+                            <TextBlock Foreground="{StaticResource AudioLabDimText}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                       Text="{Binding DesignText}" />
+                        </StackPanel>
+                        <Border Grid.Column="3" Height="70" VerticalAlignment="Top" Margin="0,2,0,0"
+                                BorderBrush="{StaticResource AudioLabSeparator}" BorderThickness="1">
+                            <controls:FilterChart x:Name="FilterPreview" Compact="True" IsHitTestVisible="False"
+                                                  Low="{Binding ChartLow}" High="{Binding ChartHigh}" StopDb="{Binding ChartStop}"
+                                                  BottomDb="{Binding BottomDb}" Predicted="{Binding Predicted}" />
+                        </Border>
+                    </Grid>
+
+                    <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource HintStyle}" Text="P2 sets the NR level, P3 the squelch" />
+                            <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="AGC, noise reduction, squelch" />
+                        </DockPanel>
+                    </Border>
+                    <Grid Margin="2,0,2,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <ContentControl x:Name="AgcKeys" Content="{Binding Agc}" ContentTemplate="{StaticResource ChoiceKeys}" />
+                            <UniformGrid Columns="3">
+                                <ContentControl Content="{Binding AgcGain}" ContentTemplate="{StaticResource SmallDial}" />
+                                <ContentControl Content="{Binding Hang}" ContentTemplate="{StaticResource SmallDial}" />
+                                <ContentControl Content="{Binding Decay}" ContentTemplate="{StaticResource SmallDial}" />
+                            </UniformGrid>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <ContentControl x:Name="NrKeys" Content="{Binding Nr}" ContentTemplate="{StaticResource ChoiceKeys}" />
+                            <UniformGrid Columns="4">
+                                <ContentControl Content="{Binding NrLevel}" ContentTemplate="{StaticResource SmallDial}" />
+                                <ContentControl Content="{Binding Squelch}" ContentTemplate="{StaticResource SmallDial}" />
+                                <ContentControl Content="{Binding FmDeviation}" ContentTemplate="{StaticResource SmallDial}"
+                                                Visibility="{Binding IsFm, Converter={StaticResource VisibleWhen}}" />
+                                <ContentControl Content="{Binding Deemphasis}" ContentTemplate="{StaticResource SmallDial}"
+                                                Visibility="{Binding IsFm, Converter={StaticResource VisibleWhen}}" />
+                            </UniformGrid>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource HintStyle}" Text="The SDR front end: the Uno with the Si5351A on its own port" />
+                            <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Input and front end" />
+                        </DockPanel>
+                    </Border>
+                    <Grid Margin="2,0,2,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="200" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ContentControl x:Name="InputKeys" Grid.Column="0" VerticalAlignment="Center"
+                                        Content="{Binding Input}" ContentTemplate="{StaticResource ChoiceKeys}" />
+                        <ContentControl Grid.Column="1" Width="90" Content="{Binding IqGain}" ContentTemplate="{StaticResource SmallDial}" />
+                        <ContentControl Grid.Column="2" Width="96" Content="{Binding IqPhase}" ContentTemplate="{StaticResource SmallDial}" />
+                        <StackPanel Grid.Column="3" Margin="4,4,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="NullImageKey" Style="{StaticResource AudioLabKeyStyle}" FontWeight="Bold" Content="Null image"
+                                        ToolTip="Finds the I/Q correction with a steady carrier tuned into the channel"
+                                        Command="{Binding NullImageCommand}" />
+                                <Button Style="{StaticResource AudioLabKeyStyle}" Content="Cancel" Command="{Binding CancelCommand}" />
+                            </StackPanel>
+                            <TextBlock x:Name="NullText" Margin="2,3,0,0" Foreground="{StaticResource AudioLabDimText}" TextWrapping="Wrap"
+                                       Text="{Binding NullText}" />
+                        </StackPanel>
+                    </Grid>
+                    <Border x:Name="FrontEndCard" Style="{StaticResource AudioLabSettingsBlockStyle}" Margin="2,2,2,0">
+                        <StackPanel>
+                            <DockPanel>
+                                <TextBlock Style="{StaticResource AudioLabSettingsLabelStyle}" Text="Front end on" FontWeight="Bold" />
+                                <ComboBox x:Name="FrontEndPortBox" Width="150" Height="24" VerticalContentAlignment="Center"
+                                          ItemsSource="{Binding FrontEndPorts}" SelectedItem="{Binding SelectedFrontEndPort}"
+                                          IsEnabled="{Binding IsFrontEndDisconnected}" />
+                                <Button Style="{StaticResource AudioLabKeyStyle}" MinWidth="28" Content="↻" ToolTip="Look for ports again"
+                                        Command="{Binding RefreshFrontEndPortsCommand}" />
+                                <Button x:Name="FrontEndConnectKey" Style="{StaticResource AudioLabGoldKeyStyle}" Content="Connect"
+                                        Command="{Binding ConnectFrontEndCommand}" />
+                                <Button x:Name="FrontEndDisconnectKey" Style="{StaticResource AudioLabKeyStyle}" Content="Disconnect"
+                                        Command="{Binding DisconnectFrontEndCommand}" />
+                                <TextBlock x:Name="FrontEndStatus" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource AudioLabTextOnBlock}"
+                                           FontWeight="Bold" Text="{Binding FrontEndStatusText}" TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                            <DockPanel Margin="0,4,0,0" LastChildFill="False" IsEnabled="{Binding IsFrontEndConnected}">
+                                <TextBlock Style="{StaticResource AudioLabSettingsLabelStyle}" Text="LO drive" />
+                                <ItemsControl x:Name="DriveKeys" ItemsSource="{Binding DriveKeys}" Width="230" VerticalAlignment="Center">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource AudioLabStationKeyStyle}" Height="22" Margin="0,0,3,0" Padding="2,0" FontSize="10"
+                                                    Content="{Binding Label}" Command="{Binding SelectCommand}" CommandParameter="{Binding Name}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Style="{StaticResource AudioLabSettingsLabelStyle}" Margin="12,0,4,0" Text="Correction" />
+                                <TextBox x:Name="CorrectionBox" Width="70" Height="22" FontSize="12" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"
+                                         ToolTip="Crystal correction in ppb, -100000 to 100000; Enter sets it"
+                                         Text="{Binding CorrectionText, UpdateSourceTrigger=PropertyChanged}">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Return" Command="{Binding SetCorrectionCommand}" />
+                                    </TextBox.InputBindings>
+                                </TextBox>
+                                <TextBlock Style="{StaticResource AudioLabSettingsLabelStyle}" Margin="4,0" Text="ppb" />
+                                <Button Style="{StaticResource AudioLabKeyStyle}" Height="22" Content="Set" Command="{Binding SetCorrectionCommand}" />
+                            </DockPanel>
+                            <TextBlock x:Name="FrontEndText" Margin="2,4,0,0" Foreground="{DynamicResource AudioLabTextOnBlock}"
+                                       Text="{Binding FrontEndText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding FrontEndText}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource HintStyle}" Text="As on the equalizer page · P4 sets the volume" />
+                            <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Equalizer" />
+                        </DockPanel>
+                    </Border>
+                    <Grid Margin="2,0,2,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ItemsControl x:Name="ReceiverBands" ItemsSource="{Binding Bands}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="3" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <UniformGrid Columns="2">
+                                        <ContentControl Content="{Binding Gain}" ContentTemplate="{StaticResource SmallDial}" />
+                                        <ContentControl Content="{Binding Frequency}" ContentTemplate="{StaticResource SmallDial}" />
+                                    </UniformGrid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <ContentControl x:Name="ReceiverVolume" Width="90" Content="{Binding Volume}" ContentTemplate="{StaticResource SmallDial}" />
+                            <StackPanel VerticalAlignment="Center" Margin="2,0,0,10">
+                                <ToggleButton x:Name="ReceiverOutputKey" Style="{StaticResource AudioLabToggleStyle}"
+                                              Width="124" Height="30" FontWeight="Bold"
+                                              ToolTip="K3 and K4 · off after every start"
+                                              Content="{Binding Output.OnOffText}"
+                                              IsChecked="{Binding Output.IsOn, Mode=OneWay}"
+                                              Command="{Binding Output.ToggleCommand}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+
+                <!-- ===== Filter view ===== -->
+                <StackPanel x:Name="FilterViewPanel" Visibility="{Binding IsFilterView, Converter={StaticResource VisibleWhen}}">
+                    <Border Margin="2,0,2,0" BorderBrush="{StaticResource AudioLabSeparator}" BorderThickness="1">
+                        <controls:FilterChart x:Name="FilterResponse" Height="250" IsEditable="True"
+                                              Low="{Binding ChartLow}" High="{Binding ChartHigh}" StopDb="{Binding ChartStop}"
+                                              BottomDb="{Binding BottomDb}" Predicted="{Binding Predicted}" Measured="{Binding Measured}"
+                                              PredictedLabel="{Binding PredictedLabel}"
+                                              EdgesCommand="{Binding SetEdgesCommand}" StopCommand="{Binding SetStopCommand}" />
+                    </Border>
+                    <TextBlock Margin="6,2,0,0" Foreground="{StaticResource AudioLabDimText}"
+                               Text="Drag an edge, the passband or the dashed stop-band line; the receiver designs on release · hover to read" />
+                    <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,4,0,0">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource HintStyle}" Text="Edges re the carrier, at -6 dB" />
+                            <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Channel filter" />
+                        </DockPanel>
+                    </Border>
+                    <UniformGrid Columns="5" Margin="2,0,2,0">
+                        <ContentControl x:Name="FilterLow" Content="{Binding Low}" ContentTemplate="{StaticResource SmallDial}" />
+                        <ContentControl x:Name="FilterHigh" Content="{Binding High}" ContentTemplate="{StaticResource SmallDial}" />
+                        <ContentControl x:Name="FilterWidth" Content="{Binding Width}" ContentTemplate="{StaticResource SmallDial}" />
+                        <ContentControl x:Name="FilterStop" Content="{Binding Stopband}" ContentTemplate="{StaticResource SmallDial}" />
+                        <ContentControl x:Name="FilterPitch" Content="{Binding Pitch}" ContentTemplate="{StaticResource SmallDial}"
+                                        IsEnabled="{Binding IsCw}" />
+                    </UniformGrid>
+                    <TextBlock Margin="6,0,0,0" Foreground="{DynamicResource AudioLabText}" Text="{Binding EdgesText}" />
+                    <TextBlock Margin="6,1,0,0" Foreground="{StaticResource AudioLabDimText}" Text="{Binding DesignText}" />
+
+                    <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,4,0,0">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource HintStyle}" Text="The test tone steps across the band; the S-meter reads it" />
+                            <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Measure" />
+                        </DockPanel>
+                    </Border>
+                    <Border Style="{StaticResource AudioLabSettingsBlockStyle}" Margin="2,0,2,0">
+                        <StackPanel>
+                            <DockPanel>
+                                <Button x:Name="MeasureFilterKey" DockPanel.Dock="Left" Style="{StaticResource AudioLabKeyStyle}" Height="30"
+                                        FontWeight="Bold" Content="Measure" Command="{Binding MeasureCommand}" />
+                                <Button DockPanel.Dock="Left" Style="{StaticResource AudioLabKeyStyle}" Height="30"
+                                        Content="Cancel" Command="{Binding CancelCommand}" />
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource AudioLabSettingsLabelStyle}" Margin="10,0,4,0" Text="Step" />
+                                <ComboBox x:Name="SweepStepBox" DockPanel.Dock="Left" Width="64" Height="24" VerticalContentAlignment="Center"
+                                          ItemsSource="{Binding SweepSteps}" SelectedItem="{Binding SweepStep}" />
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource AudioLabSettingsLabelStyle}" Margin="4,0,0,0" Text="Hz" />
+                                <ProgressBar x:Name="MeasureProgress" Height="14" Margin="10,0,0,0" Minimum="0" Maximum="1"
+                                             Value="{Binding MeasureProgress, Mode=OneWay}" />
+                            </DockPanel>
+                            <TextBlock x:Name="MeasureText" Margin="2,4,0,0" Foreground="{DynamicResource AudioLabTextOnBlock}" TextWrapping="Wrap"
+                                       Text="{Binding MeasureText}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,4,0,0">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource HintStyle}" Text="Into the receiver's input, instead of the antenna" />
+                            <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Test tone" />
+                        </DockPanel>
+                    </Border>
+                    <Grid Margin="2,0,2,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ToggleButton x:Name="TestToneKey" Style="{StaticResource AudioLabToggleStyle}" VerticalAlignment="Center" Margin="2,0,10,14"
+                                      Width="140" Height="30" FontWeight="Bold"
+                                      Content="{Binding Test.OnOffText}" IsChecked="{Binding Test.IsOn, Mode=OneWay}"
+                                      Command="{Binding Test.ToggleCommand}" />
+                        <UniformGrid Grid.Column="1" Columns="4">
+                            <ContentControl Content="{Binding TestOffset}" ContentTemplate="{StaticResource SmallDial}" />
+                            <ContentControl Content="{Binding TestLevel}" ContentTemplate="{StaticResource SmallDial}" />
+                            <ContentControl Content="{Binding TestNoise}" ContentTemplate="{StaticResource SmallDial}" />
+                            <ContentControl Content="{Binding TestKey}" ContentTemplate="{StaticResource SmallDial}" />
+                        </UniformGrid>
+                    </Grid>
+                </StackPanel>
+
+                <!-- ===== Designer view ===== -->
+                <StackPanel x:Name="DesignerViewPanel" Visibility="{Binding IsDesignerView, Converter={StaticResource VisibleWhen}}">
+                    <Border Margin="2,0,2,0" BorderBrush="{StaticResource AudioLabSeparator}" BorderThickness="1">
+                        <controls:FilterChart x:Name="DesignResponse" Height="220" ShowEdges="False"
+                                              StopDb="{Binding DesignStop}" BottomDb="{Binding DesignBottomDb}"
+                                              Predicted="{Binding DesignPredicted}" Mask="{Binding Mask}"
+                                              PredictedLabel="designed here (with the down-converter)" />
+                    </Border>
+                    <TextBlock Margin="6,2,0,0" Foreground="{StaticResource AudioLabDimText}" TextTrimming="CharacterEllipsis"
+                               Text="{Binding DesignSourceText}" />
+                    <TextBlock x:Name="DesignProblem" Margin="6,0,0,0" Foreground="{StaticResource AudioLabWarningText}"
+                               Text="{Binding DesignProblem}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="310" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
+                                <DockPanel>
+                                    <TextBlock Style="{StaticResource HintStyle}" Text="Hz re the carrier, edges at -6 dB" />
+                                    <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Mask" />
+                                </DockPanel>
+                            </Border>
+                            <Grid Margin="6,0,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="104" />
+                                    <ColumnDefinition Width="104" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Foreground="{StaticResource AudioLabDimText}" Text="From, Hz" />
+                                <TextBlock Grid.Column="1" Foreground="{StaticResource AudioLabDimText}" Text="To, Hz" />
+                                <TextBlock Grid.Column="2" Foreground="{StaticResource AudioLabDimText}" Text="Gain, dB" />
+                            </Grid>
+                            <ItemsControl x:Name="MaskRows" ItemsSource="{Binding MaskBands}" Margin="2,0,2,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,3">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="104" />
+                                                <ColumnDefinition Width="104" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Margin="0,0,4,0" Padding="4,1" Background="{StaticResource AudioLabFrequencyBackground}"
+                                                    CornerRadius="{DynamicResource AudioLabDisplayCornerRadius}">
+                                                <controls:DigitDial IntegerDigits="4" FractionDigits="0" ShowSign="True" DigitFontSize="16"
+                                                                    Minimum="{Binding EdgeMinimum}" Maximum="{Binding EdgeMaximum}" Value="{Binding From}" />
+                                            </Border>
+                                            <Border Grid.Column="1" Margin="0,0,4,0" Padding="4,1" Background="{StaticResource AudioLabFrequencyBackground}"
+                                                    CornerRadius="{DynamicResource AudioLabDisplayCornerRadius}">
+                                                <controls:DigitDial IntegerDigits="4" FractionDigits="0" ShowSign="True" DigitFontSize="16"
+                                                                    Minimum="{Binding EdgeMinimum}" Maximum="{Binding EdgeMaximum}" Value="{Binding To}" />
+                                            </Border>
+                                            <Border Grid.Column="2" Margin="0,0,4,0" Padding="4,1" Background="{StaticResource AudioLabAmplitudeBackground}"
+                                                    CornerRadius="{DynamicResource AudioLabDisplayCornerRadius}">
+                                                <controls:DigitDial IntegerDigits="2" FractionDigits="1" ShowSign="True" ShowPlus="True" DigitFontSize="16"
+                                                                    Minimum="-60" Maximum="20" Value="{Binding GainDb}" />
+                                            </Border>
+                                            <Button Grid.Column="3" HorizontalAlignment="Left" Style="{StaticResource AudioLabKeyStyle}" MinWidth="26" Padding="4,0"
+                                                    Content="✕" ToolTip="Remove this band" Command="{Binding RemoveCommand}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <WrapPanel Margin="2,2,2,0">
+                                <Button x:Name="AddBandKey" Style="{StaticResource AudioLabKeyStyle}" Margin="0,0,6,4" Content="Add band"
+                                        Command="{Binding AddBandCommand}" />
+                                <ItemsControl x:Name="TemplateKeys" ItemsSource="{Binding Templates}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource AudioLabKeyStyle}" Margin="0,0,4,4" Padding="6,0" Content="{Binding}"
+                                                    ToolTip="Start from this mask"
+                                                    Command="{Binding DataContext.TemplateCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </WrapPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,2,0,0">
+                                <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Design and download" />
+                            </Border>
+                            <UniformGrid Columns="2" Margin="2,0,2,0">
+                                <StackPanel Margin="0,0,6,0">
+                                    <controls:LabDisplay Title="Stop band" TitleFontSize="11" DisplayBackground="{StaticResource AudioLabAmplitudeBackground}">
+                                        <controls:LabDisplay.Body>
+                                            <controls:DigitDial IntegerDigits="3" FractionDigits="0" DigitFontSize="16" Minimum="20" Maximum="120"
+                                                                Value="{Binding DesignStop}" />
+                                        </controls:LabDisplay.Body>
+                                    </controls:LabDisplay>
+                                    <TextBlock Style="{StaticResource SynthUnitLineStyle}" Text="-- dB --" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <controls:LabDisplay Title="Transition" TitleFontSize="11" DisplayBackground="{StaticResource AudioLabFrequencyBackground}">
+                                        <controls:LabDisplay.Body>
+                                            <controls:DigitDial IntegerDigits="4" FractionDigits="0" DigitFontSize="16" Minimum="20" Maximum="1000"
+                                                                Value="{Binding DesignTransition}" />
+                                        </controls:LabDisplay.Body>
+                                    </controls:LabDisplay>
+                                    <TextBlock Style="{StaticResource SynthUnitLineStyle}" Text="-- Hz --" />
+                                </StackPanel>
+                            </UniformGrid>
+                            <TextBlock x:Name="DesignInfo" Margin="4,0" Foreground="{DynamicResource AudioLabText}" Text="{Binding DesignInfoText}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <Button x:Name="DownloadFilterKey" Style="{StaticResource AudioLabGoldKeyStyle}" Content="Download"
+                                        ToolTip="Sends the coefficients to the receiver and switches them in"
+                                        Command="{Binding DownloadCommand}" />
+                                <Button x:Name="DesignAgainKey" Style="{StaticResource AudioLabKeyStyle}" Content="Design again"
+                                        ToolTip="Back to the filter the receiver designs from its edges"
+                                        Command="{Binding DesignAgainCommand}" />
+                                <Button Style="{StaticResource AudioLabKeyStyle}" Content="Cancel" Command="{Binding CancelCommand}" />
+                            </StackPanel>
+                            <ProgressBar x:Name="DownloadProgress" Height="10" Margin="2,4,2,0" Minimum="0" Maximum="1"
+                                         Value="{Binding DownloadProgress, Mode=OneWay}" />
+                            <TextBlock Margin="4,2,4,0" Foreground="{StaticResource AudioLabDimText}" TextWrapping="Wrap"
+                                       Text="{Binding DesignerBoardText}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <Button x:Name="ImportKey" Style="{StaticResource AudioLabKeyStyle}" Content="Import CSV …" Click="ImportCoefficients_Click" />
+                                <Button x:Name="ExportKey" Style="{StaticResource AudioLabKeyStyle}" Content="Export CSV …" Click="ExportCoefficients_Click"
+                                        IsEnabled="{Binding HasCoefficients}" />
+                                <Button Style="{StaticResource AudioLabKeyStyle}" Content="Use the mask" Command="{Binding UseMaskCommand}" />
+                            </StackPanel>
+                            <TextBlock Margin="4,8,4,0" Foreground="{StaticResource AudioLabDimText}" Text="Designs kept on this PC: a name, then Save" />
+                            <DockPanel Margin="2,2,2,0">
+                                <Button x:Name="SaveDesignKey" DockPanel.Dock="Right" Style="{StaticResource AudioLabKeyStyle}" Content="Save"
+                                        Command="{Binding SaveDesignCommand}" />
+                                <TextBox x:Name="DesignNameBox" Height="24" FontSize="12" VerticalContentAlignment="Center" Margin="0,0,2,0"
+                                         ToolTip="{Binding DesignsDirectory}"
+                                         Text="{Binding DesignName, UpdateSourceTrigger=PropertyChanged}">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Return" Command="{Binding SaveDesignCommand}" />
+                                    </TextBox.InputBindings>
+                                </TextBox>
+                            </DockPanel>
+                            <DockPanel Margin="2,4,2,0">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource AudioLabKeyStyle}" Content="Delete" Command="{Binding DeleteDesignCommand}" />
+                                <Button DockPanel.Dock="Right" Style="{StaticResource AudioLabKeyStyle}" Content="Load" Command="{Binding LoadDesignCommand}" />
+                                <ComboBox x:Name="DesignsBox" Height="24" VerticalContentAlignment="Center" Margin="0,0,2,0"
+                                          ItemsSource="{Binding Designs}" SelectedItem="{Binding SelectedDesign}" />
+                            </DockPanel>
+                            <TextBlock x:Name="DesignerMessage" Margin="4,3,4,0" Foreground="{StaticResource AudioLabDimText}" TextWrapping="Wrap"
+                                       Text="{Binding DesignerMessage}" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+
             <!-- Potentiometers -->
             <Border Style="{StaticResource AudioLabHeaderRuleStyle}" Margin="0,4,0,0">
                 <TextBlock Style="{StaticResource AudioLabHeaderStyle}" Text="Potentiometers" />

@@ -98,6 +98,33 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ImportCoefficients_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Import filter coefficients",
+            Filter = "Coefficients (*.csv;*.txt)|*.csv;*.txt|All files|*.*",
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            viewModel.Receiver.ImportCoefficients(dialog.FileName);
+        }
+    }
+
+    private void ExportCoefficients_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export filter coefficients",
+            Filter = "CSV (*.csv)|*.csv",
+            FileName = "filter_coefficients.csv",
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            viewModel.Receiver.ExportCoefficients(dialog.FileName);
+        }
+    }
+
     private void Manual_Click(object sender, RoutedEventArgs eventArgs)
     {
         string local = Path.Combine(AppContext.BaseDirectory, "docs", "Manual.pdf");

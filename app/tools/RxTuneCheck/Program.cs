@@ -13,10 +13,15 @@ using AudioDspLab;
 using AudioDspLab.FrontEnd;
 using AudioDspLab.Protocol;
 
-if (args.Length != 3)
+if (args.Length is not (3 or 4))
 {
-    Console.WriteLine("RxTuneCheck <board port> <front-end port> <carrier Hz>");
+    Console.WriteLine("RxTuneCheck <board port> <front-end port> <carrier Hz> [core]");
     return 2;
+}
+
+if (args.Length == 4 && args[3] == "core")
+{
+    return await CoreCheck.RunAsync(args[0], args[1], long.Parse(args[2], CultureInfo.InvariantCulture));
 }
 
 long carrier = long.Parse(args[2], CultureInfo.InvariantCulture);

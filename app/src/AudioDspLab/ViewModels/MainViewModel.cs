@@ -3,7 +3,9 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Input;
 using System.Windows.Threading;
+using AudioDspLab.FrontEnd;
 using AudioDspLab.Protocol;
+using AudioDspLab.Receiver;
 using AudioDspLab.Settings;
 using AudioDspLab.Simulation;
 
@@ -77,7 +79,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Radio = new RadioViewModel(WriteParameterAsync, RunAsync);
         Analyzer = new AnalyzerPageViewModel(WriteParameterAsync, RunAsync);
         Synth = new SynthPageViewModel(WriteParameterAsync, RunAsync);
-        pages = [Generator, Equalizer, Radio, Analyzer, Synth];
+        Receiver = new ReceiverPageViewModel(WriteParameterAsync, RunAsync, this.preferences);
+        pages = [Generator, Equalizer, Radio, Analyzer, Synth, Receiver];
         Potentiometers = [.. Enumerable.Range(0, 4).Select(index => new PotentiometerViewModel(index))];
 
         RefreshPortsCommand = new RelayCommand(RefreshPorts, () => !IsConnected && !isConnecting);
@@ -194,6 +197,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public SynthPageViewModel Synth { get; }
 
+    public ReceiverPageViewModel Receiver { get; }
+
     public IReadOnlyList<PotentiometerViewModel> Potentiometers { get; }
 
     public ICommand SelectApplicationCommand { get; }
@@ -221,6 +226,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             RaisePropertyChanged(nameof(IsAnalyzerSelected));
             RaisePropertyChanged(nameof(IsSigmaStudioSelected));
             RaisePropertyChanged(nameof(IsSynthSelected));
+            RaisePropertyChanged(nameof(IsReceiverSelected));
             RaisePropertyChanged(nameof(IsEqualizerPageShown));
             RaisePropertyChanged(nameof(IsGeneratorPageShown));
             RaisePropertyChanged(nameof(SignalHeading));
@@ -242,13 +248,17 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public bool IsSynthSelected => activeApplication == Applications.Synthesizer;
 
+    public bool IsReceiverSelected => activeApplication == Applications.Receiver;
+
     public bool IsEqualizerPageShown => IsEqualizerSelected || IsRadioSelected;
 
-    public bool IsGeneratorPageShown => !IsEqualizerPageShown && !IsAnalyzerSelected && !IsSigmaStudioSelected && !IsSynthSelected;
+    public bool IsGeneratorPageShown =>
+        !IsEqualizerPageShown && !IsAnalyzerSelected && !IsSigmaStudioSelected && !IsSynthSelected && !IsReceiverSelected;
 
     public string SignalHeading =>
         IsSigmaStudioSelected ? "SigmaStudio"
         : IsSynthSelected ? "Synthesizer"
+        : IsReceiverSelected ? "Receiver"
         : IsAnalyzerSelected ? "Analysis"
         : IsEqualizerPageShown ? "Response"
         : "Signal";
@@ -508,6 +518,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             candidate.SweepChanged += sweep => Post(() => Analyzer.ApplySweep(sweep));
             candidate.PointMeasured += point => Post(() => Analyzer.AddPoint(point));
             candidate.VoiceChanged += voice => Post(() => Synth.ApplyVoice(voice));
+            candidate.MeterChanged += meter => Post(() =>
+            {
+                if (IsReceiverSelected)
+                {
+                    Receiver.ApplyMeter(meter);
+                }
+            });
             candidate.Restarted += info => Post(() => _ = OnRestartedAsync());
             BoardClient connecting = candidate;
             candidate.DistortionChanged += status => Post(() => _ = Analyzer.ApplyDistortionAsync(connecting, status));
@@ -522,6 +539,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
             BoardInfo info = await Task.Run(() => connecting.ConnectAsync()).ConfigureAwait(true);
             client = candidate;
+            Receiver.IsSimulatedBoard = port == SimulatorPort;
             FirmwareText = info.Kit.Length > 0 ? $"{info.Name} {info.Firmware} · {info.KitDisplayName}" : $"{info.Name} {info.Firmware}";
             preferences.LastPort = port;
             preferences.Save();
@@ -654,7 +672,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             async board =>
             {
                 IReadOnlyDictionary<string, string> values = await board.GetValuesAsync().ConfigureAwait(true);
-                var stored = new StoredSettings(name, application, [.. values.Where(pair => pair.Key != "output")]);
+                // not the receiver's filter state: "downloaded" can only come from a download
+                var stored = new StoredSettings(name, application, [.. values.Where(pair => pair.Key is not ("output" or "filter"))]);
                 if (!settingsStore.Save(stored))
                 {
                     throw new IOException($"Settings '{name}' could not be stored in {settingsStore.Directory}.");
@@ -761,6 +780,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
         disposed = true;
         timer.Stop();
+        Receiver.Dispose();
         client?.Dispose();
         client = null;
     }
@@ -800,6 +820,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             BoardErrorException board => $"Refused: {board.Code} {board.Detail}".TrimEnd(),
             TimeoutException or IOException => exception.Message,
+            OperationCanceledException or InvalidOperationException or FilterDownloadException or FrontEndException => exception.Message,
             _ => $"Failed: {exception.Message}"
         };
 
@@ -991,6 +1012,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             case Applications.Synthesizer:
                 Synth.ApplyVoice(await board.GetVoiceAsync().ConfigureAwait(true));
                 break;
+            case Applications.Receiver:
+                await Receiver.LoadAsync(board).ConfigureAwait(true);
+                break;
             case Applications.SigmaStudio:
                 StudioBackup backup = await board.GetBackupAsync().ConfigureAwait(true);
                 BackupText = backup.Exists
@@ -1029,6 +1053,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         ["osc1-width"] = "Osc 1 width",
         ["cutoff"] = "Cutoff",
         ["emphasis"] = "Emphasis",
+        ["nr-level"] = "NR level",
+        ["squelch"] = "Squelch",
     };
 
     private void AssignPotentiometerRoles(string? running)
@@ -1116,8 +1142,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             await action(board).ConfigureAwait(true);
             Succeed(successMessage);
         }
-        catch (Exception exception) when (exception is BoardErrorException or IOException or TimeoutException or FormatException)
+        catch (Exception exception) when (exception is BoardErrorException or IOException or TimeoutException or FormatException
+                                              or OperationCanceledException or InvalidOperationException
+                                              or FilterDownloadException or FrontEndException)
         {
+            // also a page's own outcomes: a cancel, a refused download, the receiver's front end
             Fail(Describe(exception));
         }
 
@@ -1178,6 +1207,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             _ = MeasureInputAsync(board);
         }
+
+        // the receiver's filter state, after a change of its edges, mode or filter
+        if (client is { } receiverBoard && Receiver.IsFilterStatusStale && !isBusy && !reloading)
+        {
+            _ = Receiver.RefreshFilterStatusAsync(receiverBoard);
+        }
     }
 
     private async Task MeasureInputAsync(BoardClient board)
@@ -1213,6 +1248,9 @@ public sealed class AppPreferences
     /// <summary>The front panel's network address ("192.168.0.205", "audio-dsp-lab.local"), or null.</summary>
     public string? PanelAddress { get; set; }
 
+    /// <summary>The SDR front end's serial port (the receiver's Uno with the Si5351A), or null.</summary>
+    public string? FrontEndPort { get; set; }
+
     public static AppPreferences Load()
     {
         var preferences = new AppPreferences();
@@ -1232,6 +1270,10 @@ public sealed class AppPreferences
                 {
                     preferences.PanelAddress = line[6..].Trim();
                 }
+                else if (line.StartsWith("frontend=", StringComparison.Ordinal))
+                {
+                    preferences.FrontEndPort = line[9..].Trim();
+                }
             }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -1246,7 +1288,7 @@ public sealed class AppPreferences
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, $"port={LastPort}\ntheme={Theme}\npanel={PanelAddress}\n");
+            File.WriteAllText(FilePath, $"port={LastPort}\ntheme={Theme}\npanel={PanelAddress}\nfrontend={FrontEndPort}\n");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {

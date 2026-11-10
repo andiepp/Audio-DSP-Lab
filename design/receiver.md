@@ -535,3 +535,33 @@ Bench check `app\tools\RxTuneCheck COM10 COM24 14100000`, carrier
 
 R4 done (option B). The move of the Si5351A to the board's I2C, with
 the firmware's `frequency` and `frontend`, remains for later.
+
+**R5 (2026-11-10).** Firmware: `rxfilter load / data / end <crc32>`
+(float32 values, CRC-32 as zlib's), parameter 36 `filter`, the default
+offset 10 kHz; `rxfilter` reports a design or download not yet taken up
+as `designing`. Core: `Receiver\` (`ChannelFilter`, `MaskDesign`,
+`CoefficientFile`, `FilterSweep`, `ReceiverRequests`, `ReceiverMeter`,
+`ReceiverPageLogic`), `FrontEnd\ImageNull`; the simulator serves the
+receiver (its 37 parameters checked against the firmware's tables);
+`BoardConnection` resynchronises after a `! ready` that interrupted a
+request. Application: a **Receiver** page with Receiver, Filter and
+Designer views (mode keys, RF dial through the front end, S-meter and
+meters, filter preview, AGC / NR / squelch, input and I/Q correction
+with "Null image", the front-end card, the equalizer; the response
+chart with draggable edges and "Measure"; the mask designer with
+download, CSV and saved designs), ported from DSP-Box-Lab by a
+subagent and reviewed. 65 tests. On the board (`RxTuneCheck ... core`,
+carrier 14.100 MHz at -56 dBm):
+
+- ImageNull 31.9 -> 72.2 dB (+0.41 dB, +1.12 deg); mode, edges, offset
+  and AGC restored.
+- FilterSweep of the USB filter against `ChannelFilter`: 0.00 dB in the
+  passband, within 0.2 dB down to -100 dB. The test tone gets the I/Q
+  errors the correction removes (`test-iq-gain` / `-phase`); without
+  that a correction of 0.4 dB read as a filter 0.2 dB low.
+- A two-band mask (347 taps) downloaded in 0.44 s and swept 0.00 dB
+  against its own response; "design again" returns to the edges.
+
+Not tried by hand yet: dragging the edges on the chart, the CSV
+dialogs. The page's hints already name the R7 pots (P1 width, P2 NR
+level, P3 squelch); the firmware maps only P4 so far.

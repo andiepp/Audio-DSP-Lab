@@ -1,6 +1,7 @@
-// Renders the manual's screenshots from the simulated board, every page in
-// every theme: Studio dark, the manual's, into docs/images/screenshots,
-// Classic and Studio light into its classic and studio-light folders.
+// Renders the manual's screenshots from the simulated board, every page (the
+// receiver's three views too) in every theme: Studio dark, the manual's, into
+// docs/images/screenshots, Classic and Studio light into its classic and
+// studio-light folders.
 //   dotnet run --project app/tools/Screenshots [-- <folder>]
 using System.IO;
 using System.Windows;
@@ -93,6 +94,7 @@ static class Program
                     }
                 }
 
+                await ReceiverAsync(vm, window, output);
                 window.Close();
               }
             }
@@ -106,6 +108,41 @@ static class Program
             }
         };
         app.Run();
+    }
+
+    // the receiver's three views: the Receiver with the simulated front end
+    // and the test tone on the S-meter, the Filter measured, the Designer
+    static async Task ReceiverAsync(MainViewModel vm, Window window, string output)
+    {
+        await vm.SelectApplicationAsync("receiver");
+        await Task.Delay(1500);
+        ReceiverPageViewModel receiver = vm.Receiver;
+        receiver.SelectedFrontEndPort = AudioDspLab.FrontEnd.SimulatedFrontEndPort.SimulatorName;
+        await receiver.ConnectFrontEndAsync();
+        await vm.Client!.SetAsync("test", true);
+        await vm.Client!.SetAsync("test-offset", 1200);
+        await vm.Client!.SetAsync("test-level", -40);
+        await vm.RefreshFromBoardAsync();
+        await Task.Delay(800);
+        receiver.View = ReceiverPageViewModel.ReceiverView;
+        await Task.Delay(300);
+        Save(window, Path.Combine(output, "receiver.png"));
+        Console.WriteLine($"receiver: {vm.ApplicationStateText} | {receiver.FrontEndText} | {receiver.TuningText} | {vm.StatusInfo} | {window.ActualWidth}x{window.ActualHeight}");
+
+        receiver.View = ReceiverPageViewModel.FilterView;
+        receiver.SweepStep = 200;
+        await receiver.MeasureAsync();
+        await Task.Delay(500);
+        Save(window, Path.Combine(output, "receiver-filter.png"));
+        Console.WriteLine($"receiver filter: {receiver.MeasureText} | {receiver.FilterStatusText} | {vm.StatusInfo} | {window.ActualWidth}x{window.ActualHeight}");
+
+        receiver.View = ReceiverPageViewModel.DesignerView;
+        await receiver.DownloadAsync();
+        await Task.Delay(800);
+        Save(window, Path.Combine(output, "receiver-designer.png"));
+        Console.WriteLine($"receiver designer: {receiver.DesignInfoText} | {receiver.DesignerBoardText} | {vm.StatusInfo} | {window.ActualWidth}x{window.ActualHeight}");
+        await receiver.DisconnectFrontEndAsync("Disconnected.");
+        receiver.View = ReceiverPageViewModel.ReceiverView;
     }
 
     static string RepositoryRoot()

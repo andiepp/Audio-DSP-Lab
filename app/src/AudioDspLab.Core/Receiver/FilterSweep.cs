@@ -12,7 +12,8 @@ public readonly record struct FilterPoint(double Hz, double GainDb);
 /// The S-meter is the AGC's peak detector: it rises at once but falls only
 /// after the hang time at the decay rate, whether the AGC is on or off. The
 /// sweep therefore sets the AGC off, hang 0 and decay 200 dB/s, and reads each
-/// point until two readings agree. In CW the down-converter is tuned to
+/// point until two readings agree. The test tone gets the I/Q errors the
+/// correction removes, so it reaches the filter clean. In CW the down-converter is tuned to
 /// offset - pitch, so a tone at f lands at f + pitch. Every setting it touches
 /// is restored afterwards, also on cancel or error.
 /// </remarks>
@@ -20,7 +21,8 @@ public static class FilterSweep
 {
     public const double ToneLevel = -10;
 
-    private static readonly string[] Touched = ["test", "test-offset", "test-level", "test-noise", "test-key", "agc", "hang", "decay"];
+    private static readonly string[] Touched =
+        ["test", "test-offset", "test-level", "test-noise", "test-key", "test-iq-gain", "test-iq-phase", "agc", "hang", "decay"];
 
     public static IReadOnlyList<double> Frequencies(double from = -5900, double to = 5900, double step = 100)
     {
@@ -58,6 +60,13 @@ public static class FilterSweep
             await board.SetAsync("test-level", toneLevel, cancellation).ConfigureAwait(false);
             await board.SetAsync("test-noise", -150, cancellation).ConfigureAwait(false);   // a steady, clean tone
             await board.SetAsync("test-key", 0, cancellation).ConfigureAwait(false);
+            // the I/Q correction acts on the test tone too: a tone with the very
+            // errors it removes comes out clean (else a correction of 0.4 dB
+            // reads as a filter 0.2 dB low)
+            await board.SetAsync("test-iq-gain", await board.GetAsync("iq-gain", cancellation).ConfigureAwait(false), cancellation)
+                .ConfigureAwait(false);
+            await board.SetAsync("test-iq-phase", await board.GetAsync("iq-phase", cancellation).ConfigureAwait(false), cancellation)
+                .ConfigureAwait(false);
             await board.SetAsync("test", true, cancellation).ConfigureAwait(false);
 
             foreach (double f in frequencies)

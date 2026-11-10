@@ -79,6 +79,16 @@ struct Board {
   float rms[2] = { NAN, NAN };        // dBFS, 20 Hz to 20 kHz
   float peakHertz[2] = { NAN, NAN };
   float peakDb[2] = { NAN, NAN };     // as a sine's peak, dBFS
+  // the receiver's meter, five times a second ("! meter"); NAN until heard.
+  // meterVersion alone counts it: the page redraws only its meter
+  float sMeter = NAN;           // dBFS
+  float agcGain = NAN;          // dB
+  float fmOffset = NAN;         // Hz
+  bool squelchOpen = true;
+  float audioDb = NAN;          // dBFS
+  float rxCpu = NAN;            // %
+  float nrGain = NAN;           // dB, the spectral NR's
+  uint32_t meterVersion = 0;
 };
 
 extern Board board;

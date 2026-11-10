@@ -30,7 +30,8 @@ struct Application {
 };
 static const Application applications[] = {
   { "generator", "Generator" }, { "equalizer", "Equalizer" }, { "radio", "Radio" },
-  { "analyzer", "Analysis" }, { "synthesizer", "Synth" }, { "sigmastudio", "SigmaStudio" },
+  { "analyzer", "Analysis" }, { "synthesizer", "Synth" }, { "receiver", "Receiver" },
+  { "sigmastudio", "SigmaStudio" },
 };
 static const int applicationCount = sizeof(applications) / sizeof(applications[0]);
 
@@ -169,6 +170,11 @@ static String readable(const String &text) {
 static String pretty(const String &name) {
   String text = name;
   text.replace("-", " ");
+  // the receiver's abbreviations as words of their own: "agc-gain" reads "AGC gain"
+  static const char *const acronyms[][2] = { { "agc", "AGC" }, { "nr", "NR" }, { "fm", "FM" }, { "iq", "I/Q" } };
+  text = String(" ") + text + " ";
+  for (const auto &acronym : acronyms) text.replace(String(" ") + acronym[0] + " ", String(" ") + acronym[1] + " ");
+  text.trim();
   if (text.length() > 0) text.setCharAt(0, toupper(text[0]));
   return text;
 }
@@ -539,7 +545,7 @@ static void buildHome() {
   lv_obj_set_flex_flow(content, LV_FLEX_FLOW_ROW_WRAP);
   lv_obj_set_style_pad_gap(content, 6, 0);
   for (int i = 0; i < applicationCount; i++) {
-    appButtons[i] = button(content, applications[i].title, 98, 56);
+    appButtons[i] = button(content, applications[i].title, 98, 38);   // three rows and the pot control
     lv_obj_add_event_cb(appButtons[i], onApplication, LV_EVENT_CLICKED, (void *)(intptr_t)i);
   }
   lv_obj_t *row = lv_obj_create(content);
@@ -1171,6 +1177,346 @@ static void buildSectionKeys() {
   }
 }
 
+// --- the receiver's header -----------------------------------------------------------------
+
+// the dial, the S-meter and three rows of keys fill the content's first
+// screen; the tiles follow below the knob strip's edge, a scroll away. The
+// front end is the PC's (design/receiver.md, option B): the dial tunes the
+// receiver's offset, the PC's dial follows it.
+#define RX_DIAL_HEIGHT                40
+#define RX_METER_HEIGHT               26      // the first tile starts at the knob strip, not 2 px above it
+#define RX_KEY_HEIGHT                 30
+#define RX_DIGITS                     5       // the offset's digits, 10 kHz .. 1 Hz
+#define RX_DIGIT_WIDTH                19
+#define RX_DIGIT_GAP                  6       // between the thousands and the hundreds
+#define RX_SIGN_X                     86      // the sign's left edge in the dial
+#define RX_DRAG_PX                    14      // a drag moves the offset a step per this many pixels
+#define RX_METER_LOW                  -130    // dBFS at the bar's left end, 0 at its right
+#define RX_BAR_X                      4
+#define RX_BAR_WIDTH                  100
+#define RX_SKETCH_WIDTH               88
+#define RX_SKETCH_HZ                  6000.0f // the sketch: -6 .. +6 kHz around the carrier
+#define RX_WIDTH_KEYS                 4
+#define RX_MODES                      6
+#define RX_NRS                        3
+
+static const char *const rxModes[RX_MODES] = { "off", "am", "usb", "lsb", "cw", "fm" };
+static const char *const rxModeTitles[RX_MODES] = { "Off", "AM", "USB", "LSB", "CW", "FM" };
+static const char *const rxNrs[RX_NRS] = { "off", "lms", "spectral" };
+static const char *const rxNrTitles[RX_NRS] = { "NR off", "LMS", "Spectral" };
+static lv_obj_t *rxDial;
+static lv_obj_t *rxSign;
+static lv_obj_t *rxDigits[RX_DIGITS];
+static lv_obj_t *rxStepLabel;
+static int rxDigit = 2;                       // the digit -/+ and a drag step: 0 = 10 kHz .. 4 = 1 Hz
+static lv_obj_t *rxBar;
+static lv_obj_t *rxSquelchMark;
+static lv_obj_t *rxMeterText;
+static lv_obj_t *rxSquelchDot;
+static lv_obj_t *rxModeKeys[RX_MODES];
+static lv_obj_t *rxWidthKeys[RX_WIDTH_KEYS];
+static int rxWidths[RX_WIDTH_KEYS];
+static lv_obj_t *rxPassband;
+static lv_obj_t *rxNrKeys[RX_NRS];
+static lv_obj_t *rxLoadText;
+static uint32_t drawnMeter = 0xFFFFFFFF;
+// a drag on the dial
+static int32_t rxDragFrom = 0;                // the touch's x at the press
+static int32_t rxDragOffset = 0;              // the offset at the press
+static bool rxDragging = false;
+
+static String paramText(const char *name) {
+  const int index = linkFindParam(name);
+  return index >= 0 ? board.params[index].value : String();
+}
+
+static int32_t rxOffset() {
+  return paramText("offset").toInt();
+}
+
+static int32_t rxStep() {
+  int32_t step = 1;
+  for (int i = rxDigit; i < RX_DIGITS - 1; i++) step *= 10;
+  return step;
+}
+
+static void rxSetOffset(int32_t value) {
+  const int index = linkFindParam("offset");
+  if (index < 0) return;
+  const Param &param = board.params[index];
+  value = constrain(value, (int32_t)param.minimum, (int32_t)param.maximum);
+  const String text(value);
+  if (text != param.value) linkSetParam(index, text);
+}
+
+static void rxSetChoice(const char *name, const char *value) {
+  const int index = linkFindParam(name);
+  if (index >= 0 && board.params[index].value != value) linkSetParam(index, value);
+}
+
+static int rxDigitX(int digit) {
+  return RX_SIGN_X + (digit + 1) * RX_DIGIT_WIDTH + (digit >= 2 ? RX_DIGIT_GAP : 0);
+}
+
+// the width keys: the widths that suit the mode
+static void rxWidthsFor(const String &mode, int widths[RX_WIDTH_KEYS]) {
+  static const int ssb[] = { 1800, 2400, 2700, 3000 };
+  static const int cw[] = { 200, 300, 500, 1000 };
+  static const int fm[] = { 6000, 8000, 10000, 11000 };
+  static const int am[] = { 4000, 6000, 8000, 10000 };
+  const int *chosen = mode == "usb" || mode == "lsb" ? ssb : mode == "cw" ? cw : mode == "fm" ? fm : am;
+  for (int i = 0; i < RX_WIDTH_KEYS; i++) widths[i] = chosen[i];
+}
+
+static String widthText(int hertz) {
+  char text[12];
+  if (hertz < 1000) snprintf(text, sizeof(text), "%d", hertz);
+  else if (hertz % 1000 == 0) snprintf(text, sizeof(text), "%dk", hertz / 1000);
+  else snprintf(text, sizeof(text), "%.1fk", hertz / 1000.0f);
+  return String(text);
+}
+
+static void refreshReceiver();
+
+static void onRxStep(lv_event_t *e) {
+  const int direction = (int)(intptr_t)lv_event_get_user_data(e);
+  rxSetOffset(rxOffset() + direction * rxStep());
+}
+
+// the dial: a tap picks the digit, a drag to the right tunes up
+static void onRxDial(lv_event_t *e) {
+  const lv_event_code_t code = lv_event_get_code(e);
+  lv_point_t touch;
+  lv_indev_get_point(lv_indev_active(), &touch);
+  lv_area_t area;
+  lv_obj_get_coords((lv_obj_t *)lv_event_get_current_target(e), &area);
+  const int32_t x = touch.x - area.x1;
+  if (code == LV_EVENT_PRESSED) {
+    rxDragFrom = x;
+    rxDragOffset = rxOffset();
+    rxDragging = false;
+  } else if (code == LV_EVENT_PRESSING) {
+    const int32_t steps = (x - rxDragFrom) / RX_DRAG_PX;
+    if (!rxDragging && steps == 0) return;      // a finger at rest is a tap
+    rxDragging = true;
+    rxSetOffset(rxDragOffset + steps * rxStep());
+  } else if (code == LV_EVENT_RELEASED && !rxDragging) {
+    int nearest = -1;
+    for (int digit = 0; digit < RX_DIGITS; digit++) {
+      const int distance = abs(x - (rxDigitX(digit) + RX_DIGIT_WIDTH / 2));
+      if (distance <= RX_DIGIT_WIDTH && (nearest < 0 || distance < abs(x - (rxDigitX(nearest) + RX_DIGIT_WIDTH / 2)))) {
+        nearest = digit;
+      }
+    }
+    if (nearest >= 0) {
+      rxDigit = nearest;
+      refreshReceiver();
+    }
+  }
+}
+
+static void onRxMode(lv_event_t *e) {
+  rxSetChoice("mode", rxModes[(int)(intptr_t)lv_event_get_user_data(e)]);
+}
+
+static void onRxWidth(lv_event_t *e) {
+  const int index = linkFindParam("width");
+  const int key = (int)(intptr_t)lv_event_get_user_data(e);
+  if (index >= 0) linkSetParam(index, String(rxWidths[key]));
+}
+
+static void onRxNr(lv_event_t *e) {
+  rxSetChoice("nr", rxNrs[(int)(intptr_t)lv_event_get_user_data(e)]);
+}
+
+static lv_obj_t *smallKey(lv_obj_t *parent, const char *text, int width, const lv_font_t *font) {
+  lv_obj_t *key = button(parent, text, width, RX_KEY_HEIGHT);
+  lv_obj_set_style_text_font(lv_obj_get_child(key, 0), font, 0);
+  return key;
+}
+
+static void buildReceiverHeader() {
+  // the dial: "Offset" and the step, the sign and five digits, -/+
+  rxDial = lv_obj_create(content);
+  plainBox(rxDial, COLOUR_CARD);
+  lv_obj_set_size(rxDial, PLOT_WIDTH, RX_DIAL_HEIGHT);
+  lv_obj_set_style_radius(rxDial, 6, 0);
+  lv_obj_add_flag(rxDial, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_remove_flag(rxDial, LV_OBJ_FLAG_SCROLL_CHAIN);   // a drag tunes, it does not scroll the page
+  for (lv_event_code_t code : { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED }) {
+    lv_obj_add_event_cb(rxDial, onRxDial, code, nullptr);
+  }
+  lv_obj_t *title = label(rxDial, "Offset, Hz", &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_obj_set_pos(title, 6, 3);
+  rxStepLabel = label(rxDial, "", &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_obj_set_pos(rxStepLabel, 6, 21);
+  rxSign = label(rxDial, "+", &lv_font_montserrat_28, COLOUR_TEXT);
+  lv_obj_set_width(rxSign, RX_DIGIT_WIDTH);
+  lv_obj_set_style_text_align(rxSign, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_pos(rxSign, RX_SIGN_X, 3);
+  for (int digit = 0; digit < RX_DIGITS; digit++) {
+    rxDigits[digit] = label(rxDial, "0", &lv_font_montserrat_28, COLOUR_TEXT);
+    lv_obj_set_size(rxDigits[digit], RX_DIGIT_WIDTH, 35);
+    lv_obj_set_style_text_align(rxDigits[digit], LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_border_side(rxDigits[digit], LV_BORDER_SIDE_BOTTOM, 0);
+    lv_obj_set_style_border_color(rxDigits[digit], lv_color_hex(COLOUR_ACCENT), 0);
+    lv_obj_set_pos(rxDigits[digit], rxDigitX(digit), 3);
+  }
+  lv_obj_t *minus = button(rxDial, LV_SYMBOL_MINUS, 44, 34);
+  lv_obj_align(minus, LV_ALIGN_RIGHT_MID, -50, 0);
+  lv_obj_t *plus = button(rxDial, LV_SYMBOL_PLUS, 44, 34);
+  lv_obj_align(plus, LV_ALIGN_RIGHT_MID, -3, 0);
+  for (lv_obj_t *key : { minus, plus }) {
+    void *direction = (void *)(intptr_t)(key == plus ? 1 : -1);
+    lv_obj_add_event_cb(key, onRxStep, LV_EVENT_SHORT_CLICKED, direction);
+    lv_obj_add_event_cb(key, onRxStep, LV_EVENT_LONG_PRESSED_REPEAT, direction);
+  }
+
+  // the S-meter: a bar with the squelch's mark, the level and the AGC's gain, the squelch's dot
+  lv_obj_t *meter = lv_obj_create(content);
+  plainBox(meter, COLOUR_CARD);
+  lv_obj_set_size(meter, PLOT_WIDTH, RX_METER_HEIGHT);
+  lv_obj_set_style_radius(meter, 6, 0);
+  rxBar = lv_bar_create(meter);
+  lv_obj_set_size(rxBar, RX_BAR_WIDTH, 12);
+  lv_obj_set_pos(rxBar, RX_BAR_X, (RX_METER_HEIGHT - 12) / 2);
+  lv_bar_set_range(rxBar, RX_METER_LOW, 0);
+  lv_bar_set_value(rxBar, RX_METER_LOW, LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(rxBar, lv_color_hex(0x141920), 0);
+  lv_obj_set_style_bg_opa(rxBar, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(rxBar, 3, 0);
+  lv_obj_set_style_bg_color(rxBar, lv_color_hex(COLOUR_ACCENT), LV_PART_INDICATOR);
+  lv_obj_set_style_radius(rxBar, 3, LV_PART_INDICATOR);
+  rxSquelchMark = lv_obj_create(meter);
+  plainBox(rxSquelchMark, potColours[2]);
+  lv_obj_set_size(rxSquelchMark, 2, RX_METER_HEIGHT - 6);
+  lv_obj_add_flag(rxSquelchMark, LV_OBJ_FLAG_HIDDEN);
+  rxMeterText = label(meter, "-- dBFS", &lv_font_montserrat_12, COLOUR_TEXT);
+  lv_obj_align(rxMeterText, LV_ALIGN_LEFT_MID, RX_BAR_X + RX_BAR_WIDTH + 6, 0);
+  lv_obj_t *squelch = label(meter, "Sql", &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_obj_align(squelch, LV_ALIGN_RIGHT_MID, -20, 0);
+  rxSquelchDot = lv_obj_create(meter);
+  plainBox(rxSquelchDot, COLOUR_ACCENT);
+  lv_obj_set_size(rxSquelchDot, 10, 10);
+  lv_obj_set_style_radius(rxSquelchDot, LV_RADIUS_CIRCLE, 0);
+  lv_obj_align(rxSquelchDot, LV_ALIGN_RIGHT_MID, -6, 0);
+
+  // the modes
+  lv_obj_t *modes = row(content, 4);
+  for (int i = 0; i < RX_MODES; i++) {
+    rxModeKeys[i] = smallKey(modes, rxModeTitles[i], 47, &lv_font_montserrat_14);
+    lv_obj_add_event_cb(rxModeKeys[i], onRxMode, LV_EVENT_CLICKED, (void *)(intptr_t)i);
+  }
+
+  // the widths that suit the mode, and the passband around the carrier
+  lv_obj_t *widths = row(content, 4);
+  for (int i = 0; i < RX_WIDTH_KEYS; i++) {
+    rxWidthKeys[i] = smallKey(widths, "", 50, &lv_font_montserrat_14);
+    lv_obj_add_event_cb(rxWidthKeys[i], onRxWidth, LV_EVENT_CLICKED, (void *)(intptr_t)i);
+  }
+  lv_obj_t *sketch = lv_obj_create(widths);
+  plainBox(sketch, 0x141920);
+  lv_obj_set_size(sketch, RX_SKETCH_WIDTH, RX_KEY_HEIGHT);
+  lv_obj_set_style_radius(sketch, 4, 0);
+  rxPassband = lv_obj_create(sketch);
+  plainBox(rxPassband, COLOUR_ACCENT);
+  lv_obj_set_style_bg_opa(rxPassband, LV_OPA_60, 0);
+  lv_obj_set_style_radius(rxPassband, 2, 0);
+  lv_obj_t *carrier = gridLine(sketch, RX_SKETCH_WIDTH / 2, 0, 1, RX_KEY_HEIGHT);
+  lv_obj_set_style_bg_color(carrier, lv_color_hex(COLOUR_TEXT), 0);
+
+  // the noise reduction, and the chain's load
+  lv_obj_t *nr = row(content, 4);
+  lv_obj_set_flex_align(nr, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+  for (int i = 0; i < RX_NRS; i++) {
+    rxNrKeys[i] = smallKey(nr, rxNrTitles[i], 66, &lv_font_montserrat_14);
+    lv_obj_add_event_cb(rxNrKeys[i], onRxNr, LV_EVENT_CLICKED, (void *)(intptr_t)i);
+  }
+  rxLoadText = label(nr, "", &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_obj_set_style_pad_left(rxLoadText, 6, 0);
+  refreshReceiver();
+}
+
+// the dial, the keys and the passband from the parameters
+static void refreshReceiver() {
+  if (rxDial == nullptr) return;
+  const int32_t offset = rxOffset();
+  lv_label_set_text(rxSign, offset < 0 ? "-" : "+");
+  char digits[12];
+  snprintf(digits, sizeof(digits), "%05ld", (long)labs(offset));
+  bool leading = true;                          // the zeros before the first digit, dimmed
+  for (int i = 0; i < RX_DIGITS; i++) {
+    const char one[2] = { digits[i], '\0' };
+    lv_label_set_text(rxDigits[i], one);
+    if (digits[i] != '0' || i == RX_DIGITS - 1) leading = false;
+    const bool chosen = i == rxDigit;
+    lv_obj_set_style_text_color(rxDigits[i], lv_color_hex(chosen ? COLOUR_ACCENT : leading ? COLOUR_MUTED : COLOUR_TEXT), 0);
+    lv_obj_set_style_border_width(rxDigits[i], chosen ? 2 : 0, 0);
+  }
+  lv_label_set_text(rxStepLabel, (String("step ") + widthText(rxStep())).c_str());
+
+  const String mode = paramText("mode");
+  for (int i = 0; i < RX_MODES; i++) markSelected(rxModeKeys[i], mode == rxModes[i]);
+  rxWidthsFor(mode, rxWidths);
+  const int width = paramText("width").toInt();
+  for (int i = 0; i < RX_WIDTH_KEYS; i++) {
+    lv_label_set_text(lv_obj_get_child(rxWidthKeys[i], 0), widthText(rxWidths[i]).c_str());
+    markSelected(rxWidthKeys[i], width == rxWidths[i]);
+  }
+  const String nr = paramText("nr");
+  for (int i = 0; i < RX_NRS; i++) markSelected(rxNrKeys[i], nr == rxNrs[i]);
+
+  // the passband: low .. high around the carrier in the sketch's middle
+  const auto sketchX = [](float hertz) {
+    return (int)lroundf(constrain((hertz + RX_SKETCH_HZ) / (2 * RX_SKETCH_HZ), 0.0f, 1.0f) * (RX_SKETCH_WIDTH - 1));
+  };
+  const int left = sketchX(paramText("low").toFloat());
+  const int right = sketchX(paramText("high").toFloat());
+  lv_obj_set_pos(rxPassband, left, 6);
+  lv_obj_set_size(rxPassband, max(right - left, 2), RX_KEY_HEIGHT - 12);
+
+  // the squelch's threshold on the S-meter's scale; off at its bottom
+  const int squelch = paramText("squelch").toInt();
+  if (squelch <= -150) {
+    lv_obj_add_flag(rxSquelchMark, LV_OBJ_FLAG_HIDDEN);
+  } else {
+    const float share = constrain((squelch - RX_METER_LOW) / (float)-RX_METER_LOW, 0.0f, 1.0f);
+    lv_obj_set_pos(rxSquelchMark, RX_BAR_X + (int)lroundf(share * (RX_BAR_WIDTH - 1)), 3);
+    lv_obj_remove_flag(rxSquelchMark, LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
+// the S-meter, the AGC's gain (the FM offset in FM), the squelch, the load
+static void refreshMeter() {
+  drawnMeter = board.meterVersion;
+  if (rxBar == nullptr) return;
+  const bool heard = !isnan(board.sMeter);
+  lv_bar_set_value(rxBar, heard ? (int32_t)lroundf(constrain(board.sMeter, (float)RX_METER_LOW, 0.0f)) : RX_METER_LOW,
+                   LV_ANIM_OFF);
+  char text[48];
+  if (!heard) snprintf(text, sizeof(text), "-- dBFS");
+  else if (paramText("mode") == "fm") snprintf(text, sizeof(text), "%.1f dBFS  FM %+.0f Hz", board.sMeter, board.fmOffset);
+  else snprintf(text, sizeof(text), "%.1f dBFS  AGC %.0f dB", board.sMeter, board.agcGain);
+  lv_label_set_text(rxMeterText, text);
+  lv_obj_set_style_bg_color(rxSquelchDot, lv_color_hex(board.squelchOpen ? COLOUR_ACCENT : 0x4A5566), 0);
+  if (isnan(board.rxCpu)) text[0] = '\0';
+  else if (paramText("nr") == "spectral" && !isnan(board.nrGain)) snprintf(text, sizeof(text), "NR %.1f dB\nCPU %.0f %%", board.nrGain, board.rxCpu);
+  else snprintf(text, sizeof(text), "CPU %.0f %%", board.rxCpu);
+  lv_label_set_text(rxLoadText, text);
+}
+
+// the receiver's tiles: what is turned most first, the equalizer and the test tone last
+static int receiverRank(int index) {
+  static const char *const order[] = {
+    "volume", "squelch", "nr-level", "width", "low", "high", "agc", "agc-gain", "hang", "decay", "pitch",
+    "stopband", "fm-deviation", "deemphasis", "filter", "input", "iq-gain", "iq-phase",
+  };
+  for (size_t i = 0; i < sizeof(order) / sizeof(order[0]); i++) {
+    if (board.params[index].name == order[i]) return (int)i;
+  }
+  return 100 + index;
+}
+
 // --- the application's page ------------------------------------------------------------------
 
 // a parameter as a tile, two to a row: its name above, its value below
@@ -1224,6 +1570,7 @@ static void buildApplication() {
   if (board.application == "radio") buildRadioHeader();
   else if (board.application == "analyzer") buildAnalyzerHeader();
   else if (board.application == "equalizer") buildEqualizerCurve();
+  else if (board.application == "receiver") buildReceiverHeader();
   else if (synth) buildSectionKeys();
   if (synth && section == SECTION_FILTER) buildFilterCurve();
   if (synth && section == SECTION_ENV) buildEnvelopeCurve();
@@ -1235,6 +1582,8 @@ static void buildApplication() {
     if (name == "output") continue;                     // the switch in the top bar
     // the radio: the volume beside its station keys; the bands are on the pots
     if (board.application == "radio" && name != "volume") continue;
+    // the receiver: mode, tuning and NR are the header's keys
+    if (board.application == "receiver" && (name == "mode" || name == "offset" || name == "nr")) continue;
     if (synth && section != SECTION_ALL && sectionOf(name) != section) continue;
     rows.push_back((int)i);
   }
@@ -1242,6 +1591,9 @@ static void buildApplication() {
     std::stable_sort(rows.begin(), rows.end(), [](int a, int b) {
       return board.params[a].name.endsWith("-frequency") < board.params[b].name.endsWith("-frequency");
     });
+  }
+  if (board.application == "receiver") {
+    std::stable_sort(rows.begin(), rows.end(), [](int a, int b) { return receiverRank(a) < receiverRank(b); });
   }
   if (synth) {
     const auto rank = [](int index) {
@@ -1269,6 +1621,11 @@ static void rebuild() {
   curve = CurvePlot();
   curveKind = CURVE_NONE;
   stationKeys.clear();
+  rxDial = rxSign = rxStepLabel = rxBar = rxSquelchMark = rxMeterText = rxSquelchDot = rxPassband = rxLoadText = nullptr;
+  for (lv_obj_t *&key : rxModeKeys) key = nullptr;
+  for (lv_obj_t *&key : rxWidthKeys) key = nullptr;
+  for (lv_obj_t *&key : rxNrKeys) key = nullptr;
+  drawnMeter = 0xFFFFFFFF;
   valueLabels.clear();
   settingsPotSwitch = startupSwitch = brightnessSlider = settingsInfo = nullptr;
   if (page == PAGE_HOME) buildHome();
@@ -1339,6 +1696,8 @@ static void refresh() {
       if (valueLabels[i] != nullptr) lv_label_set_text(valueLabels[i], shown(board.params[i]).c_str());
     }
     refreshRadio();
+    refreshReceiver();
+    refreshMeter();
     refreshAnalyzer();
     refreshCurve();
     for (int i = 0; i < sectionCount; i++) {
@@ -1493,12 +1852,15 @@ void uiPoll() {
     seenVersion = board.version;
     refresh();
   }
+  // the receiver's meter, five times a second: only its own widgets
+  if (board.meterVersion != drawnMeter) refreshMeter();
 }
 
 // commands on the USB port, for screenshots and tests: "page home|app|settings",
 // "section osc|filter|env|lfo|perf|all", "edit <parameter>", "close",
 // "cursor <point>" (the Frequency Response plot's cursor on that point, -1 none),
-// "view response|thd|spectrum" (the analysis' view)
+// "view response|thd|spectrum" (the analysis' view), "digit <0..4>" (the
+// receiver's tuning digit, 10 kHz .. 1 Hz)
 void uiCommand(const String &line) {
   if (line.startsWith("page ")) {
     const String name = line.substring(5);
@@ -1521,6 +1883,9 @@ void uiCommand(const String &line) {
   } else if (line.startsWith("cursor ")) {
     cursorIndex = line.substring(7).toInt();
     drawCursor();
+  } else if (line.startsWith("digit ")) {
+    rxDigit = constrain((int)line.substring(6).toInt(), 0, RX_DIGITS - 1);
+    refreshReceiver();
   } else if (line == "view thd" || line == "view response" || line == "view spectrum") {
     view = line == "view thd" ? VIEW_THD : line == "view spectrum" ? VIEW_SPECTRUM : VIEW_RESPONSE;
     drawnPoints = drawnSpectrum = 0xFFFFFFFF;

@@ -182,6 +182,9 @@ static void readParams() {
     board.params.push_back(param);
   }
   board.paramsVersion++;
+  board.sMeter = board.agcGain = board.fmOffset = board.audioDb = board.rxCpu = board.nrGain = NAN;
+  board.squelchOpen = true;
+  board.meterVersion++;
   // what the application's own page needs besides its parameters
   if (board.application == "radio") {
     enqueue("stations", REQ_STATIONS);
@@ -478,6 +481,17 @@ static void event(const std::vector<String> &w) {
   } else if (name == "spectrum") {
     readSpectrumState(w, 2);
     changed();
+  } else if (name == "meter" && w.size() >= 8) {
+    // ! meter <s-meter> <agc-gain> <fm-offset> <squelch> <audio> <cpu> [<nr-gain>]:
+    // only the meter redraws
+    board.sMeter = w[2].toFloat();
+    board.agcGain = w[3].toFloat();
+    board.fmOffset = w[4].toFloat();
+    board.squelchOpen = w[5] == "1";
+    board.audioDb = w[6].toFloat();
+    board.rxCpu = w[7].toFloat();
+    board.nrGain = w.size() >= 9 ? w[8].toFloat() : NAN;
+    board.meterVersion++;
   }
 }
 

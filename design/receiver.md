@@ -273,11 +273,14 @@ parameter tiles and knob strip below. Optional: panadapter plot from
 `! rxspectrum` with the tuned frequency marked. Layout rules as before
 (content 182 px, tiles 150 x 40, ASCII fonts).
 
-## 10 Sensitivity: a preamplifier is needed (superseded)
+## 10 Sensitivity: a preamplifier is needed (open again)
 
-*R3 measured the opposite on this board (section 14): about -133 dBm in
-2.4 kHz through K2, clipping above about -50 dBm. The preamplifier is
-dropped (section 13). The text below is the proposal as it stood.*
+*R3 seemed to measure the opposite (about -133 dBm in 2.4 kHz, clipping
+above -50 dBm) and the preamplifier was dropped (section 13). Those
+levels came from the generator's sync output, not its 100 mVpp sine; the
+repeat with the sine (section 14, "R3 levels corrected") finds about
+-102 dBm in 2.4 kHz and clipping about 32 dB higher. The decision is open
+again. The text below is the proposal as it stood.*
 
 The QRP Labs front end delivers I / Q at microvolt to millivolt level;
 the measured requirement on the DSP-Box was about **+30 dB of low-noise
@@ -373,6 +376,21 @@ the application's tuning core (`FrontEndClient`, `SdrTuner` centred on
 front end into K2 reaches about -133 dBm in 2.4 kHz and clips above
 about -50 dBm (section 14, R3); an attenuator ahead of the front end is
 the useful addition, if any.
+
+**Revised again 2026-11-10 (after R6):** the R3 levels were measured on the
+generator's sync output. With its sine, the receiver reaches about -102 dBm
+in 2.4 kHz (noise figure about 38 dB) and clips at about -18 dBm (section
+14, "R3 levels corrected"). Decision 5 is open again: a preamplifier of
+about +20 dB would bring the noise-equivalent input to about -122 dBm
+with the clipping still near -38 dBm.
+
+**Decided 2026-11-10:** a **10 dB wideband RF amplifier with a high IP3**
+ahead of the front end (the user's hardware). Expected: noise-equivalent
+input about -112 dBm in 2.4 kHz (its own noise figure is small against
+the receiver's 38 dB), clipping at about -28 dBm (S9+45), the S-meter
+reading dBm + 19.5 at +10 kHz. To check once fitted: the same carrier
+at -50 dBm (about -30 dBFS expected), the noise floor with the
+generator's output off, the clipping point.
 
 ## 14 Results
 
@@ -509,6 +527,46 @@ tuner split takes 10 kHz as its centre.
 
 R3 done.
 
+**R3 levels corrected (2026-11-10, after R6).** The generator's *sync*
+output, not its main output, fed the front end through R3 .. R5: in sine
+mode a square wave at the carrier frequency, about 28 dB stronger than
+the 100 mVpp sine. Every absolute level above is that much off; ratios
+and frequencies stand (image null, filter sweeps, tuning, distortion
+orders relative to the carrier, the fs/4 and 16 kHz findings). Repeated
+with the main output: **200 mVpp into 50 ohms (-10 dBm) through 40 dB,
+-50 dBm at the front end**, AM 1 kHz 80 %, carrier at +10 kHz, I/Q
+correction +0.41 dB / +1.05 deg, AGC off at 0 dB, through the panel's
+network port while the application held the board. (A first repeat read
+15 dB less: a bad connector, found and redone.)
+
+- ADC input, whole band (`diag rx`): -42.1 / -41.8 dBFS RMS.
+- Carrier in 100 Hz: **-40.5 dBFS**, so dBm = dBFS - 9.5 at this offset
+  (R3's -18 dBFS for "-56 dBm" was the sync output, 28 dB stronger).
+  Sidebands -49.1 / -47.8 dBFS, -8.6 / -7.3 dBc (80 % AM: -8.0 dBc):
+  the chain is linear there.
+- Noise, USB 2.4 kHz, generator connected: -91.3 .. -93.3 dBFS at
+  offsets of 16 .. 19 kHz (mean -92.2), -91.9 at -18 kHz, -86.9 at
+  -8 kHz, -84.3 at 6 kHz (near the LO); R3 had -98.6 with the generator
+  off.
+- **S/N 52 dB at -50 dBm: noise-equivalent input about -102 dBm in
+  2.4 kHz**, noise figure about 38 dB; 10 dB S/N at about -92 dBm. (With
+  R3's floor, generator off, it would be -108 dBm; a floor measured with
+  the generator connected but its output off would settle which.) The
+  DSP-Box reached -89 dBm: about 13 dB better here, mostly the ADAU1701's
+  ADC being quieter than the AIC23 (section 10) -- and the "30 dB hotter
+  than into the DSK" of R3 was the sync output.
+- Clipping: the carrier clipped at -8.5 dBFS (R3), about **-18 dBm** at
+  the front end, not -50 dBm (the front end's own compression is not
+  measured).
+
+Consequence: R3's (1) is reversed. The receiver is about 15 dB short of
+hearing the 20 m band's own noise (which needs a noise figure of roughly
+20 .. 25 dB), and it has some 15 dB of headroom above the strongest
+stations (S9+40, -33 dBm). A preamplifier of about +20 dB (noise figure
+well below 20 dB) is worth it again: about -122 dBm, clipping near
+-38 dBm; the 20 m filter's 28 dB loss (until it is aligned) adds to the
+case. Decision 5 is open again (section 13).
+
 **R4 (2026-11-10), front end on the Uno (option B).** `AudioDspLab.Core`
 gets `FrontEnd\FrontEndClient` (SDRFrontend 1.0 text protocol, serial
 port opened without a DTR pulse, simulated front end), `SdrTuner`
@@ -565,3 +623,20 @@ carrier 14.100 MHz at -56 dBm):
 Not tried by hand yet: dragging the edges on the chart, the CSV
 dialogs. The page's hints already name the R7 pots (P1 width, P2 NR
 level, P3 squelch); the firmware maps only P4 so far.
+
+**R6 (2026-11-10, CYD on COM6).** A Receiver page in `AudioDspLabPanel`:
+an offset dial of five digits (tap a digit, step it with - / +, or drag
+along the dial, 14 px a step; the front end is the PC's, option B, so
+the panel tunes the offset and the PC's dial follows), an S-meter bar
+(-130 .. 0 dBFS) with the squelch's mark, level and AGC gain (FM offset
+in FM) and a squelch dot, mode keys Off AM USB LSB CW FM, four width
+keys that suit the mode with a passband sketch around the carrier, NR
+keys with the CPU load (and the spectral NR's gain); the other
+parameters as tiles below, a scroll away. The link reads `! meter` into
+its own version count, so only the meter's widgets redraw five times a
+second. Home keys 98 x 38 for seven applications; tile names spell AGC,
+NR, FM, I/Q; USB command `digit <n>` for screenshots. Panel firmware
+1,382,407 bytes. Checked: the page follows mode, width, NR and squelch
+set elsewhere; tuning, keys and tiles tried by hand on the CYD. Not
+done: the optional panadapter (`rxspectrum`); screenshots for the
+manual come with R7.

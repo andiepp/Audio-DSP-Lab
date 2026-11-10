@@ -14,6 +14,7 @@
 #include "Eeprom24.h"
 #include "Synth.h"
 #include "Capture.h"
+#include "Receiver.h"
 #include <Arduino.h>
 #include <esp_system.h>
 #include <esp_rom_sys.h>
@@ -1219,7 +1220,17 @@ static void cmdDiag() {
     return okf("%.2f %s %s %s %s %s %s %s %s %s %s", thdResult.hertz, v[0], v[1], v[2], v[3], v[4], v[5], v[6],
                v[7], v[8], v[9]);
   }
-  if ((is(1, "capture") || is(1, "record")) && distortionBusy()) return fail(ERR_BUSY);
+  // the receiver holds the serial output's port while it runs
+  if ((is(1, "capture") || is(1, "record")) && (distortionBusy() || captureStreaming())) return fail(ERR_BUSY);
+  // the receiver's input: blocks, gaps, I and Q (dBFS), processing time of
+  // the last block and the longest (us)
+  if (is(1, "rx") && tokenCount == 2) {
+    if (!runningApp(APP_RECEIVER)) return;
+    ReceiverStats s;
+    receiverGetStats(s);
+    return okf("%lu %lu %.1f %.1f %lu %lu", (unsigned long)s.blocks, (unsigned long)s.gaps, s.inputDb[0],
+               s.inputDb[1], (unsigned long)s.processUs, (unsigned long)s.processMaxUs);
+  }
   if (is(1, "capture") && (tokenCount == 2 || tokenCount == 3)) {
     long frames = CAPTURE_DEFAULT_FRAMES;
     if (tokenCount == 3 && !parseLong(tokens[2], CAPTURE_MIN_FRAMES, CAPTURE_MAX_FRAMES, frames)) {
@@ -1312,7 +1323,7 @@ static const Command commands[] = {
   { "load",      cmdLoad,       "load" },
   { "aux",       cmdAux,        "aux" },
   { "backup",    cmdBackup,     "backup" },
-  { "diag",      cmdDiag,       "diag boot|dsp|dspset|eeprom|scan|tone|meter|raw|heap|capture|record|clocks|thd-test ..." },
+  { "diag",      cmdDiag,       "diag boot|dsp|dspset|eeprom|scan|tone|meter|raw|heap|capture|record|clocks|thd-test|rx ..." },
   { "reset",     cmdReset,      "reset" },
 };
 

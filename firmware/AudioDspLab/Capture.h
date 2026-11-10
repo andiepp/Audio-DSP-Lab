@@ -50,6 +50,16 @@ bool captureMeasure(uint32_t frames, CaptureResult &result, int32_t *keep = null
 // capture at a time (the THD measurement's task, or a diag request)
 bool captureSamples(uint32_t frames, float *left, float *right);
 
+// a continuous stream for the receiver: the port stays open (the measuring
+// functions above fail meanwhile), each read takes the next
+// CAPTURE_CHUNK_FRAMES frames as received, left and right in turn, 24 bits
+// at the top of each 32-bit slot; false on a timeout (no clock: the DSP
+// in reset or booting). The stream belongs to one task
+bool captureStreamOpen();
+bool captureStreamRead(int32_t *frames, uint32_t timeoutMs);
+void captureStreamClose();
+bool captureStreaming();
+
 // the serial output's clocks, counted on their pins (-1 if the counter
 // could not be set up)
 void captureClocks(float &lrclkHertz, float &bclkHertz);

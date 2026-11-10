@@ -108,6 +108,7 @@ static const AppTable tables[] = {
   { APP_ANALYSIS,    "analyzer",    analyzerInfo,  COUNT(analyzerInfo) },
   { APP_SIGMASTUDIO, "sigmastudio", nullptr,       0 },
   { APP_SYNTH,       "synthesizer", synthInfo,     COUNT(synthInfo) },
+  { APP_RECEIVER,    "receiver",    equalizerInfo, COUNT(equalizerInfo) - 1 },  // R1: the equalizer's
 };
 
 static const AppTable *tableOf(uint8_t appId) {

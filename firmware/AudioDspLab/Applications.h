@@ -40,6 +40,7 @@
 #define APP_ANALYSIS                  0x04
 #define APP_SIGMASTUDIO               0x05
 #define APP_SYNTH                     0x06
+#define APP_RECEIVER                  0x07
 
 // analysis (0x04) parameters
 #define ANA_LEVEL                    1       // 0.01 dBFS, -60 .. 0, the output's level

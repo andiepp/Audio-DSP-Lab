@@ -1,0 +1,62 @@
+verify 511 taps (fir coef natural): max|y| 1440.9, err dot 0.000246, fir 0.000246, fft-part 0.0011
+verify 511 taps (fir coef reversed): max|y| 1170.8, err dot 0.000306, fir 0.000306, fft-part 0.00129
+verify 175 taps (fir coef natural): max|y| 2765.3, err dot 0.00244, fir 3.74e+03, fft-part 0.00244
+verify 175 taps (fir coef reversed): max|y| 2599.4, err dot 0.00147, fir 0.00147, fft-part 0.00156
+
+=== RxBench  -Os, CPU 240 MHz, core 1, block 256 @ 48 kHz = 5333 us ===
+stage                                           mean us   max us   % blk
+I2S int32 -> float (2 x 256)                       24.2       28    0.5%
+DDC I/Q: DC, IQ corr, NCO mix, 43-tap /4 (C)      231.5      247    4.3%
+DDC I/Q, low-pass by esp-dsp fird ae32            276.0      300    5.2%
+Channel FIR 175 taps, direct (C)                 1464.7     1469   27.5%
+Channel FIR 511 taps, direct (C)                 3803.1     3809   71.3%
+Channel FIR 511, 4x dsps_dotprod_f32_ae32        2463.4     2467   46.2%
+Channel FIR 511, 4x dsps_fir_f32_ae32            2228.5     2232   41.8%
+Channel FIR 511, FFT-128 partitioned (8)          254.3      258    4.8%
+Channel FIR 175, FFT-128 partitioned (3)          179.1      183    3.4%
+AGC (log10f + expf per sample)                    189.8      318    3.6%
+FM demod (atan2f) + de-emphasis                   102.8      144    1.9%
+AM demod (sqrtf) + DC block                        29.0       35    0.5%
+NR LMS 64 taps                                    395.9      421    7.4%
+NR spectral (FFT 256 x2, min. stats)              863.2      952   16.2%
+x4 interpolation 43 taps                          162.7      172    3.1%
+float -> I2S int32 (2 x 256)                       27.5       32    0.5%
+CHAIN worst case (C 511, FM, LMS)                4923.5     4930   92.3%
+CHAIN FFT 511, FM, LMS                           1374.9     1382   25.8%
+CHAIN FFT 511, FM, spectral NR                   1827.9     1887   34.3%
+CHAIN FFT 175, AM, spectral NR                   1688.0     1748   31.6%
+Channel filter design: 511 prototype taps in 3415 us (6.7 us/tap)  [0.999975]
+heap free 205872, largest 94196, internal free 205872; out sample 38814464, nrGain -12.0 dB
+=== end ===
+
+verify 511 taps (fir coef natural): max|y| 1440.9, err dot 0.000246, fir 0.000246, fft-part 0.0011
+verify 511 taps (fir coef reversed): max|y| 1170.8, err dot 0.000306, fir 0.000306, fft-part 0.00129
+verify 175 taps (fir coef natural): max|y| 2765.3, err dot 0.00244, fir 3.74e+03, fft-part 0.00244
+verify 175 taps (fir coef reversed): max|y| 2599.4, err dot 0.00147, fir 0.00147, fft-part 0.00156
+
+=== RxBench  -O2, CPU 240 MHz, core 1, block 256 @ 48 kHz = 5333 us ===
+stage                                           mean us   max us   % blk
+I2S int32 -> float (2 x 256)                       18.9       27    0.4%
+DDC I/Q: DC, IQ corr, NCO mix, 43-tap /4 (C)      138.9      159    2.6%
+DDC I/Q, low-pass by esp-dsp fird ae32            189.2      215    3.5%
+Channel FIR 175 taps, direct (C)                  903.4      905   16.9%
+Channel FIR 511 taps, direct (C)                 2162.5     2167   40.5%
+Channel FIR 511, 4x dsps_dotprod_f32_ae32        2460.9     2464   46.1%
+Channel FIR 511, 4x dsps_fir_f32_ae32            2228.2     2237   41.8%
+Channel FIR 511, FFT-128 partitioned (8)          220.0      224    4.1%
+Channel FIR 175, FFT-128 partitioned (3)          166.2      170    3.1%
+AGC (log10f + expf per sample)                    190.7      320    3.6%
+FM demod (atan2f) + de-emphasis                   102.5      146    1.9%
+AM demod (sqrtf) + DC block                        29.0       37    0.5%
+NR LMS 64 taps                                    346.7      372    6.5%
+NR spectral (FFT 256 x2, min. stats)              636.5      779   11.9%
+x4 interpolation 43 taps                           89.0       96    1.7%
+float -> I2S int32 (2 x 256)                       23.1       27    0.4%
+CHAIN worst case (C 511, FM, LMS)                3058.7     3065   57.4%
+CHAIN FFT 511, FM, LMS                           1116.3     1122   20.9%
+CHAIN FFT 511, FM, spectral NR                   1401.8     1440   26.3%
+CHAIN FFT 175, AM, spectral NR                   1284.7     1323   24.1%
+Channel filter design: 511 prototype taps in 3344 us (6.5 us/tap)  [0.999975]
+heap free 205872, largest 94196, internal free 205872; out sample 38814464, nrGain -12.0 dB
+=== end ===
+

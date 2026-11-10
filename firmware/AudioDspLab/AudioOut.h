@@ -15,7 +15,9 @@
 
 #define AUDIO_OUT_RATE                48000
 
-bool audioOutStart();
+// dmaBuffers: the ring's depth in 64-frame buffers, 0 for the default 4
+// (about 5 ms); a task writing larger blocks needs at least two of its blocks
+bool audioOutStart(uint8_t dmaBuffers = 0);
 void audioOutStop();
 // blocks until the DMA takes the frames (interleaved left, right)
 void audioOutWrite(const int16_t *frames, size_t bytes);

@@ -11,10 +11,10 @@
 
 static i2s_chan_handle_t txChannel = NULL;
 
-bool audioOutStart() {
+bool audioOutStart(uint8_t dmaBuffers) {
   i2s_chan_config_t channelConfig = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
   channelConfig.auto_clear = true;          // silence, not the last block, if the task lags
-  channelConfig.dma_desc_num = AUDIO_OUT_DMA_BUFFERS;
+  channelConfig.dma_desc_num = dmaBuffers != 0 ? dmaBuffers : AUDIO_OUT_DMA_BUFFERS;
   channelConfig.dma_frame_num = AUDIO_OUT_DMA_FRAMES;
   if (i2s_new_channel(&channelConfig, &txChannel, NULL) != ESP_OK) {
     txChannel = NULL;

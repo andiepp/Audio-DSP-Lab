@@ -20,6 +20,8 @@
 #include "DspImageEqualizer.h"
 #include "DspImageRadio.h"
 #include "DspImageAnalysis.h"
+#include "DspImageReceiver.h"
+#include "Receiver.h"
 
 #define MAX_PARAMS                    56      // the synthesizer has 48
 #define POT_PICKUP_THRESHOLD          80      // counts of 4095 (~2 %)
@@ -594,6 +596,31 @@ static const PotMap synthPots[] = {
   { 3, SYN_VOLUME,   potToAmplitude },
 };
 
+// ----------------------------------------------------------------------------
+//  Application 0x07 - receiver (design/receiver.md)
+//  SigmaStudio project sigmastudio/Receiver: the Radio project (I2S in ->
+//  bands -> volume, cells and addresses the equalizer's) plus SerialOutL /
+//  SerialOutR, fed straight from ADC0 (I) and ADC1 (Q). The ESP32 runs the
+//  receiver chain between them (Receiver.cpp) at 48 kHz, its I2S output
+//  making the DSP's MCLK as the generator's does.
+//  Step R1: the equalizer's parameters; P4 the volume.
+// ----------------------------------------------------------------------------
+
+static bool rxTakeClock() {
+  mclkStop();
+  coreRate = DSP_CORE_RATE;
+  return receiverBegin();
+}
+
+static void rxReleaseClock() {
+  receiverEnd();
+  if (!mclkRunning()) mclkStart(DSP_SAMPLE_RATE);
+}
+
+static const PotMap receiverPots[] = {
+  { 3, EQ_VOLUME, potToAmplitude },
+};
+
 static const AppDef applications[] = {
   { 0x01, "Signal generator", DspImageRadio, DspImageRadioLength,
     generatorParams, 6, generatorPots, 4, genTakeClock, genReleaseClock },
@@ -610,6 +637,9 @@ static const AppDef applications[] = {
   { APP_SYNTH, "Synthesizer", DspImageRadio, DspImageRadioLength,
     synthParams, sizeof(synthParams) / sizeof(synthParams[0]),
     synthPots, sizeof(synthPots) / sizeof(synthPots[0]), synTakeClock, synReleaseClock },
+  { APP_RECEIVER, "SDR receiver", DspImageReceiver, DspImageReceiverLength,
+    equalizerParams, sizeof(equalizerParams) / sizeof(equalizerParams[0]),
+    receiverPots, sizeof(receiverPots) / sizeof(receiverPots[0]), rxTakeClock, rxReleaseClock },
 };
 static const uint8_t applicationCount = sizeof(applications) / sizeof(applications[0]);
 
@@ -836,7 +866,7 @@ static bool storeStartup(bool restores, uint8_t id) {
 // output comes on ; the generator and the analyzer
 // may drive a device under test and stay off
 static void outputOnAtPowerUp() {
-  uint8_t paramId = active->begin == radioTakeClock ? EQ_OUTPUT
+  uint8_t paramId = active->begin == radioTakeClock || active->id == APP_RECEIVER ? EQ_OUTPUT
                   : active->id == APP_SYNTH ? SYN_OUTPUT : 0;
   int index = paramId == 0 ? -1 : findParam(paramId);
   if (index >= 0 && active->params[index].apply(1)) values[index] = 1;

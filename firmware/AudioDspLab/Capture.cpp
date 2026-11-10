@@ -101,10 +101,12 @@ static bool readChunk(i2s_chan_handle_t rx, uint32_t timeoutMs) {
   return i2s_channel_read(rx, chunk, sizeof(chunk), &got, timeoutMs) == ESP_OK && got == sizeof(chunk);
 }
 
-// the second port as a slave, enabled, its first full chunk received and
-// what the DMA buffered meanwhile dropped: the next chunk read has just
-// come in. False (and the port deleted) without clocks
-static bool openRx(i2s_chan_handle_t &rx) {
+// the receiver's stream (captureStream*), NULL while none runs
+static i2s_chan_handle_t stream = NULL;
+
+// the second port as a slave, created and enabled; false (nothing left
+// behind) if the driver refuses it, as while the stream holds the port
+static bool createRx(i2s_chan_handle_t &rx) {
   rx = NULL;
   i2s_chan_config_t channelConfig = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_1, I2S_ROLE_SLAVE);
   channelConfig.dma_desc_num = 4;
@@ -138,6 +140,14 @@ static bool openRx(i2s_chan_handle_t &rx) {
     rx = NULL;
     return false;
   }
+  return true;
+}
+
+// the second port, its first full chunk received and what the DMA
+// buffered meanwhile dropped: the next chunk read has just come in. False
+// (and the port deleted) without clocks, or while the stream runs
+static bool openRx(i2s_chan_handle_t &rx) {
+  if (stream != NULL || !createRx(rx)) return false;
   bool clocked = readChunk(rx, CAPTURE_CLOCK_TIMEOUT_MS);
   while (clocked && readChunk(rx, 0)) {}
   if (!clocked) {
@@ -198,6 +208,27 @@ bool captureMeasure(uint32_t frames, CaptureResult &result, int32_t *keep) {
   }
   closeRx(rx);
   return clocked && result.frames > 0;
+}
+
+bool captureStreamOpen() {
+  return stream != NULL || createRx(stream);
+}
+
+bool captureStreamRead(int32_t *frames, uint32_t timeoutMs) {
+  if (stream == NULL) return false;
+  const size_t bytes = 2 * CAPTURE_CHUNK_FRAMES * sizeof(int32_t);
+  size_t got = 0;
+  return i2s_channel_read(stream, frames, bytes, &got, timeoutMs) == ESP_OK && got == bytes;
+}
+
+void captureStreamClose() {
+  if (stream == NULL) return;
+  closeRx(stream);
+  stream = NULL;
+}
+
+bool captureStreaming() {
+  return stream != NULL;
 }
 
 bool captureSamples(uint32_t frames, float *left, float *right) {

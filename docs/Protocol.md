@@ -112,7 +112,7 @@ The board keeps numbers in hundredths. A request with more decimals is rounded, 
 | `no-sweep` | there is no complete sweep to keep as the reference |
 | `store-failed` | the ESP32's flash (NVS) refused the write |
 | `no-clock` | no clock arrives on the DSP's serial output (MP10, MP11) |
-| `busy` | the THD measurement uses the serial output (`diag capture`, `diag record`) |
+| `busy` | the THD measurement or the receiver uses the serial output (`diag capture`, `diag record`) |
 | `no-memory` | not enough free memory for the THD measurement |
 
 ## Commands
@@ -236,6 +236,7 @@ The THD measurement takes the line input as the DSP sends it to its serial outpu
 | `diag blocks` | `ok <32k> <16k> <8k> <4k>`: how many blocks of 32, 16, 8 and 4 KB the heap gives, taken greedily, largest first, and given back at once |
 | `diag thd-test` | `ok <hz> <level-L> <thd-L> <thdn-L> <H2-L> <H3-L> <level-R> <thd-R> <thdn-R> <H2-R> <H3-R>`: the distortion analysis on a synthetic signal, -20 dBFS at 1001.95 Hz with H3 at -60 dBc on the left and H2 at -80 dBc on the right; the answer gives those back |
 | `diag record [<frames>]` | `* <frame> ...` 16 frames a line, each the left and right sample as 6 hex digits (24 bits, two's complement), then `ok <rate> <frames>`: 4096 contiguous frames (or 256 to 4096, rounded up to a multiple of 256) of the serial output |
+| `diag rx` | `ok <blocks> <gaps> <i-db> <q-db> <process-us> <process-max-us>`: the receiver (0x07) since it started: blocks of 256 frames processed, reads that found no clock, the last block's RMS of I (ADC0) and Q (ADC1) without their DC in dBFS (-200 for silence), its processing time and the longest, in us; `err wrong-application` in another application |
 
 Addresses and words may be written in hexadecimal with `0x`.
 

@@ -24,6 +24,14 @@ The configurable receiver of the TMS320-DSP-Box (`H:\TMS320-DSP-Box`,
 Accepted: the receiver is one application among the others (one
 application and one DSP image at a time), not simultaneous with them.
 
+**The goal, as clarified 2026-11-10:** a receiver *backend* from the IF on,
+defined at its input K2: a real IF (K2 left) or I/Q (K2 left I, right Q),
+with a stated full scale, noise floor and sensitivity, so that a front end
+knows what it has to deliver. The QRP Labs front end with its Uno
+(sections 6, 14) is the author's test rig, not part of the product; its
+figures in dBm describe that rig. The backend's own figures are in
+section 14, "The backend at K2".
+
 ## 2 What is there
 
 **DSP-Box chain** (C6713, about 10 % CPU, 13 % with I/Q): 48 kHz real IF
@@ -385,10 +393,11 @@ about +20 dB would bring the noise-equivalent input to about -122 dBm
 with the clipping still near -38 dBm.
 
 **Decided 2026-11-10:** a **10 dB wideband RF amplifier with a high IP3**
-ahead of the front end (the user's hardware). Expected: noise-equivalent
-input about -112 dBm in 2.4 kHz (its own noise figure is small against
-the receiver's 38 dB), clipping at about -28 dBm (S9+45), the S-meter
-reading dBm + 19.5 at +10 kHz. To check once fitted: the same carrier
+ahead of the front end (the user's hardware). Expected: clipping at
+about -28 dBm (S9+45), the S-meter reading dBm + 19.5 at +10 kHz; the gain
+in sensitivity depends on whether the module's or the backend's noise
+sets the floor, which is not measured yet (section 14, "The backend at
+K2"); if the backend's, up to 10 dB. To check once fitted: the same carrier
 at -50 dBm (about -30 dBFS expected), the noise floor with the
 generator's output off, the clipping point.
 
@@ -641,6 +650,46 @@ carrier 14.100 MHz at -56 dBm):
 Not tried by hand yet: dragging the edges on the chart, the CSV
 dialogs. The page's hints already name the R7 pots (P1 width, P2 NR
 level, P3 squelch); the firmware maps only P4 so far.
+
+**The backend at K2 (2026-11-10, after R7a).** The DG4162's CH1 straight
+into K2 (on both channels through the user's cable), 10 kHz, 1 Vpp set
+with the generator's load at High-Z (K2 is about 22.5 kOhm), no front
+end. The S-meter reads a tone's level at the ADC directly, also with the
+IF input (it agreed with `diag rx`'s RMS + 3.01 dB within 0.03 dB);
+noise and signal as audio RMS (the `meter`'s audio field) in USB 2.4 kHz
+with the AGC off at 0 dB and the NR off; the noise with the generator's
+output off but connected (its 50 ohm on K2), at offsets of 4, 9 and
+16 kHz (within 0.4 dB of each other).
+
+| At K2, 2.4 kHz | IF input (K2 left) | I/Q input (per channel) |
+|---|---|---|
+| Full scale, 0 dBFS (the ADC clips) | 2.98 Vpp = 1.05 V RMS = +2.7 dBu | the same |
+| 1 Vpp at 10 kHz reads | -9.5 dBFS | -9.5 dBFS |
+| Noise, audio RMS | -108.8 dBFS | -112.1 dBFS |
+| Noise-equivalent input (S/N 0 dB) | 5.4 uV RMS, -103 dBu, -106 dBFS | 3.7 uV RMS, -106 dBu, -109 dBFS |
+| Noise density | about 110 nV/sqrt(Hz) | about 75 nV/sqrt(Hz) |
+| 10 dB S/N | 17 uV RMS, -93 dBu, -96 dBFS | 12 uV RMS, -96 dBu, -99 dBFS |
+| Dynamic range, full scale to noise | about 106 dB | about 109 dB |
+
+What a front end should deliver: for its own noise, not the backend's,
+to set the sensitivity, its output noise at K2 about 10 dB above the
+backend's -- at least about 240 nV/sqrt(Hz) per channel for I/Q, 350 for
+an IF; the strongest signals (all of them together) below full scale with
+some headroom; nothing above about 21 kHz, which the board does not
+filter (R2, R3). The bench front end: its -102 dBm (R3 corrected) was
+measured with the generator on, and the DG4162's own broadband noise
+(about -82 dBc/Hz, sdr-input S4) lifted the floor by about 6 dB (S-meter
+-92.2 dBFS with the carrier on against -98.6 with the generator off, the
+front end connected both times): with the generator off the rig reaches
+about -108 dBm. Whether the front end or the backend sets that is not
+measured yet -- the rig on K2, the generator off, the noise as audio RMS
+as above would settle it; until then the estimate for the 10 dB
+amplifier below is open. The I/Q
+input's image rejection is the front end's and the two ADC channels'
+balance, corrected by `iq-gain` / `iq-phase` (+-3 dB, +-10 deg); with
+the correction exact the backend reaches more than 130 dB (R3, internal
+test signal). With a mono cable the measurement could not check the two
+ADC channels against each other.
 
 **R6 (2026-11-10, CYD on COM6).** A Receiver page in `AudioDspLabPanel`:
 an offset dial of five digits (tap a digit, step it with - / +, or drag

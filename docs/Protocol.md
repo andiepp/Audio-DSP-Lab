@@ -155,7 +155,7 @@ Applications:
 | `analyzer` | 4 | analysis: sine out on K3/K4, measured on K2; its Frequency Response (the sweep) and its THD |
 | `sigmastudio` | 5 | your own SigmaStudio program from the EEPROM |
 | `synthesizer` | 6 | monophonic synthesizer played from MIDI on K5 |
-| `receiver` | 7 | SDR receiver: I and Q from a front end on K2, demodulated on the ESP32, through the equalizer to K3 and K4 |
+| `receiver` | 7 | SDR receiver backend: a real IF or I and Q from a front end on K2, demodulated on the ESP32, through the equalizer to K3 and K4 |
 
 ### Potentiometers, power-up and service mode
 

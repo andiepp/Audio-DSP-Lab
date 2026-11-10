@@ -14,7 +14,7 @@ The project's home is **[github.com/andiepp/Audio-DSP-Lab](https://github.com/an
 | **Analysis** | **Frequency Response**: sweeps a device under test, with a reference to subtract the board's own response. **THD**: the harmonic distortion and THD+N of a device, with its spectrum. **Spectrum**: what comes on the line input, with its RMS and strongest peaks |
 | **SigmaStudio** | Runs your own SigmaStudio programs; the pots go to the DSP's auxiliary ADC, your program survives the other applications |
 | **Synthesizer** | A Minimoog-style monophonic synthesizer: three oscillators, ladder filter, envelopes, two LFOs, glide, played from any MIDI keyboard |
-| **Receiver** | An SDR receiver for the I/Q output of a short-wave front end: AM, USB, LSB, CW and FM, channel filters of up to 511 taps (designed on the board, or on the PC and downloaded), AGC, S-meter, noise reduction, squelch; the PC application tunes the front end's oscillator |
+| **Receiver** | An SDR receiver backend from the IF (a real IF or I/Q at K2, from your front end, with full scale, noise and sensitivity specified at K2): AM, USB, LSB, CW and FM, channel filters of up to 511 taps (designed on the board, or on the PC and downloaded), AGC, S-meter, noise reduction, squelch |
 
 The four pots on the board play the main values of each application, side by side with the PC. The board can start an application by itself at power-up and run without a PC. The window comes in three themes, Classic, Studio dark and Studio light.
 
@@ -60,7 +60,7 @@ Step by step: **[Installation guide](docs/Installation.md)**.
 
 - Elektor Audio-DSP-FX board v2.2, with either ESP32 kit: ESP32-PICO-KIT V4 (PICO-D4) or ESP32-PICO-KIT-1 (PICO-V3)
 - Windows 10 or 11, 64-bit (the application is self-contained; nothing else to install)
-- Optional: 2.4 GHz WiFi for the radio; a MIDI keyboard with DIN MIDI Out for the synthesizer; an I/Q front end (such as a QRP Labs receiver module with an Si5351A on an Arduino Uno) for the receiver; SigmaStudio 4.7 and a USBi for your own programs
+- Optional: 2.4 GHz WiFi for the radio; a MIDI keyboard with DIN MIDI Out for the synthesizer; a front end that delivers a real IF or I/Q for the receiver (see the manual's chapter on the receiver for what K2 expects); SigmaStudio 4.7 and a USBi for your own programs
 
 Scripting works on any system: [tools/adl.py](tools/adl.py) is a Python client (needs pyserial).
 

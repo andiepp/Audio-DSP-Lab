@@ -29,6 +29,9 @@ enum ErrorCode : uint8_t {
   ERR_NO_CLOCK              = 0x19, // no clock on the DSP's serial output
   ERR_BUSY                  = 0x1A, // the serial output capture is in use (the THD measurement)
   ERR_NO_MEMORY             = 0x1B, // not enough free heap for the measurement
+  ERR_DOWNLOAD_COUNT        = 0x1C, // a filter download ended with too few or too many taps
+  ERR_DOWNLOAD_CRC          = 0x1D, // a filter download's CRC-32 does not match
+  ERR_NOT_LOADING           = 0x1E, // filter data or end without a download begun
 };
 
 #endif

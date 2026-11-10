@@ -12,10 +12,11 @@ public static class Applications
     public const string Analyzer = "analyzer";
     public const string SigmaStudio = "sigmastudio";
     public const string Synthesizer = "synthesizer";
+    public const string Receiver = "receiver";
 
     /// <summary>In the order the application offers them.</summary>
     public static IReadOnlyList<string> All { get; } =
-        [Generator, Equalizer, Radio, Analyzer, Synthesizer, SigmaStudio];
+        [Generator, Equalizer, Radio, Analyzer, Synthesizer, Receiver, SigmaStudio];
 
     public static string DisplayName(string? name) =>
         name switch
@@ -26,6 +27,7 @@ public static class Applications
             Analyzer => "Analysis",
             SigmaStudio => "SigmaStudio mode",
             Synthesizer => "Synthesizer",
+            Receiver => "Receiver",
             None or null => "none",
             _ => name
         };

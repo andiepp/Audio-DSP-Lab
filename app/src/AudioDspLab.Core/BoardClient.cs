@@ -46,6 +46,9 @@ public sealed class BoardClient : IDisposable
     /// <summary>The Spectrum has a new result, or its state changed.</summary>
     public event Action<SpectrumStatus>? SpectrumChanged;
 
+    /// <summary>The receiver's meters, five times a second while it runs.</summary>
+    public event Action<Receiver.ReceiverMeter>? MeterChanged;
+
     public event Action<Exception>? Disconnected;
 
     /// <summary>Every event line as it came, for a console.</summary>
@@ -390,6 +393,9 @@ public sealed class BoardClient : IDisposable
                     break;
                 case "spectrum" when values.Count >= 2:
                     SpectrumChanged?.Invoke(SpectrumStatus.Parse(values));
+                    break;
+                case "meter" when values.Count >= 6:
+                    MeterChanged?.Invoke(Receiver.ReceiverMeter.Parse(values));
                     break;
             }
         }

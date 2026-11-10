@@ -7,6 +7,7 @@
 #include <math.h>
 #include <string.h>
 #include "dsps_fft2r.h"
+#include <esp_rom_crc.h>
 
 #define FS                            48000.0f
 #define DEC                           4
@@ -110,6 +111,7 @@ struct Chain {
   int parts[2];                           // its partitions
   uint16_t taps[2];
   float transition[2];
+  bool downloaded[2];
 };
 
 // the noise reduction (nr.c), on the heap of its own (about 12 KB)
@@ -129,10 +131,21 @@ struct Nr {
   float w[LMS_L];
 };
 
+// a download in progress (the loop), and the taps the design task
+// transforms once it ended well
+struct Load {
+  bool active;                            // between begin and end
+  bool complex;
+  uint16_t expected, received;
+  uint32_t crc;
+  cfloat taps[RX_TAPS_MAX];               // natural order
+};
+
 // the design's request and its result (the loop and the audio task write
 // the request, the design task the result)
 struct Design {
   float low, high, stopband;
+  bool fromLoad;                          // the request: the loaded taps, not a design
   volatile uint32_t generation;           // a newer request abandons a design
   uint32_t doneGeneration;
   float proto[RX_TAPS_MAX];               // the real prototype
@@ -144,6 +157,8 @@ static float *spectra[2][UP_PMAX];        // partition spectra of both sets, 2 x
 static float *inputSpectra[UP_PMAX];      // the frequency-domain delay line
 static Design *design = nullptr;
 static Nr *nr = nullptr;
+static Load *load = nullptr;
+static volatile bool loadInUse = false;   // the design task has the loaded taps to transform
 static TaskHandle_t designTask = nullptr;
 static volatile bool designStop = false;
 static volatile bool designBusy = false;
@@ -390,6 +405,31 @@ static bool designInto(int set, float low, float high, float stopband, uint32_t 
   chain->parts[set] = parts;
   chain->taps[set] = (uint16_t)n;
   chain->transition[set] = transition;
+  chain->downloaded[set] = false;
+  return true;
+}
+
+// the loaded taps into the inactive set, partitioned and transformed
+static bool partitionInto(int set, uint32_t generation) {
+  const int n = load->expected;
+  const int parts = (n + RXB - 1) / RXB;
+  for (int p = 0; p < parts; p++) {
+    if (design->generation != generation) return false;
+    float *h = spectra[set][p];
+    memset(h, 0, 2 * UP_N * sizeof(float));
+    for (int i = 0; i < RXB; i++) {
+      const int k = p * RXB + i;
+      if (k >= n) break;
+      h[2 * i] = load->taps[k].re;
+      h[2 * i + 1] = load->taps[k].im;
+    }
+    fft128(h);
+  }
+  if (design->generation != generation) return false;
+  chain->parts[set] = parts;
+  chain->taps[set] = (uint16_t)n;
+  chain->transition[set] = 0.0f;
+  chain->downloaded[set] = true;
   return true;
 }
 
@@ -436,13 +476,17 @@ static void designTaskRun(void *) {
       portENTER_CRITICAL(&lock);
       const uint32_t generation = design->generation;
       const float low = design->low, high = design->high, stopband = design->stopband;
+      const bool fromLoad = design->fromLoad;
       portEXIT_CRITICAL(&lock);
       if (generation == design->doneGeneration) break;
       designBusy = true;
       // the inactive set is free once the audio task took the last result
       while (swapReady && !designStop) vTaskDelay(1);
       if (designStop) break;
-      if (designInto(1 - chain->act, low, high, stopband, generation)) {
+      const bool done = fromLoad ? partitionInto(1 - chain->act, generation)
+                                 : designInto(1 - chain->act, low, high, stopband, generation);
+      if (fromLoad) loadInUse = false;
+      if (done) {
         design->doneGeneration = generation;
         __sync_synchronize();
         swapReady = true;
@@ -455,10 +499,12 @@ static void designTaskRun(void *) {
 }
 
 static void requestDesign(float low, float high, float stopband) {
+  if (load != nullptr) load->active = false;      // a design replaces a download
   portENTER_CRITICAL(&lock);
   design->low = low;
   design->high = high;
   design->stopband = stopband;
+  design->fromLoad = false;
   design->generation++;
   portEXIT_CRITICAL(&lock);
   if (designTask != nullptr) xTaskNotifyGive(designTask);
@@ -822,6 +868,9 @@ static void freeAll() {
   design = nullptr;
   free(nr);
   nr = nullptr;
+  free(load);
+  load = nullptr;
+  loadInUse = false;
   for (int s = 0; s < 2; s++) {
     for (int p = 0; p < UP_PMAX; p++) {
       free(spectra[s][p]);
@@ -842,7 +891,8 @@ bool rxChainBegin(const RxConfig &config) {
   sineTable = (float *)malloc((NCO_TABLE + 1) * sizeof(float));
   design = (Design *)calloc(1, sizeof(Design));
   nr = (Nr *)calloc(1, sizeof(Nr));
-  bool ok = chain != nullptr && sineTable != nullptr && design != nullptr && nr != nullptr;
+  load = (Load *)calloc(1, sizeof(Load));
+  bool ok = chain != nullptr && sineTable != nullptr && design != nullptr && nr != nullptr && load != nullptr;
   for (int s = 0; s < 2 && ok; s++) {
     for (int p = 0; p < UP_PMAX && ok; p++) ok = (spectra[s][p] = (float *)calloc(1, spectrum)) != nullptr;
   }
@@ -986,6 +1036,7 @@ void rxChainProcess(const int32_t *in, int16_t *out) {
   meter.designs = designs;
   meter.designing = designBusy || swapReady;
   meter.nrGainDb = nr->mode == RX_NR_SPECTRAL ? nr->gainDb : 0.0f;
+  meter.downloaded = c.downloaded[c.act];
 }
 
 void rxChainGetMeter(RxMeter &out) {
@@ -999,4 +1050,52 @@ void rxChainGetMeter(RxMeter &out) {
   out.designs = meter.designs;
   out.designing = meter.designing;
   out.nrGainDb = meter.nrGainDb;
+  out.downloaded = meter.downloaded;
+}
+
+// ----------------------------------------------------------------------------
+//  Filter download (the loop)
+// ----------------------------------------------------------------------------
+
+RxLoadResult rxChainLoadBegin(uint16_t taps, bool complex) {
+  if (load == nullptr) return RX_LOAD_NOT_LOADING;
+  if (loadInUse) return RX_LOAD_BUSY;                // the last one is still being transformed
+  load->active = true;
+  load->complex = complex;
+  load->expected = taps;
+  load->received = 0;
+  load->crc = 0;
+  return RX_LOAD_OK;
+}
+
+RxLoadResult rxChainLoadData(const float *values, uint8_t count, uint16_t &received) {
+  if (load == nullptr || !load->active) return RX_LOAD_NOT_LOADING;
+  const uint8_t per = load->complex ? 2 : 1;
+  if (count % per != 0 || load->received + count / per > load->expected) {
+    received = load->received;
+    return RX_LOAD_COUNT;
+  }
+  load->crc = esp_rom_crc32_le(load->crc, (const uint8_t *)values, count * sizeof(float));
+  for (uint8_t i = 0; i < count; i += per) {
+    cfloat &t = load->taps[load->received++];
+    t.re = values[i];
+    t.im = per == 2 ? values[i + 1] : 0.0f;
+  }
+  received = load->received;
+  return RX_LOAD_OK;
+}
+
+RxLoadResult rxChainLoadEnd(uint32_t crc, uint16_t &taps) {
+  if (load == nullptr || !load->active) return RX_LOAD_NOT_LOADING;
+  load->active = false;
+  taps = load->received;
+  if (load->received != load->expected) return RX_LOAD_COUNT;
+  if (load->crc != crc) return RX_LOAD_CRC;
+  loadInUse = true;
+  portENTER_CRITICAL(&lock);
+  design->fromLoad = true;
+  design->generation++;
+  portEXIT_CRITICAL(&lock);
+  if (designTask != nullptr) xTaskNotifyGive(designTask);
+  return RX_LOAD_OK;
 }

@@ -14,7 +14,7 @@ namespace AudioDspLab.Simulation;
 /// Requests are handled one at a time on a thread of its own, as the
 /// firmware's loop does; events follow between responses.
 /// </remarks>
-public sealed class SimulatedBoard : ILineTransport
+public sealed partial class SimulatedBoard : ILineTransport
 {
     public const string FirmwareVersion = "1.4";
 
@@ -281,6 +281,8 @@ public sealed class SimulatedBoard : ILineTransport
             case "harmonics": Harmonics(); break;
             case "spectrum": SpectrumPart(args); break;
             case "voice": if (Running(Applications.Synthesizer)) Ok(VoiceText()); break;
+            case "meter": Meter(); break;
+            case "rxfilter": RxFilter(args); break;
             case "midi": if (Running(Applications.Synthesizer)) Ok("0 0 0 0"); break;
             case "load": if (Running(Applications.Synthesizer)) Ok("12.5 18.3"); break;
             case "aux": Ok($"{pots[0] / 16} {pots[1] / 16} {pots[2] / 16} {pots[3] / 16} {ProtocolText.FormatSwitch(application == Applications.SigmaStudio)}"); break;
@@ -354,6 +356,7 @@ public sealed class SimulatedBoard : ILineTransport
         Data("analyzer 4 \"Analysis\"");
         Data("sigmastudio 5 \"SigmaStudio mode\"");
         Data("synthesizer 6 \"Synthesizer\"");
+        Data("receiver 7 \"SDR receiver\"");
         Ok();
     }
 
@@ -399,6 +402,9 @@ public sealed class SimulatedBoard : ILineTransport
         }
 
         pendingValueEvents.Clear();
+        downloadedFilter = null;
+        loading = null;
+        filterCount = 1;
         points.Clear();
         sweepState = SweepStatus.Idle;
         sweepTotal = 0;
@@ -549,6 +555,12 @@ public sealed class SimulatedBoard : ILineTransport
         {
             Error("out-of-range",
                 $"{args[0]} {FormatRange(parameter, parameter.Minimum)}..{FormatRange(parameter, parameter.Maximum)} {parameter.Unit}".TrimEnd());
+            return;
+        }
+
+        if (application == Applications.Receiver && !ReceiverSet(parameter.Name, ref value))
+        {
+            Error("dsp-write-failed", "writing to the DSP failed");
             return;
         }
 
@@ -1280,6 +1292,7 @@ public sealed class SimulatedBoard : ILineTransport
         }
 
         pendingValueEvents.Clear();
+        ReceiverEvents();
         if (pots.Where((raw, index) => Math.Abs(raw - reportedPots[index]) >= 80).Any())
         {
             Array.Copy(pots, reportedPots, pots.Length);

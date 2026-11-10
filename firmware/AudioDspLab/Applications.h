@@ -102,6 +102,8 @@ bool appPotControlEnabled();
 uint8_t appStartupSet(bool restores);       // the startup option; ERR_STORE_FAILED
 void appStartupGet(bool &restores, uint8_t &id);
 bool appRunning(uint8_t id);                // the application runs (not loading, failed or in service)
+// the receiver's filter now comes from a download: its "filter" parameter says so
+void appReceiverFilterDownloaded();
 // the applications the firmware knows, in their order
 uint8_t appCount();
 const AppDef *appAt(uint8_t index);

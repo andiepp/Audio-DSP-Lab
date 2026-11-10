@@ -20,6 +20,7 @@ public partial class FirmwareTableTests
         { AudioDspLab.Applications.Radio, "equalizerInfo", "radioParams", "equalizerPots" },
         { AudioDspLab.Applications.Analyzer, "analyzerInfo", "analysisParams", "analysisPots" },
         { AudioDspLab.Applications.Synthesizer, "synthInfo", "synthParams", "synthPots" },
+        { AudioDspLab.Applications.Receiver, "receiverInfo", "receiverParams", "receiverPots" },
     };
 
     [Theory]
@@ -30,7 +31,8 @@ public partial class FirmwareTableTests
         string paramInfo = File.ReadAllText(Path.Combine(FirmwareDirectory, "ParamInfo.cpp"));
         Dictionary<string, string> symbols = Defines(applications);
         string header = File.ReadAllText(Path.Combine(FirmwareDirectory, "Applications.h"));
-        foreach ((string key, string value) in Defines(paramInfo).Concat(Defines(header)))
+        string chain = File.ReadAllText(Path.Combine(FirmwareDirectory, "RxChain.h"));
+        foreach ((string key, string value) in Defines(paramInfo).Concat(Defines(header)).Concat(Defines(chain)))
         {
             symbols[key] = value;
         }
@@ -41,6 +43,12 @@ public partial class FirmwareTableTests
         symbols["SYNTH_SAWTOOTH"] = "1";
         symbols["SYNTH_WAVEFORM_LAST"] = "3";
         symbols["RADIO_STATION_LAST"] = "7";
+        // RxChain.h's enums
+        symbols["RX_USB"] = "2";
+        symbols["RX_FM"] = "5";
+        symbols["RX_INPUT_IQ"] = "0";
+        symbols["RX_NR_LMS"] = "1";
+        symbols["RX_NR_SPECTRAL"] = "2";
 
         var info = Rows(paramInfo, infoTable).ToDictionary(row => int.Parse(row[0], CultureInfo.InvariantCulture));
         var pots = Rows(applications, potTable).ToDictionary(row => Resolve(row[1], symbols), row => $"P{int.Parse(row[0], CultureInfo.InvariantCulture) + 1}");
@@ -125,7 +133,35 @@ public partial class FirmwareTableTests
         yield return row[begin..].Trim();
     }
 
+    // a token, or a simple expression of them: unary minus, a + b, a - b, a * b
     private static int Resolve(string token, IReadOnlyDictionary<string, string> symbols)
+    {
+        string text = token.Trim();
+        foreach (string op in new[] { " + ", " - " })
+        {
+            int at = text.LastIndexOf(op, StringComparison.Ordinal);
+            if (at > 0)
+            {
+                int left = Resolve(text[..at], symbols), right = Resolve(text[(at + 3)..], symbols);
+                return op == " + " ? left + right : left - right;
+            }
+        }
+
+        int times = text.IndexOf(" * ", StringComparison.Ordinal);
+        if (times > 0)
+        {
+            return Resolve(text[..times], symbols) * Resolve(text[(times + 3)..], symbols);
+        }
+
+        if (text.StartsWith('-') && !int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+        {
+            return -Resolve(text[1..], symbols);
+        }
+
+        return ResolveSymbol(text, symbols);
+    }
+
+    private static int ResolveSymbol(string token, IReadOnlyDictionary<string, string> symbols)
     {
         string value = token;
         for (int i = 0; i < 4 && !int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _); i++)

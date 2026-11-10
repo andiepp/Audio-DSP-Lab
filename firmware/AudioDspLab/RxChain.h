@@ -96,7 +96,21 @@ struct RxMeter {
   uint32_t designs;         // filters switched in since the start
   bool designing;           // a design is in progress
   float nrGainDb;           // spectral NR: its average gain over the bins, dB
+  bool downloaded;          // the active filter came from a download, not a design
 };
+
+// a filter designed on the PC (design/receiver.md, section 7): taps in
+// natural order (tap k multiplies x[n - k]), real or complex, sent as
+// float32. The end checks the count and the CRC-32 (IEEE, as zlib's) of the
+// values' little-endian bytes in the order sent; the design task then
+// transforms them into the inactive set, and the audio task switches at a
+// block boundary as after a design. A design request (an edge, the stop
+// band, the mode) replaces a downloaded filter.
+enum RxLoadResult : uint8_t { RX_LOAD_OK = 0, RX_LOAD_NOT_LOADING, RX_LOAD_COUNT, RX_LOAD_CRC, RX_LOAD_BUSY };
+RxLoadResult rxChainLoadBegin(uint16_t taps, bool complex);
+// values: re (real) or re, im pairs (complex); received: taps so far
+RxLoadResult rxChainLoadData(const float *values, uint8_t count, uint16_t &received);
+RxLoadResult rxChainLoadEnd(uint32_t crc, uint16_t &taps);
 
 // allocates (about 53 KB of heap, no piece over 13 KB), starts the design
 // task and designs the first filter (a few ms); false without memory

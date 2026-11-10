@@ -635,7 +635,8 @@ static const PotMap synthPots[] = {
 #define RX_P_NR_LEVEL                 33      // dB, 0 passes
 #define RX_P_TEST_IQ_GAIN             34      // 0.01 dB: the test tone's Q gain error
 #define RX_P_TEST_IQ_PHASE            35      // 0.01 degree: its Q phase error
-#define RX_P_LAST                     RX_P_TEST_IQ_PHASE
+#define RX_P_FILTER                   36      // designed, downloaded (rxfilter); setting designed designs again
+#define RX_P_LAST                     RX_P_FILTER
 
 #define RX_SSB_LOW_EDGE               300     // Hz: where USB and LSB filters start
 #define RX_EDGE_GAP                   50      // Hz: the least width
@@ -683,6 +684,8 @@ static RxConfig rxConfigWith(uint8_t paramId, int32_t value) {
 }
 
 static bool rxApply(uint8_t paramId, int32_t value, uint32_t dirty) {
+  // a design replaces a downloaded filter
+  if (dirty & RX_DIRTY_FILTER) setDependent(RX_P_FILTER, 0);
   rxChainConfigure(rxConfigWith(paramId, value), dirty);
   return true;
 }
@@ -801,6 +804,11 @@ static bool rxNr(int32_t value) { return rxApply(RX_P_NR, value, RX_DIRTY_NR); }
 static bool rxNrLevel(int32_t value) { return rxApply(RX_P_NR_LEVEL, value, RX_DIRTY_NR); }
 static bool rxTestIqGain(int32_t value) { return rxApply(RX_P_TEST_IQ_GAIN, value, RX_DIRTY_TEST); }
 static bool rxTestIqPhase(int32_t value) { return rxApply(RX_P_TEST_IQ_PHASE, value, RX_DIRTY_TEST); }
+// only a download makes it "downloaded"; "designed" designs from the edges again
+static bool rxFilter(int32_t value) {
+  if (value == 0) return rxApply(RX_P_FILTER, 0, RX_DIRTY_FILTER);
+  return value == currentValue(RX_P_FILTER);
+}
 
 static const ParamDef receiverParams[] = {
   { EQ_BASS_GAIN,        -1200, 1200,    0,       eqBassGain,        false },
@@ -812,7 +820,7 @@ static const ParamDef receiverParams[] = {
   { EQ_VOLUME,           -6000, 0,       -2000,   eqVolume,          false },
   { EQ_OUTPUT,           0,     1,       0,       eqOutput,          true },
   { RX_P_MODE,           0,     RX_FM,   RX_USB,  rxMode,            false },
-  { RX_P_OFFSET,         -21000, 21000,  12000,   rxOffset,          false },
+  { RX_P_OFFSET,         -21000, 21000,  10000,   rxOffset,          false },   // not 12000 = fs/4 (R3)
   { RX_P_LOW,            -RX_EDGE_MAX, RX_EDGE_MAX - RX_EDGE_GAP, RX_SSB_LOW_EDGE, rxLow, false },
   { RX_P_HIGH,           -RX_EDGE_MAX + RX_EDGE_GAP, RX_EDGE_MAX, RX_SSB_LOW_EDGE + 2400, rxHigh, false },
   { RX_P_WIDTH,          100,   2 * RX_EDGE_MAX, 2400, rxWidth,        false },
@@ -837,6 +845,7 @@ static const ParamDef receiverParams[] = {
   { RX_P_NR_LEVEL,       0,     30,      0,       rxNrLevel,         false },
   { RX_P_TEST_IQ_GAIN,   -300,  300,     0,       rxTestIqGain,      false },
   { RX_P_TEST_IQ_PHASE,  -1000, 1000,    0,       rxTestIqPhase,     false },
+  { RX_P_FILTER,         0,     1,       0,       rxFilter,          true },
 };
 #define RECEIVER_PARAM_COUNT          (sizeof(receiverParams) / sizeof(receiverParams[0]))
 
@@ -1355,6 +1364,10 @@ const ParamDef *appParamAt(uint8_t index) {
 
 void appOnParamChanged(ParamListener listener) {
   paramListener = listener;
+}
+
+void appReceiverFilterDownloaded() {
+  if (active != nullptr && active->id == APP_RECEIVER) setDependent(RX_P_FILTER, 1);
 }
 
 bool appRunning(uint8_t id) {

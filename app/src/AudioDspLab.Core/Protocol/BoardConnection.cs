@@ -156,8 +156,21 @@ public sealed class BoardConnection : IDisposable
             var boardEvent = new BoardEvent(words[0], [.. words.Skip(1)]);
             if (boardEvent.Name == "ready")
             {
-                // whatever was asked before the restart is lost with it
+                // whatever was asked before the restart is lost with it -- or
+                // answered after all, if it was still queued (the simulated
+                // board does that): the next request first resynchronises, so
+                // such an answer cannot be taken for the next request's
+                bool asked;
+                lock (sync)
+                {
+                    asked = pending is not null;
+                }
+
                 Fail(new IOException("The board restarted."), keepConnection: true);
+                if (asked)
+                {
+                    resyncNeeded = true;
+                }
             }
 
             EventReceived?.Invoke(boardEvent);

@@ -24,7 +24,7 @@
 #include <strings.h>
 
 #define APP_RADIO                     0x03
-#define MAX_TOKENS                    8
+#define MAX_TOKENS                    18      // rxfilter data: the command, "data" and 16 values
 #define OUTPUT_LINE_MAX               384
 #define EVENT_CHECK_MS                20
 
@@ -127,6 +127,9 @@ static const char *errorWord(uint8_t code) {
     case ERR_STORE_FAILED:        return "store-failed";
     case ERR_BUSY:                return "busy";
     case ERR_NO_MEMORY:           return "no-memory";
+    case ERR_DOWNLOAD_COUNT:      return "count-wrong";
+    case ERR_DOWNLOAD_CRC:        return "crc-wrong";
+    case ERR_NOT_LOADING:         return "not-loading";
     case ERR_NO_CLOCK:            return "no-clock";
     default:                      return "failed";
   }
@@ -149,6 +152,9 @@ static const char *errorText(uint8_t code) {
     case ERR_STORE_FAILED:        return "storing in flash failed";
     case ERR_BUSY:                return "the THD measurement uses the serial output";
     case ERR_NO_MEMORY:           return "not enough free memory";
+    case ERR_DOWNLOAD_COUNT:      return "the filter download's tap count does not match";
+    case ERR_DOWNLOAD_CRC:        return "the filter download's CRC-32 does not match";
+    case ERR_NOT_LOADING:         return "no filter download begun (rxfilter load)";
     case ERR_NO_CLOCK:            return "no clock on the DSP's serial output (MP10, MP11)";
     default:                      return "failed";
   }
@@ -1065,14 +1071,58 @@ static void cmdMeter() {
   okf("%s", text);
 }
 
-// the channel filter in force: its taps and transition width, and whether
-// a new design is on its way
+static uint8_t loadError(RxLoadResult r) {
+  switch (r) {
+    case RX_LOAD_OK:          return ERR_NONE;
+    case RX_LOAD_COUNT:       return ERR_DOWNLOAD_COUNT;
+    case RX_LOAD_CRC:         return ERR_DOWNLOAD_CRC;
+    case RX_LOAD_BUSY:        return ERR_BUSY;
+    default:                  return ERR_NOT_LOADING;
+  }
+}
+
+// rxfilter: the channel filter in force (designed or downloaded, its taps,
+// its transition width, whether a new one is on its way, filters so far);
+// rxfilter load <taps> real|complex, rxfilter data <v> ..., rxfilter end <crc32>:
+// a filter designed on the PC (RxChain.h)
 static void cmdRxFilter() {
   if (!runningApp(APP_RECEIVER)) return;
-  RxMeter m;
-  rxChainGetMeter(m);
-  okf("designed %u %.0f %s %lu", m.taps, m.transition, m.designing ? "designing" : "ready",
-      (unsigned long)m.designs);
+  if (tokenCount == 1) {
+    RxMeter m;
+    rxChainGetMeter(m);
+    return okf("%s %u %.0f %s %lu", m.downloaded ? "downloaded" : "designed", m.taps, m.transition,
+               m.designing ? "designing" : "ready", (unsigned long)m.designs);
+  }
+  if (is(1, "load") && tokenCount == 4) {
+    long taps;
+    if (!parseLong(tokens[2], 1, RX_TAPS_MAX, taps) || !(is(3, "real") || is(3, "complex"))) {
+      return fail(ERR_BAD_ARGUMENT);
+    }
+    const uint8_t error = loadError(rxChainLoadBegin((uint16_t)taps, is(3, "complex")));
+    return error == ERR_NONE ? ok() : fail(error);
+  }
+  if (is(1, "data") && tokenCount >= 3 && tokenCount <= 2 + 16) {
+    float values[16];
+    for (uint8_t i = 2; i < tokenCount; i++) {
+      char *end = nullptr;
+      values[i - 2] = strtof(tokens[i], &end);
+      if (end == tokens[i] || *end != '\0') return fail(ERR_BAD_ARGUMENT);
+    }
+    uint16_t received = 0;
+    const uint8_t error = loadError(rxChainLoadData(values, (uint8_t)(tokenCount - 2), received));
+    return error == ERR_NONE ? okf("%u", received) : fail(error);
+  }
+  if (is(1, "end") && tokenCount == 3) {
+    char *end = nullptr;
+    const uint32_t crc = (uint32_t)strtoul(tokens[2], &end, 0);
+    if (end == tokens[2] || *end != '\0') return fail(ERR_BAD_ARGUMENT);
+    uint16_t taps = 0;
+    const uint8_t error = loadError(rxChainLoadEnd(crc, taps));
+    if (error != ERR_NONE) return fail(error);
+    appReceiverFilterDownloaded();
+    return okf("%u", taps);
+  }
+  fail(ERR_BAD_ARGUMENT);
 }
 
 // --- synthesizer ------------------------------------------------------------------
@@ -1349,7 +1399,7 @@ static const Command commands[] = {
   { "level",     cmdLevel,      "level" },
   { "voice",     cmdVoice,      "voice" },
   { "meter",     cmdMeter,      "meter" },
-  { "rxfilter",  cmdRxFilter,   "rxfilter" },
+  { "rxfilter",  cmdRxFilter,   "rxfilter [load <taps> real|complex | data <v> ... | end <crc32>]" },
   { "midi",      cmdMidi,       "midi" },
   { "load",      cmdLoad,       "load" },
   { "aux",       cmdAux,        "aux" },

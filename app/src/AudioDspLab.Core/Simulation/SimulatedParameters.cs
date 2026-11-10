@@ -26,6 +26,7 @@ internal static class SimulatedParameters
             Applications.Radio => [.. Equalizer, new("station", ParameterKind.Integer, 0, 7, 0)],
             Applications.Analyzer => Analyzer,
             Applications.Synthesizer => Synthesizer,
+            Applications.Receiver => Receiver,
             _ => []
         };
 
@@ -49,6 +50,45 @@ internal static class SimulatedParameters
         new("treble-frequency", ParameterKind.Number, 500, 8000, 2000, "Hz"),
         new("volume", ParameterKind.Number, -60, 0, -20, "dB", Pot: "P4"),
         new("output", ParameterKind.Switch, 0, 1, 0),
+    ];
+
+    private static readonly SimulatedParameter[] Receiver =
+    [
+        new("bass-gain", ParameterKind.Number, -12, 12, 0, "dB"),
+        new("bass-frequency", ParameterKind.Number, 50, 400, 200, "Hz"),
+        new("middle-gain", ParameterKind.Number, -12, 12, 0, "dB"),
+        new("middle-frequency", ParameterKind.Number, 300, 5000, 1000, "Hz"),
+        new("treble-gain", ParameterKind.Number, -12, 12, 0, "dB"),
+        new("treble-frequency", ParameterKind.Number, 500, 8000, 2000, "Hz"),
+        new("volume", ParameterKind.Number, -60, 0, -20, "dB", Pot: "P4"),
+        new("output", ParameterKind.Switch, 0, 1, 0),
+        new("mode", ParameterKind.Choice, 0, 5, 2, Choices: ["off", "am", "usb", "lsb", "cw", "fm"]),
+        new("offset", ParameterKind.Integer, -21000, 21000, 10000, "Hz"),
+        new("low", ParameterKind.Integer, -5500, 5450, 300, "Hz"),
+        new("high", ParameterKind.Integer, -5450, 5500, 2700, "Hz"),
+        new("width", ParameterKind.Integer, 100, 11000, 2400, "Hz"),
+        new("stopband", ParameterKind.Integer, 40, 100, 80, "dB"),
+        new("pitch", ParameterKind.Integer, 300, 1000, 600, "Hz"),
+        new("agc", ParameterKind.Choice, 0, 3, 2, Choices: ["off", "fast", "medium", "slow"]),
+        new("agc-gain", ParameterKind.Integer, 0, 90, 60, "dB"),
+        new("hang", ParameterKind.Number, 0, 5, 0.5, "s"),
+        new("decay", ParameterKind.Integer, 1, 200, 20, "dB/s"),
+        new("fm-deviation", ParameterKind.Integer, 100, 5000, 2500, "Hz"),
+        new("deemphasis", ParameterKind.Integer, 0, 2000, 0, "us"),
+        new("squelch", ParameterKind.Integer, -150, 0, -150, "dBFS"),
+        new("input", ParameterKind.Choice, 0, 2, 0, Choices: ["iq", "qi", "if"]),
+        new("iq-gain", ParameterKind.Number, -3, 3, 0, "dB"),
+        new("iq-phase", ParameterKind.Number, -10, 10, 0, "deg"),
+        new("test", ParameterKind.Switch, 0, 1, 0),
+        new("test-offset", ParameterKind.Integer, -45000, 45000, 1000, "Hz"),
+        new("test-level", ParameterKind.Number, -120, 0, -20, "dBFS"),
+        new("test-noise", ParameterKind.Integer, -150, 0, -150, "dBFS"),
+        new("test-key", ParameterKind.Integer, 0, 5000, 0, "ms"),
+        new("nr", ParameterKind.Choice, 0, 2, 1, Choices: ["off", "lms", "spectral"]),
+        new("nr-level", ParameterKind.Integer, 0, 30, 0, "dB"),
+        new("test-iq-gain", ParameterKind.Number, -3, 3, 0, "dB"),
+        new("test-iq-phase", ParameterKind.Number, -10, 10, 0, "deg"),
+        new("filter", ParameterKind.Choice, 0, 1, 0, Choices: ["designed", "downloaded"]),
     ];
 
     private static readonly SimulatedParameter[] Analyzer =

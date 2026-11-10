@@ -612,11 +612,20 @@ public sealed partial class SimulatedBoard : ILineTransport
             (Applications.Synthesizer, "cutoff") => Math.Round(20 * Math.Pow(10, 3 * share)),
             (Applications.Synthesizer, "emphasis") => Math.Round(100 * share),
             (Applications.Synthesizer, "osc1-width") => 5 + Math.Round(90 * share),
+            (Applications.Receiver, "width") => 10 * Math.Round(10 * Math.Pow(110, share)),
+            (Applications.Receiver, "nr-level") => Math.Round(30 * share),
+            (Applications.Receiver, "squelch") => share < 0.05 ? -150 : Math.Round(-130 + ((share - 0.05) * 100 / 0.95)),
             (_, "bass-gain" or "middle-gain" or "treble-gain") => Math.Round(-12 + (24 * share), 2),
             _ => Math.Round(-60 + (60 * share), 2),
         };
         if (values[name] != value)
         {
+            // the receiver's width moves its edges, as a set does
+            if (application == Applications.Receiver && !ReceiverSet(name, ref value))
+            {
+                return;
+            }
+
             values[name] = value;
             pendingValueEvents.Add(name);
         }

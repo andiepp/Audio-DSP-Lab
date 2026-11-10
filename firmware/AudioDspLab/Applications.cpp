@@ -867,8 +867,29 @@ static void rxReleaseClock() {
   if (!mclkRunning()) mclkStart(DSP_SAMPLE_RATE);
 }
 
+// P1: the width, 100 Hz .. 11 kHz over the travel, logarithmic (CW and SSB
+// get the left half), in 10 Hz steps; the mode clamps it to its room
+static int32_t potToRxWidth(uint16_t raw) {
+  return 10 * (int32_t)lroundf(10.0f * powf(110.0f, raw / 4095.0f));
+}
+
+// P2: the noise reduction's level, 0 .. 30 dB
+static int32_t potToNrLevel(uint16_t raw) {
+  return (int32_t)lroundf(raw * (30.0f / 4095.0f));
+}
+
+// P3: the squelch, off at the left stop (its first 5 %), then -130 .. -30 dBFS
+static int32_t potToSquelch(uint16_t raw) {
+  const float share = raw / 4095.0f;
+  if (share < 0.05f) return -150;
+  return (int32_t)lroundf(-130.0f + (share - 0.05f) * (100.0f / 0.95f));
+}
+
 static const PotMap receiverPots[] = {
-  { 3, EQ_VOLUME, potToAmplitude },
+  { 0, RX_P_WIDTH,    potToRxWidth },
+  { 1, RX_P_NR_LEVEL, potToNrLevel },
+  { 2, RX_P_SQUELCH,  potToSquelch },
+  { 3, EQ_VOLUME,     potToAmplitude },
 };
 
 static const AppDef applications[] = {

@@ -392,6 +392,24 @@ reading dBm + 19.5 at +10 kHz. To check once fitted: the same carrier
 at -50 dBm (about -30 dBFS expected), the noise floor with the
 generator's output off, the clipping point.
 
+**Tried 2026-11-10 (after R6): decision 2, option A -- on hold again.**
+The Si5351A module went onto the board's I2C bus through the box's USBi
+socket (tip SDA, ring SCL, sleeve GND to K1; the module on its own 3.3 V
+supply), and the firmware got the front end (branch `frontend-on-board`,
+3d8964b: `FrontEnd.cpp`, parameters `frequency` / `lo-drive` /
+`correction`, requests `frontend`, `diag i2c [<kHz>]`, `diag i2c probe
+<s>`). On the board only the DSP (0x34) and the EEPROM (0x50) answered:
+the module never acknowledged 0x60 at 400, 100, 20 or 10 kHz (143,002
+probes), with the cable, ground and pull-ups checked; on the Uno it
+answers. Not the cause: WP (the EEPROM's pin 7 only) and the ADAU1701 (a
+slave once booted); K1 is the ESP32's own bus (IO9 / IO10, 10 kOhm
+pull-ups R42 / R43) through 470 Ohm in each line (R40 SDA, R39 SCL; also
+R38 WP, R37 RESET; pin 5 GND, pin 6 VCC). A plugged-in USBi shows at
+0x51 (its own EEPROM). Still to find: what the module sees at its pins
+(scope on SDA / SCL during `diag i2c probe`), and which module it is.
+The Uno on COM24 drives the Si5351A again (option B); branch `receiver`
+stays without option A.
+
 ## 14 Results
 
 **Benchmark (2026-11-09, COM10).** Section 3. Sketch and raw output in

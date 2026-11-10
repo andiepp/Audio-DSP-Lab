@@ -52,6 +52,30 @@ public sealed class ReceiverTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ThePotsSetWidthNrLevelAndSquelch()
+    {
+        board.SetPot(0, 2048);                                // P1 half way: 100 x 110^0.5 = 1049 -> 1050 Hz
+        board.SetPot(1, 4095);                                // P2 right: 30 dB
+        board.SetPot(2, 0);                                   // P3 left: squelch off
+        await client.SetPotControlAsync(true);
+        Assert.Equal("1050", await client.GetAsync("width"));
+        Assert.Equal("300", await client.GetAsync("low"));   // USB: the edges follow the width
+        Assert.Equal("1350", await client.GetAsync("high"));
+        Assert.Equal("30", await client.GetAsync("nr-level"));
+        Assert.Equal("-150", await client.GetAsync("squelch"));
+        var squelch = new TaskCompletionSource<string>();
+        client.ValueChanged += (name, value) =>
+        {
+            if (name == "squelch")
+            {
+                squelch.TrySetResult(value);
+            }
+        };
+        board.SetPot(2, 4095);                                // P3 right: -30 dBFS
+        Assert.Equal("-30", await squelch.Task.WaitAsync(TimeSpan.FromSeconds(2)));
+    }
+
+    [Fact]
     public async Task AModeLoadsItsFilter()
     {
         await client.SetAsync("mode", "cw");

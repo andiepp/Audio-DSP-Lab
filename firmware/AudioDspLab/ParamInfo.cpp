@@ -30,6 +30,40 @@ static const ParamInfo equalizerInfo[] = {
   { 9, "station",           KIND_INTEGER, 0, "",     nullptr },
 };
 
+// application 0x07 - receiver: the equalizer's eight, then the chain's
+static const ParamInfo receiverInfo[] = {
+  { 1,  "bass-gain",         KIND_NUMBER,  2, "dB",    nullptr },
+  { 2,  "bass-frequency",    KIND_NUMBER,  2, "Hz",    nullptr },
+  { 3,  "middle-gain",       KIND_NUMBER,  2, "dB",    nullptr },
+  { 4,  "middle-frequency",  KIND_NUMBER,  2, "Hz",    nullptr },
+  { 5,  "treble-gain",       KIND_NUMBER,  2, "dB",    nullptr },
+  { 6,  "treble-frequency",  KIND_NUMBER,  2, "Hz",    nullptr },
+  { 7,  "volume",            KIND_NUMBER,  2, "dB",    nullptr },
+  { 8,  "output",            KIND_SWITCH,  0, "",      nullptr },
+  { 10, "mode",              KIND_CHOICE,  0, "",      "off,am,usb,lsb,cw,fm" },
+  { 11, "offset",            KIND_INTEGER, 0, "Hz",    nullptr },
+  { 12, "low",               KIND_INTEGER, 0, "Hz",    nullptr },
+  { 13, "high",              KIND_INTEGER, 0, "Hz",    nullptr },
+  { 14, "width",             KIND_INTEGER, 0, "Hz",    nullptr },
+  { 15, "stopband",          KIND_INTEGER, 0, "dB",    nullptr },
+  { 16, "pitch",             KIND_INTEGER, 0, "Hz",    nullptr },
+  { 17, "agc",               KIND_CHOICE,  0, "",      "off,fast,medium,slow" },
+  { 18, "agc-gain",          KIND_INTEGER, 0, "dB",    nullptr },
+  { 19, "hang",              KIND_NUMBER,  2, "s",     nullptr },
+  { 20, "decay",             KIND_INTEGER, 0, "dB/s",  nullptr },
+  { 21, "fm-deviation",      KIND_INTEGER, 0, "Hz",    nullptr },
+  { 22, "deemphasis",        KIND_INTEGER, 0, "us",    nullptr },
+  { 23, "squelch",           KIND_INTEGER, 0, "dBFS",  nullptr },
+  { 24, "input",             KIND_CHOICE,  0, "",      "iq,qi,if" },
+  { 25, "iq-gain",           KIND_NUMBER,  2, "dB",    nullptr },
+  { 26, "iq-phase",          KIND_NUMBER,  2, "deg",   nullptr },
+  { 27, "test",              KIND_SWITCH,  0, "",      nullptr },
+  { 28, "test-offset",       KIND_INTEGER, 0, "Hz",    nullptr },
+  { 29, "test-level",        KIND_NUMBER,  2, "dBFS",  nullptr },
+  { 30, "test-noise",        KIND_INTEGER, 0, "dBFS",  nullptr },
+  { 31, "test-key",          KIND_INTEGER, 0, "ms",    nullptr },
+};
+
 // application 0x04 - analysis: Frequency Response and THD
 static const ParamInfo analyzerInfo[] = {
   { 1, "level",             KIND_NUMBER,  2, "dBFS", nullptr },
@@ -108,7 +142,7 @@ static const AppTable tables[] = {
   { APP_ANALYSIS,    "analyzer",    analyzerInfo,  COUNT(analyzerInfo) },
   { APP_SIGMASTUDIO, "sigmastudio", nullptr,       0 },
   { APP_SYNTH,       "synthesizer", synthInfo,     COUNT(synthInfo) },
-  { APP_RECEIVER,    "receiver",    equalizerInfo, COUNT(equalizerInfo) - 1 },  // R1: the equalizer's
+  { APP_RECEIVER,    "receiver",    receiverInfo,  COUNT(receiverInfo) },
 };
 
 static const AppTable *tableOf(uint8_t appId) {

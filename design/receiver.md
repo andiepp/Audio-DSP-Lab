@@ -171,8 +171,8 @@ ESP32  receiver task (core 0, high priority):
 
 Tuning window: the ADAU1701's ADC decimation filter ends a little below
 24 kHz; the 6 .. 18 kHz window (`SdrTuner`) plus a 3 kHz filter reaches
-21 kHz. Step R2 measures the ADC response at 15 .. 22 kHz with the
-Analysis application; if it droops, the window shrinks (e.g. 6 .. 15 kHz).
+21 kHz. Step R2 measured the response at 15 .. 23 kHz (section 14): a smooth
+slope of at most 2.7 dB, no cutoff, so the window stays.
 
 ## 6 SDR front end: the Si5351A
 
@@ -379,3 +379,48 @@ the 2 at boot over 72,000 blocks; open inputs -98.5 / -100 dBFS (RMS
 without DC; the DC offset alone reads -36 dBFS); processing 96 us a
 block (statistics only; `double` is software on the ESP32 and cost
 0.4 ms). A tone on K2 left heard on K3 / K4; P4 drives the volume.
+
+**R2 (2026-11-10, COM10).** `RxChain.cpp` (-O2): the DSP-Box modules
+1:1 (DDC with DC trackers and I/Q correction, AGC, demodulators, squelch,
+DUC, test signal with noise and keying), the channel filter as
+partitioned overlap-save (block 64, FFT 128, up to 8 partitions) with a
+design task on core 0 (priority 1) writing the inactive set; the audio
+task switches at a block boundary. Heap about 40 KB in pieces of at most
+11 KB; firmware 1,266,124 bytes (+14 KB). Parameters 10..31 (`mode`,
+`offset`, `low`, `high`, `width`, `stopband`, `pitch`, `agc`,
+`agc-gain`, `hang`, `decay`, `fm-deviation`, `deemphasis`, `squelch`,
+`input`, `iq-gain`, `iq-phase`, `test`, `test-offset`, `test-level`,
+`test-noise`, `test-key`); a mode loads its edges, an AGC speed its hang
+and decay, edges and width follow each other (`setDependent`). Requests
+`meter`, `rxfilter`, `diag rx [reset]`; `! meter` five times a second.
+Checks with the internal test tone:
+
+- S-meter against the test level, 0 .. -100 dBFS: 0.00 dB error.
+- USB 300 .. 2700 Hz, 80 dB (203 taps, 300 Hz transition), swept
+  -1000 .. 4000 Hz in 100 Hz steps against the same Kaiser design
+  computed in Python: passband 0.00 dB, stopband within 1 dB down to
+  -139 dB.
+- CPU: USB 203 taps 14.8 %; FM with 511 taps (240 Hz, 100 dB, 151 Hz
+  transition) 16.5 % average, 17.3 % the longest block.
+- 92 filter switches with a 1 kHz tone on the outputs (203 <-> 203 and
+  203 <-> 243 taps): no click heard.
+
+- ADC response (loopback cable K3 -> K2; the receiver in mode `off` puts
+  its test tone, AGC off at 0 dB, at offset + test-offset on the
+  outputs; `diag rx` reads ADC0 / ADC1), relative to 1 kHz, DAC and ADC
+  together:
+
+  | kHz | 5 | 10 | 15 | 18 | 20 | 21 | 22 | 23 |
+  |---|---:|---:|---:|---:|---:|---:|---:|---:|
+  | I (left) dB | -0.5 | -1.3 | -2.0 | -2.4 | -2.6 | -2.6 | -2.6 | -2.7 |
+  | Q (right) dB | -0.4 | -1.0 | -1.5 | -1.8 | -1.9 | -1.9 | -1.9 | -2.0 |
+
+  A smooth slope, no cutoff up to 23 kHz: the ADC's decimation filter
+  is not the limit, and the 6 .. 18 kHz tuning window (plus 3 kHz of
+  filter, 21 kHz) stays. A station at the top of the window reads up to
+  2.6 dB low on the S-meter. The channels differ by 0.5 dB at 15 kHz and
+  0.7 dB at 21 kHz; `iq-gain` takes out a fixed part, the remaining
+  0.2 dB across 15 .. 21 kHz limits the image rejection there (if it is
+  the ADCs' and not the DACs'; R3 measures the real one).
+
+R2 done.

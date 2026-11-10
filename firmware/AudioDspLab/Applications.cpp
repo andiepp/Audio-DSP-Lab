@@ -601,15 +601,256 @@ static const PotMap synthPots[] = {
 //  SigmaStudio project sigmastudio/Receiver: the Radio project (I2S in ->
 //  bands -> volume, cells and addresses the equalizer's) plus SerialOutL /
 //  SerialOutR, fed straight from ADC0 (I) and ADC1 (Q). The ESP32 runs the
-//  receiver chain between them (Receiver.cpp) at 48 kHz, its I2S output
-//  making the DSP's MCLK as the generator's does.
-//  Step R1: the equalizer's parameters; P4 the volume.
+//  receiver chain between them (Receiver.cpp, RxChain.cpp) at 48 kHz, its
+//  I2S output making the DSP's MCLK as the generator's does.
+//  Parameters 1-8 are the equalizer's (on the chain's audio), 10 on the
+//  chain's (ranges and presets as on the DSP-Box, params.c). A mode loads
+//  its filter edges, an AGC speed its hang and decay, as a receiver's
+//  buttons do; edges and width follow each other.
 // ----------------------------------------------------------------------------
+
+#define RX_P_MODE                     10      // RxMode: off, am, usb, lsb, cw, fm
+#define RX_P_OFFSET                   11      // Hz, the DSP's tuning
+#define RX_P_LOW                      12      // Hz rel. carrier, the filter's -6 dB edges
+#define RX_P_HIGH                     13
+#define RX_P_WIDTH                    14      // Hz, high - low, around the mode's place
+#define RX_P_STOPBAND                 15      // dB
+#define RX_P_PITCH                    16      // Hz, CW
+#define RX_P_AGC                      17      // off, fast, medium, slow
+#define RX_P_AGC_GAIN                 18      // dB
+#define RX_P_HANG                     19      // 0.01 s
+#define RX_P_DECAY                    20      // dB/s
+#define RX_P_FM_DEVIATION             21      // Hz
+#define RX_P_DEEMPHASIS               22      // us
+#define RX_P_SQUELCH                  23      // dBFS
+#define RX_P_INPUT                    24      // RxInput: iq, qi, if
+#define RX_P_IQ_GAIN                  25      // 0.01 dB
+#define RX_P_IQ_PHASE                 26      // 0.01 degree
+#define RX_P_TEST                     27      // off, on: the internal test signal
+#define RX_P_TEST_OFFSET              28      // Hz from the offset
+#define RX_P_TEST_LEVEL               29      // 0.01 dBFS
+#define RX_P_TEST_NOISE               30      // dBFS RMS, -150 none
+#define RX_P_TEST_KEY                 31      // ms, 0 steady
+
+#define RX_SSB_LOW_EDGE               300     // Hz: where USB and LSB filters start
+#define RX_EDGE_GAP                   50      // Hz: the least width
+
+// a value the firmware itself changes, reported as a pot's change is
+// (defined below, with the values)
+static void setDependent(uint8_t paramId, int32_t value);
+
+// the chain's configuration from the values, one of them about to change
+// (an apply receives its value before it is stored)
+static RxConfig rxConfigWith(uint8_t paramId, int32_t value) {
+  auto v = [&](uint8_t id) { return id == paramId ? value : currentValue(id); };
+  RxConfig c;
+  c.mode = (uint8_t)v(RX_P_MODE);
+  c.offset = (float)v(RX_P_OFFSET);
+  c.low = (float)v(RX_P_LOW);
+  c.high = (float)v(RX_P_HIGH);
+  c.stopband = (float)v(RX_P_STOPBAND);
+  c.pitch = (float)v(RX_P_PITCH);
+  c.agc = (uint8_t)v(RX_P_AGC);
+  c.agcGain = (float)v(RX_P_AGC_GAIN);
+  c.hang = v(RX_P_HANG) / 100.0f;
+  c.decay = (float)v(RX_P_DECAY);
+  c.fmDeviation = (float)v(RX_P_FM_DEVIATION);
+  c.deemphasis = (float)v(RX_P_DEEMPHASIS);
+  c.squelch = (float)v(RX_P_SQUELCH);
+  c.input = (uint8_t)v(RX_P_INPUT);
+  c.iqGain = v(RX_P_IQ_GAIN) / 100.0f;
+  c.iqPhase = v(RX_P_IQ_PHASE) / 100.0f;
+  c.test = v(RX_P_TEST) != 0;
+  c.testOffset = (float)v(RX_P_TEST_OFFSET);
+  c.testLevel = v(RX_P_TEST_LEVEL) / 100.0f;
+  c.testNoise = (float)v(RX_P_TEST_NOISE);
+  c.testKey = (float)v(RX_P_TEST_KEY);
+  return c;
+}
+
+static bool rxApply(uint8_t paramId, int32_t value, uint32_t dirty) {
+  rxChainConfigure(rxConfigWith(paramId, value), dirty);
+  return true;
+}
+
+// the filter's edges, and the width that follows them
+static void rxSetEdges(int32_t low, int32_t high) {
+  setDependent(RX_P_LOW, low);
+  setDependent(RX_P_HIGH, high);
+  setDependent(RX_P_WIDTH, high - low);
+}
+
+// a width placed as the mode places its filter: SSB from 300 Hz off the
+// carrier, CW around the pitch, AM, FM and off around the carrier
+static void rxEdgesForWidth(uint8_t mode, int32_t width, int32_t pitch, int32_t &low, int32_t &high) {
+  switch (mode) {
+    case RX_USB: low = RX_SSB_LOW_EDGE; high = RX_SSB_LOW_EDGE + width; break;
+    case RX_LSB: low = -RX_SSB_LOW_EDGE - width; high = -RX_SSB_LOW_EDGE; break;
+    case RX_CW:  low = pitch - width / 2; high = low + width; break;
+    default:     low = -width / 2; high = low + width; break;
+  }
+  low = constrain(low, -RX_EDGE_MAX, RX_EDGE_MAX - RX_EDGE_GAP);
+  high = constrain(high, low + RX_EDGE_GAP, RX_EDGE_MAX);
+}
+
+// the mode's preset filter (params.c)
+static int32_t rxPresetWidth(uint8_t mode) {
+  switch (mode) {
+    case RX_USB: case RX_LSB: return 2400;
+    case RX_CW: return 500;
+    case RX_FM: return 2 * RX_EDGE_MAX;
+    default: return 6000;
+  }
+}
+
+static bool rxMode(int32_t value) {
+  // a new mode loads its filter, a start or a resume keeps the edges
+  if (value != currentValue(RX_P_MODE)) {
+    int32_t low, high;
+    rxEdgesForWidth((uint8_t)value, rxPresetWidth((uint8_t)value), currentValue(RX_P_PITCH), low, high);
+    rxSetEdges(low, high);
+  }
+  return rxApply(RX_P_MODE, value, RX_DIRTY_MODE | RX_DIRTY_TUNE | RX_DIRTY_FILTER);
+}
+
+static bool rxOffset(int32_t value) { return rxApply(RX_P_OFFSET, value, RX_DIRTY_TUNE); }
+
+// an edge that would pass the other pushes it along
+static bool rxLow(int32_t value) {
+  int32_t high = currentValue(RX_P_HIGH);
+  if (high < value + RX_EDGE_GAP) setDependent(RX_P_HIGH, high = value + RX_EDGE_GAP);
+  setDependent(RX_P_WIDTH, high - value);
+  return rxApply(RX_P_LOW, value, RX_DIRTY_FILTER);
+}
+
+static bool rxHigh(int32_t value) {
+  int32_t low = currentValue(RX_P_LOW);
+  if (low > value - RX_EDGE_GAP) setDependent(RX_P_LOW, low = value - RX_EDGE_GAP);
+  setDependent(RX_P_WIDTH, value - low);
+  return rxApply(RX_P_HIGH, value, RX_DIRTY_FILTER);
+}
+
+static bool rxWidth(int32_t value) {
+  int32_t low, high;
+  rxEdgesForWidth((uint8_t)currentValue(RX_P_MODE), value, currentValue(RX_P_PITCH), low, high);
+  setDependent(RX_P_LOW, low);
+  setDependent(RX_P_HIGH, high);
+  // the width in force, should the edges have been clamped
+  if (high - low != value) setDependent(RX_P_WIDTH, high - low);
+  return rxApply(RX_P_WIDTH, high - low, RX_DIRTY_FILTER);
+}
+
+// keying: 0 steady, else a period of at least 100 ms
+static bool rxTestKey(int32_t value) {
+  if (value != 0 && value < 100) setDependent(RX_P_TEST_KEY, value = 100);
+  return rxApply(RX_P_TEST_KEY, value, RX_DIRTY_TEST);
+}
+
+static bool rxStopband(int32_t value) { return rxApply(RX_P_STOPBAND, value, RX_DIRTY_FILTER); }
+
+// CW: the filter moves with the pitch
+static bool rxPitch(int32_t value) {
+  const int32_t shift = value - currentValue(RX_P_PITCH);
+  if (currentValue(RX_P_MODE) == RX_CW && shift != 0) {
+    rxSetEdges(currentValue(RX_P_LOW) + shift, currentValue(RX_P_HIGH) + shift);
+  }
+  return rxApply(RX_P_PITCH, value, RX_DIRTY_TUNE | RX_DIRTY_FILTER);
+}
+
+// an AGC speed loads its hang (0.01 s) and decay (dB/s)
+static bool rxAgc(int32_t value) {
+  if (value != currentValue(RX_P_AGC)) {
+    static const int16_t hang[] = { 0, 10, 50, 150 }, decay[] = { 0, 100, 20, 10 };
+    if (value > 0) {
+      setDependent(RX_P_HANG, hang[value]);
+      setDependent(RX_P_DECAY, decay[value]);
+    }
+  }
+  return rxApply(RX_P_AGC, value, RX_DIRTY_AGC);
+}
+
+static bool rxAgcSetting(uint8_t id, int32_t value) { return rxApply(id, value, RX_DIRTY_AGC); }
+static bool rxAgcGain(int32_t value) { return rxAgcSetting(RX_P_AGC_GAIN, value); }
+static bool rxHang(int32_t value) { return rxAgcSetting(RX_P_HANG, value); }
+static bool rxDecay(int32_t value) { return rxAgcSetting(RX_P_DECAY, value); }
+static bool rxFmDeviation(int32_t value) { return rxApply(RX_P_FM_DEVIATION, value, RX_DIRTY_FM); }
+static bool rxDeemphasis(int32_t value) { return rxApply(RX_P_DEEMPHASIS, value, RX_DIRTY_FM); }
+static bool rxSquelch(int32_t value) { return rxApply(RX_P_SQUELCH, value, 0); }
+static bool rxInput(int32_t value) { return rxApply(RX_P_INPUT, value, RX_DIRTY_INPUT | RX_DIRTY_TEST); }
+static bool rxIqGain(int32_t value) { return rxApply(RX_P_IQ_GAIN, value, RX_DIRTY_INPUT); }
+static bool rxIqPhase(int32_t value) { return rxApply(RX_P_IQ_PHASE, value, RX_DIRTY_INPUT); }
+static bool rxTest(int32_t value) { return rxApply(RX_P_TEST, value, RX_DIRTY_TEST); }
+static bool rxTestOffset(int32_t value) { return rxApply(RX_P_TEST_OFFSET, value, RX_DIRTY_TEST); }
+static bool rxTestLevel(int32_t value) { return rxApply(RX_P_TEST_LEVEL, value, RX_DIRTY_TEST); }
+static bool rxTestNoise(int32_t value) { return rxApply(RX_P_TEST_NOISE, value, RX_DIRTY_TEST); }
+
+static const ParamDef receiverParams[] = {
+  { EQ_BASS_GAIN,        -1200, 1200,    0,       eqBassGain,        false },
+  { EQ_BASS_FREQUENCY,   5000,  40000,   20000,   eqBassFrequency,   false },
+  { EQ_MIDDLE_GAIN,      -1200, 1200,    0,       eqMiddleGain,      false },
+  { EQ_MIDDLE_FREQUENCY, 30000, 500000,  100000,  eqMiddleFrequency, false },
+  { EQ_TREBLE_GAIN,      -1200, 1200,    0,       eqTrebleGain,      false },
+  { EQ_TREBLE_FREQUENCY, 50000, 800000,  200000,  eqTrebleFrequency, false },
+  { EQ_VOLUME,           -6000, 0,       -2000,   eqVolume,          false },
+  { EQ_OUTPUT,           0,     1,       0,       eqOutput,          true },
+  { RX_P_MODE,           0,     RX_FM,   RX_USB,  rxMode,            false },
+  { RX_P_OFFSET,         -21000, 21000,  12000,   rxOffset,          false },
+  { RX_P_LOW,            -RX_EDGE_MAX, RX_EDGE_MAX - RX_EDGE_GAP, RX_SSB_LOW_EDGE, rxLow, false },
+  { RX_P_HIGH,           -RX_EDGE_MAX + RX_EDGE_GAP, RX_EDGE_MAX, RX_SSB_LOW_EDGE + 2400, rxHigh, false },
+  { RX_P_WIDTH,          100,   2 * RX_EDGE_MAX, 2400, rxWidth,        false },
+  { RX_P_STOPBAND,       40,    100,     80,      rxStopband,        false },
+  { RX_P_PITCH,          300,   1000,    600,     rxPitch,           false },
+  { RX_P_AGC,            0,     3,       2,       rxAgc,             false },
+  { RX_P_AGC_GAIN,       0,     90,      60,      rxAgcGain,         false },
+  { RX_P_HANG,           0,     500,     50,      rxHang,            false },
+  { RX_P_DECAY,          1,     200,     20,      rxDecay,           false },
+  { RX_P_FM_DEVIATION,   100,   5000,    2500,    rxFmDeviation,     false },
+  { RX_P_DEEMPHASIS,     0,     2000,    0,       rxDeemphasis,      false },
+  { RX_P_SQUELCH,        -150,  0,       -150,    rxSquelch,         false },
+  { RX_P_INPUT,          0,     2,       RX_INPUT_IQ, rxInput,       false },
+  { RX_P_IQ_GAIN,        -300,  300,     0,       rxIqGain,          false },
+  { RX_P_IQ_PHASE,       -1000, 1000,    0,       rxIqPhase,         false },
+  { RX_P_TEST,           0,     1,       0,       rxTest,            true },
+  { RX_P_TEST_OFFSET,    -45000, 45000,  1000,    rxTestOffset,      false },
+  { RX_P_TEST_LEVEL,     -12000, 0,      -2000,   rxTestLevel,       false },
+  { RX_P_TEST_NOISE,     -150,  0,       -150,    rxTestNoise,       false },
+  { RX_P_TEST_KEY,       0,     5000,    0,       rxTestKey,         false },
+};
+#define RECEIVER_PARAM_COUNT          (sizeof(receiverParams) / sizeof(receiverParams[0]))
+
+// the chain starts before the values are applied: with the defaults
+static RxConfig rxDefaults() {
+  int32_t v[RX_P_TEST_KEY + 1] = {};
+  for (const ParamDef &p : receiverParams) v[p.id] = p.initial;
+  RxConfig c;
+  c.mode = (uint8_t)v[RX_P_MODE];
+  c.offset = (float)v[RX_P_OFFSET];
+  c.low = (float)v[RX_P_LOW];
+  c.high = (float)v[RX_P_HIGH];
+  c.stopband = (float)v[RX_P_STOPBAND];
+  c.pitch = (float)v[RX_P_PITCH];
+  c.agc = (uint8_t)v[RX_P_AGC];
+  c.agcGain = (float)v[RX_P_AGC_GAIN];
+  c.hang = v[RX_P_HANG] / 100.0f;
+  c.decay = (float)v[RX_P_DECAY];
+  c.fmDeviation = (float)v[RX_P_FM_DEVIATION];
+  c.deemphasis = (float)v[RX_P_DEEMPHASIS];
+  c.squelch = (float)v[RX_P_SQUELCH];
+  c.input = (uint8_t)v[RX_P_INPUT];
+  c.iqGain = v[RX_P_IQ_GAIN] / 100.0f;
+  c.iqPhase = v[RX_P_IQ_PHASE] / 100.0f;
+  c.test = v[RX_P_TEST] != 0;
+  c.testOffset = (float)v[RX_P_TEST_OFFSET];
+  c.testLevel = v[RX_P_TEST_LEVEL] / 100.0f;
+  c.testNoise = (float)v[RX_P_TEST_NOISE];
+  c.testKey = (float)v[RX_P_TEST_KEY];
+  return c;
+}
 
 static bool rxTakeClock() {
   mclkStop();
   coreRate = DSP_CORE_RATE;
-  return receiverBegin();
+  return receiverBegin(rxDefaults());
 }
 
 static void rxReleaseClock() {
@@ -638,7 +879,7 @@ static const AppDef applications[] = {
     synthParams, sizeof(synthParams) / sizeof(synthParams[0]),
     synthPots, sizeof(synthPots) / sizeof(synthPots[0]), synTakeClock, synReleaseClock },
   { APP_RECEIVER, "SDR receiver", DspImageReceiver, DspImageReceiverLength,
-    equalizerParams, sizeof(equalizerParams) / sizeof(equalizerParams[0]),
+    receiverParams, RECEIVER_PARAM_COUNT,
     receiverPots, sizeof(receiverPots) / sizeof(receiverPots[0]), rxTakeClock, rxReleaseClock },
 };
 static const uint8_t applicationCount = sizeof(applications) / sizeof(applications[0]);
@@ -689,6 +930,22 @@ static int potPosition(uint8_t pot) {
   if (raw <= POT_BACKLASH) return 0;
   if (raw >= POT_RAW_MAX - POT_BACKLASH) return POT_RAW_MAX;
   return raw;
+}
+
+// the parameter appParamSet is applying, and whether its apply stored a
+// value of its own for it (a width clamped to the edges' room)
+static uint8_t settingParam = 0;
+static bool settingAdjusted = false;
+
+// a value changed by the firmware (a preset, an edge pushing the other):
+// stored and reported, not applied (its owner applies the whole)
+static void setDependent(uint8_t paramId, int32_t value) {
+  int index = findParam(paramId);
+  if (index < 0) return;
+  if (paramId == settingParam) settingAdjusted = true;
+  if (values[index] == value) return;
+  values[index] = value;
+  notifyChanged(paramId, value);
 }
 
 static void p2FollowsRange(int32_t range) {
@@ -984,8 +1241,12 @@ uint8_t appParamSet(uint8_t paramId, int32_t value) {
   const ParamDef &param = active->params[index];
   if (value < param.minimum || value > param.maximum) return ERR_OUT_OF_RANGE;
   if (state != APP_STATE_RUNNING) return ERR_DSP_NOT_RESPONDING;
-  if (!param.apply(value)) return ERR_DSP_WRITE_FAILED;
-  values[index] = value;
+  settingParam = paramId;
+  settingAdjusted = false;
+  const bool applied = param.apply(value);
+  settingParam = 0;
+  if (!applied) return ERR_DSP_WRITE_FAILED;
+  if (!settingAdjusted) values[index] = value;
   disengagePotsFor(paramId);
   return ERR_NONE;
 }

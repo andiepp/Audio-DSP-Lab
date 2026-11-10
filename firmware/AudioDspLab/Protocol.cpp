@@ -1047,6 +1047,33 @@ static void cmdLevel() {
   okf("%s %s", l, r);
 }
 
+// --- receiver -------------------------------------------------------------------
+
+// S-meter dBFS, AGC gain dB, FM offset Hz, squelch open, audio dBFS, CPU %
+static void meterText(char *out, size_t size) {
+  RxMeter m;
+  rxChainGetMeter(m);
+  snprintf(out, size, "%.1f %.1f %.0f %d %.1f %.1f", m.sMeter, m.agcGain, m.fmOffset, m.squelchOpen ? 1 : 0,
+           m.audioDb, receiverCpuPercent());
+}
+
+static void cmdMeter() {
+  if (!runningApp(APP_RECEIVER)) return;
+  char text[96];
+  meterText(text, sizeof(text));
+  okf("%s", text);
+}
+
+// the channel filter in force: its taps and transition width, and whether
+// a new design is on its way
+static void cmdRxFilter() {
+  if (!runningApp(APP_RECEIVER)) return;
+  RxMeter m;
+  rxChainGetMeter(m);
+  okf("designed %u %.0f %s %lu", m.taps, m.transition, m.designing ? "designing" : "ready",
+      (unsigned long)m.designs);
+}
+
 // --- synthesizer ------------------------------------------------------------------
 
 static void voiceText(char *out, size_t size) {
@@ -1224,12 +1251,13 @@ static void cmdDiag() {
   if ((is(1, "capture") || is(1, "record")) && (distortionBusy() || captureStreaming())) return fail(ERR_BUSY);
   // the receiver's input: blocks, gaps, I and Q (dBFS), processing time of
   // the last block and the longest (us)
-  if (is(1, "rx") && tokenCount == 2) {
+  if (is(1, "rx") && (tokenCount == 2 || (tokenCount == 3 && is(2, "reset")))) {
     if (!runningApp(APP_RECEIVER)) return;
     ReceiverStats s;
     receiverGetStats(s);
-    return okf("%lu %lu %.1f %.1f %lu %lu", (unsigned long)s.blocks, (unsigned long)s.gaps, s.inputDb[0],
-               s.inputDb[1], (unsigned long)s.processUs, (unsigned long)s.processMaxUs);
+    if (tokenCount == 3) receiverResetMax();     // after this answer, the longest starts again
+    return okf("%lu %lu %.1f %.1f %lu %lu %.0f", (unsigned long)s.blocks, (unsigned long)s.gaps, s.inputDb[0],
+               s.inputDb[1], (unsigned long)s.processUs, (unsigned long)s.processMaxUs, s.processAvgUs);
   }
   if (is(1, "capture") && (tokenCount == 2 || tokenCount == 3)) {
     long frames = CAPTURE_DEFAULT_FRAMES;
@@ -1319,6 +1347,8 @@ static const Command commands[] = {
   { "spectrum",  cmdSpectrum,   "spectrum [start|stop|points [<n>]|peaks]" },
   { "level",     cmdLevel,      "level" },
   { "voice",     cmdVoice,      "voice" },
+  { "meter",     cmdMeter,      "meter" },
+  { "rxfilter",  cmdRxFilter,   "rxfilter" },
   { "midi",      cmdMidi,       "midi" },
   { "load",      cmdLoad,       "load" },
   { "aux",       cmdAux,        "aux" },
@@ -1365,6 +1395,7 @@ static uint16_t seenPoints = 0;
 static uint16_t seenReference = 0;
 static char seenVoice[64];
 static uint32_t voiceSentAt = 0;
+static uint32_t meterSentAt = 0;
 
 static uint64_t paramBit(uint8_t paramId) {
   for (uint8_t i = 0; i < appParamCount() && i < 64; i++) {
@@ -1541,6 +1572,14 @@ static void voiceEvents(uint32_t now) {
   eventf("voice %s", voice);
 }
 
+static void meterEvents(uint32_t now) {
+  if (!appRunning(APP_RECEIVER) || now - meterSentAt < PROTOCOL_METER_EVENT_MS) return;
+  meterSentAt = now;
+  char text[96];
+  meterText(text, sizeof(text));
+  eventf("meter %s", text);
+}
+
 static void events() {
   const uint32_t now = millis();
   if (now - eventsCheckedAt < EVENT_CHECK_MS) return;
@@ -1562,6 +1601,7 @@ static void events() {
     sweepEvents();
     thdEvents();
     voiceEvents(now);
+    meterEvents(now);
   }
   broadcasting = false;
 }

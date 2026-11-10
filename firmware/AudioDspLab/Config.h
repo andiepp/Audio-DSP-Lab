@@ -34,6 +34,7 @@
 #define PROTOCOL_POT_EVENT_COUNTS     80      // a pot must move this far to be reported (2 %; the
                                               // scaled readings jitter by up to about 65 counts)
 #define PROTOCOL_VOICE_EVENT_MS       50      // synthesizer voice: at most 20 events/s
+#define PROTOCOL_METER_EVENT_MS       200     // receiver meter: 5 events/s
 
 // --- pins -------------------------------------------------------------------
 #define PIN_LED                       2

@@ -4,7 +4,6 @@
     <Project Path="src/AudioDspLab/AudioDspLab.csproj" />
   </Folder>
   <Folder Name="/tools/">
-    <Project Path="tools/RxTuneCheck/RxTuneCheck.csproj" />
     <Project Path="tools/Screenshots/Screenshots.csproj" />
   </Folder>
   <Folder Name="/tests/">

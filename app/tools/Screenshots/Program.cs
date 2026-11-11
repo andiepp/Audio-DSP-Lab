@@ -110,15 +110,13 @@ static class Program
         app.Run();
     }
 
-    // the receiver's three views: the Receiver with the simulated front end
-    // and the test tone on the S-meter, the Filter measured, the Designer
+    // the receiver's three views: the Receiver with the test tone on the
+    // S-meter, the Filter measured, the Designer
     static async Task ReceiverAsync(MainViewModel vm, Window window, string output)
     {
         await vm.SelectApplicationAsync("receiver");
         await Task.Delay(1500);
         ReceiverPageViewModel receiver = vm.Receiver;
-        receiver.SelectedFrontEndPort = AudioDspLab.FrontEnd.SimulatedFrontEndPort.SimulatorName;
-        await receiver.ConnectFrontEndAsync();
         await vm.Client!.SetAsync("test", true);
         await vm.Client!.SetAsync("test-offset", 1200);
         await vm.Client!.SetAsync("test-level", -40);
@@ -127,7 +125,7 @@ static class Program
         receiver.View = ReceiverPageViewModel.ReceiverView;
         await Task.Delay(300);
         Save(window, Path.Combine(output, "receiver.png"));
-        Console.WriteLine($"receiver: {vm.ApplicationStateText} | {receiver.FrontEndText} | {receiver.TuningText} | {vm.StatusInfo} | {window.ActualWidth}x{window.ActualHeight}");
+        Console.WriteLine($"receiver: {vm.ApplicationStateText} | {vm.StatusInfo} | {window.ActualWidth}x{window.ActualHeight}");
 
         receiver.View = ReceiverPageViewModel.FilterView;
         receiver.SweepStep = 200;
@@ -141,7 +139,6 @@ static class Program
         await Task.Delay(800);
         Save(window, Path.Combine(output, "receiver-designer.png"));
         Console.WriteLine($"receiver designer: {receiver.DesignInfoText} | {receiver.DesignerBoardText} | {vm.StatusInfo} | {window.ActualWidth}x{window.ActualHeight}");
-        await receiver.DisconnectFrontEndAsync("Disconnected.");
         receiver.View = ReceiverPageViewModel.ReceiverView;
     }
 

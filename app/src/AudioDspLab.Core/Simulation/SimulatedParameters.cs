@@ -63,7 +63,7 @@ internal static class SimulatedParameters
         new("volume", ParameterKind.Number, -60, 0, -20, "dB", Pot: "P4"),
         new("output", ParameterKind.Switch, 0, 1, 0),
         new("mode", ParameterKind.Choice, 0, 5, 2, Choices: ["off", "am", "usb", "lsb", "cw", "fm"]),
-        new("offset", ParameterKind.Integer, -21000, 21000, 10000, "Hz"),
+        new("offset", ParameterKind.Integer, -21000, 21000, 12000, "Hz"),
         new("low", ParameterKind.Integer, -5500, 5450, 300, "Hz"),
         new("high", ParameterKind.Integer, -5450, 5500, 2700, "Hz"),
         new("width", ParameterKind.Integer, 100, 11000, 2400, "Hz", Pot: "P1"),

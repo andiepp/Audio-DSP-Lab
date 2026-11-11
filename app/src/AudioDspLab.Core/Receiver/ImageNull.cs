@@ -1,6 +1,5 @@
-using AudioDspLab.Receiver;
 
-namespace AudioDspLab.FrontEnd;
+namespace AudioDspLab.Receiver;
 
 /// <summary>What "Null image" found.</summary>
 /// <param name="GainDb">The correction now in force (iq-gain).</param>
@@ -18,7 +17,7 @@ public sealed record ImageNullResult(double GainDb, double PhaseDeg, double Sign
 /// <summary>
 /// Finds the I/Q correction with a real signal (ported from DSP-Box-Lab): a
 /// steady carrier (a generator) tuned into the channel. Its image sits at the
-/// mirror of its offset from the front end's frequency; the receiver is tuned
+/// mirror of its IF (parameter "offset") about the I/Q centre; the receiver is tuned
 /// there (the offset negated) and the gain and phase corrections are searched
 /// for the lowest S-meter reading -- golden-section searches, phase and gain in
 /// turn, three rounds with narrowing ranges.
@@ -27,9 +26,10 @@ public sealed record ImageNullResult(double GainDb, double PhaseDeg, double Sign
 /// While searching, the receiver runs in AM (no CW pitch shift) with a ±150 Hz
 /// filter around the carrier (a low noise floor), the AGC off and the S-meter
 /// fast (hang 0, decay 200 dB/s). Mode, filter edges, offset and AGC are
-/// restored afterwards, also on cancel; the corrections found stay. Avoid an
-/// offset of 12 kHz: there third-order distortion folds onto the image and
-/// caps the null (design/receiver.md, R3).
+/// restored afterwards, also on cancel; the corrections found stay. At an IF
+/// of exactly 12 kHz (a quarter of the sample rate) a front end's third-order
+/// distortion folds onto the image and caps the null (design/receiver.md, R3):
+/// put the carrier a little away from it for the search.
 /// </remarks>
 public static class ImageNull
 {

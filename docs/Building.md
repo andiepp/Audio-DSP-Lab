@@ -128,11 +128,10 @@ dotnet run --project src/AudioDspLab -- --simulator
 
 | Project | Role |
 | --- | --- |
-| `src/AudioDspLab.Core` | Protocol text, line transport (serial port), connection with request/response matching and resynchronisation, `BoardClient` (every command as a method, every event as a .NET event), the model, and `SimulatedBoard`; `Receiver` (the channel filter's design as the firmware makes it, the mask design, coefficient files, the filter measurement, the receiver's requests) and `FrontEnd` (`FrontEndClient` for the SDR front end's Uno, with a simulated one; `SdrTuner` and `ReceiverTuner`, the dial split between the front end and the receiver's offset; `ImageNull`) |
+| `src/AudioDspLab.Core` | Protocol text, line transport (serial port), connection with request/response matching and resynchronisation, `BoardClient` (every command as a method, every event as a .NET event), the model, and `SimulatedBoard`; `Receiver` (the channel filter's design as the firmware makes it, the mask design, coefficient files, the filter measurement, the receiver's requests, the image null) |
 | `src/AudioDspLab` | The WPF application: `MainViewModel`, one page view model per application, generic `ParameterViewModel`, the controls (digit dial, displays, pot knob, response curve, sweep chart, spectrum chart), stored settings, the themes |
 | `tests/AudioDspLab.Core.Tests` | Protocol text, the client against the simulator, and the firmware/simulator table comparison |
 | `tools/Screenshots` | Renders the manual's screenshots from the simulator in every theme: `dotnet run --project app/tools/Screenshots` writes Studio dark, the manual's theme, to `docs/images/screenshots` and Classic and Studio light to its `classic` and `studio-light` folders |
-| `tools/RxTuneCheck` | Bench check of the receiver's tuning with the board and the front end: `dotnet run --project app/tools/RxTuneCheck -- COM10 COM24 14100000` with a generator's carrier at 14.1 MHz on the front end; with `core` as a fourth argument it checks the image null, a filter measurement and a download on the board instead |
 
 The application binds each page to parameters by their protocol names; ranges, units and pots come from the board's `params`. Writes to one parameter are coalesced (a spinning dial sends only the newest value once the previous write is answered), and the board's events update the pages without polling.
 

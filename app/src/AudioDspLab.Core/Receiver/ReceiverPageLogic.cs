@@ -1,69 +1,6 @@
 using System.Numerics;
-using AudioDspLab.FrontEnd;
 
 namespace AudioDspLab.Receiver;
-
-/// <summary>
-/// The Receiver page's frequency dial (design/receiver.md, section 8). With
-/// the front end connected (and the I/Q input) it is the RF frequency: the
-/// front end's frequency plus the board's <c>offset</c>, tuned through
-/// <see cref="ReceiverTuner"/>. Without it, it is the <c>offset</c> itself.
-/// </summary>
-public static class ReceiverDial
-{
-    public static double Minimum(bool rf) => rf ? FrontEndClient.MinHz + SdrTuner.Centre : -SdrTuner.OffsetLimit;
-
-    public static double Maximum(bool rf) => rf ? FrontEndClient.MaxHz + SdrTuner.Centre : SdrTuner.OffsetLimit;
-
-    /// <summary>What the dial shows for the board's offset: the RF frequency when the front end's is known, else the offset.</summary>
-    public static double? Show(double? offsetHz, long? frontEndHz) =>
-        offsetHz is not double offset ? null : frontEndHz is long fe ? fe + offset : offset;
-
-    /// <summary>The offset a dial value asks for without a front end.</summary>
-    public static int OffsetFor(double dial) => (int)Math.Clamp(Math.Round(dial), -SdrTuner.OffsetLimit, SdrTuner.OffsetLimit);
-
-    /// <summary>The RF frequency a dial value asks for with a front end.</summary>
-    public static long RfFor(double dial) => (long)Math.Clamp(Math.Round(dial), Minimum(true), Maximum(true));
-}
-
-/// <summary>
-/// Runs the newest of quickly following requests, one at a time: while one
-/// runs, later ones replace each other and only the last runs afterwards (a
-/// spinning dial tunes once per answer, not once per step).
-/// </summary>
-public sealed class LatestRequest<T>
-    where T : struct
-{
-    private T? pending;
-    private bool running;
-
-    public bool IsRunning => running;
-
-    public async Task SubmitAsync(T value, Func<T, Task> run)
-    {
-        ArgumentNullException.ThrowIfNull(run);
-        pending = value;
-        if (running)
-        {
-            return;
-        }
-
-        running = true;
-        try
-        {
-            while (pending is T next)
-            {
-                pending = null;
-                await run(next).ConfigureAwait(true);
-            }
-        }
-        finally
-        {
-            pending = null;
-            running = false;
-        }
-    }
-}
 
 /// <summary>The channel filter's edges, Hz re the carrier, as the Filter view's chart edits them.</summary>
 public readonly record struct FilterEdges(double Low, double High);

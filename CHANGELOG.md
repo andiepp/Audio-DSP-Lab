@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Receiver: the application no longer drives a front end. The **Front end on** card (the author's test front end: an Arduino Uno with the Si5351A), the RF dial and its tuning, the 20 m band warning and `app/tools/RxTuneCheck` are removed; the front end is entirely yours. **Null image** and the I/Q correction stay.
+- Receiver: the dial is called **IF** in the application and on the front panel (the protocol's parameter stays `offset`), and it starts at **12 kHz** instead of 10 kHz.
+- Docs: what a front end should deliver is one simple rule now, about **1 mV amplitude** at K2 (the S-meter reads about −63.5 dBFS); the manual's sections on the test front end, its card, the Uno's commands and its measurements are removed. The installation guide has a short section on connecting a front end.
+
 ## 1.5 — the SDR receiver
 
 Firmware 1.5, protocol 1 (new requests, events and errors only), application 1.5, panel firmware 1.5.

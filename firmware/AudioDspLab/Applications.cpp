@@ -820,7 +820,7 @@ static const ParamDef receiverParams[] = {
   { EQ_VOLUME,           -6000, 0,       -2000,   eqVolume,          false },
   { EQ_OUTPUT,           0,     1,       0,       eqOutput,          true },
   { RX_P_MODE,           0,     RX_FM,   RX_USB,  rxMode,            false },
-  { RX_P_OFFSET,         -21000, 21000,  10000,   rxOffset,          false },   // not 12000 = fs/4 (R3)
+  { RX_P_OFFSET,         -21000, 21000,  12000,   rxOffset,          false },   // the IF; with I/Q fs/4 (R3)
   { RX_P_LOW,            -RX_EDGE_MAX, RX_EDGE_MAX - RX_EDGE_GAP, RX_SSB_LOW_EDGE, rxLow, false },
   { RX_P_HIGH,           -RX_EDGE_MAX + RX_EDGE_GAP, RX_EDGE_MAX, RX_SSB_LOW_EDGE + 2400, rxHigh, false },
   { RX_P_WIDTH,          100,   2 * RX_EDGE_MAX, 2400, rxWidth,        false },

@@ -211,7 +211,7 @@ See the chapter [The synthesizer](#the-synthesizer) below.
 
 ### Receiver
 
-The receiver is the backend of an SDR receiver from the IF on: it takes a real IF, or I and Q, from your front end on K2, tunes, filters and demodulates them on the ESP32, and plays the audio through the equalizer's bands and volume on K3 and K4. What it expects at K2 (levels, frequencies, noise) is specified in its chapter. Its page has three views: **Receiver** (tuning, meters, AGC, noise reduction, squelch, the input, the card for the author's test front end), **Filter** (the channel filter's response, measured on the board) and **Designer** (filters designed on the PC and downloaded). See the chapter [The receiver](#the-receiver) below.
+The receiver is the backend of an SDR receiver from the IF on: it takes a real IF, or I and Q, from your front end on K2, tunes, filters and demodulates them on the ESP32, and plays the audio through the equalizer's bands and volume on K3 and K4. What it expects at K2 (levels, frequencies, noise) is specified in its chapter. Its page has three views: **Receiver** (the IF dial, meters, AGC, noise reduction, squelch, the input), **Filter** (the channel filter's response, measured on the board) and **Designer** (filters designed on the PC and downloaded). See the chapter [The receiver](#the-receiver) below.
 
 ## Pots, stored settings, power-up and service mode
 
@@ -249,7 +249,7 @@ The **Power-up** key chooses what the board starts when it is switched on. The c
 | **Last application** | The application you selected last, with its defaults |
 
 - With **Last application**, the radio, the synthesizer and the receiver come up sounding: their output is switched on, at the default volume of −20 dB. The generator and the analysis stay off, since they may drive a device under test.
-- The receiver comes up with its defaults (USB, offset +10 kHz). With the author's test front end (see [The author's test front end](#the-authors-test-front-end)), the Uno keeps the frequency it was last set to, so the station you hear is the front end's frequency plus 10 kHz until the PC application tunes again.
+- The receiver comes up with its defaults (USB, IF 12 kHz).
 - Service mode is never restored, and Pot control is off at every power-up.
 - Before another application's program replaces yours at power-up, the firmware keeps a copy of your SigmaStudio program. If the chosen application cannot start, the board starts SigmaStudio mode instead and the window shows the error.
 - **Last application** lets the board play the radio, or wait for the keyboard, as soon as it is powered, with no PC at all: a USB power supply is enough.
@@ -403,16 +403,16 @@ Save a sound you like with **Settings → Save**.
 
 The receiver is the back end of a software-defined receiver, from the IF on. The front end is yours: whatever turns the antenna's signal into a real intermediate frequency (IF) on K2's left channel, or into I and Q at audio frequencies on K2's two channels. The ESP32 does the rest: it tunes within the band that K2 carries, filters the channel, keeps the level with an AGC, reads the S-meter, demodulates AM, USB, LSB, CW or FM, reduces the noise, mutes with the squelch, and sends the audio back to the DSP, through the equalizer's bands and volume to K3 and K4. The chain is the author's receiver for a TMS320C6713 DSP board, ported to the ESP32; it takes 15 to 31 % of one of the ESP32's cores.
 
-The receiver is defined at its input: the next section gives what it expects at K2 and how sensitive it is there, the specification a front end has to meet. The author's own test front end, a QRP Labs I/Q module for 20 m whose oscillator an Arduino Uno drives, is described further down as an example ([The author's test front end](#the-authors-test-front-end)); the application can tune it, but it is not part of Audio-DSP-Lab.
+The receiver is defined at its input: the next section gives what it expects at K2 and how sensitive it is there. The front end is not part of Audio-DSP-Lab, and neither the application nor the board tunes it: the receiver tunes only within the band that K2 carries.
 
-![The receiver page, Receiver view: the mode keys, the RF dial with the front end's frequency and the offset beneath it, the S-meter with AGC gain, audio level and CPU load, the filter, AGC, noise reduction and squelch, the input with its I/Q correction, the front end and the equalizer](images/screenshots/receiver.png)
+![The receiver page, Receiver view: the mode keys, the IF dial, the S-meter with AGC gain, audio level and CPU load, the filter, AGC, noise reduction and squelch, the input with its I/Q correction, and the equalizer](images/screenshots/receiver.png)
 
 ### What the receiver expects at K2
 
 K2 is the board's line input: the left channel goes to ADC0, the right to ADC1, both sampled at 48 kHz, with about 22.5 kΩ input impedance. The receiver takes either
 
-- **a real IF** on the left channel (**Input: IF**); the right channel is not used, and the receiver's offset is the IF; or
-- **I and Q** at audio frequencies, I on the left and Q on the right (**Input: I/Q**, or **Q/I** for the other way round); the receiver tunes within ±21 kHz of the I/Q centre, the front end's frequency.
+- **a real IF** on the left channel (**Input: IF**); the right channel is not used, and the **IF** dial is set to the front end's IF; or
+- **I and Q** at audio frequencies, I on the left and Q on the right (**Input: I/Q**, or **Q/I** for the other way round); the receiver tunes within ±21 kHz of the I/Q centre, the front end's frequency, and the **IF** dial is the station's distance from it.
 
 Measured with a signal generator straight into K2 and no front end: a 10 kHz sine set with the generator's load at High-Z; signal and noise as the audio's RMS in USB with a 2.4 kHz filter, the AGC off at 0 dB and the noise reduction off; the noise with the generator connected but its output off. A level in dBFS is a sine's peak re the ADC's full scale; the S-meter reads a tone's level at the ADC this way, with the IF input too.
 
@@ -427,16 +427,12 @@ Measured with a signal generator straight into K2 and no front end: a 10 kHz sin
 
 With K2 open, `diag rx` reads about −98.5 dBFS (I) and −100 dBFS (Q) RMS over the whole band.
 
-**What a front end should deliver.**
+**What a front end should deliver.** As a simple rule, a front end should deliver its signal at K2 at about **1 mV amplitude** (2 mVpp, 0.7 mV RMS; the S-meter reads about −63.5 dBFS). There a signal lies 42 dB (IF) to 46 dB (I/Q) above the receiver's noise in 2.4 kHz and about 63 dB below full scale. Besides:
 
-- **Level.** Keep the sum of all strong signals at K2 below full scale, with some headroom: −6 dBFS is about 1.5 Vpp. Above 0 dBFS the ADC clips, strong stations distort and extra carriers appear.
-- **Noise and gain.** For the front end, not the board, to set the sensitivity, its own output noise at K2 should lie about 10 dB above the receiver's: at least about 240 nV/√Hz per channel for I/Q, 350 nV/√Hz for an IF. The receiver then adds only about 0.4 dB to the noise. A front end whose noise at K2 lies lower needs more gain ahead of K2; with too little, the board's noise sets the sensitivity.
+- **Headroom.** Keep the sum of all strong signals at K2 below full scale: −6 dBFS is about 1.5 Vpp. Above 0 dBFS the ADC clips, strong stations distort and extra carriers appear.
 - **Band-limiting.** Nothing on the board limits the band: the ADCs pass up to 24 kHz (−2.7 dB at about 23 kHz). Whatever reaches K2 above that, a signal or a product of the front end, folds back into the band. Filter the front end's output above about 21 kHz.
-- **Frequencies with an IF.** The offset is the IF. Keep the offset and the filter's edges together inside about 0.5 to 22 kHz: USB at an IF of 10 kHz takes 10.3 to 12.7 kHz.
-- **Frequencies with I/Q.** The receiver tunes within ±21 kHz of the I/Q centre, with the filter's edges up to ±5.5 kHz from the carrier. Place the wanted signal 6 to 18 kHz above the centre, at about +10 kHz after a re-centre:
-  - Below about 8 kHz a real front end's noise rises near its LO.
-  - At **12 kHz**, a quarter of the 48 kHz sample rate, the front end's third-order products fold exactly onto the image, where no I/Q correction removes them: with the author's test front end the null stopped at 56 dB there, against 67 dB at 10 kHz.
-  - At **16 kHz** its second-order product (32 kHz) folds onto the image at −16 kHz.
+- **Frequencies with an IF.** Keep the IF and the filter's edges together inside about 0.5 to 22 kHz: USB at the default IF of 12 kHz takes 12.3 to 14.7 kHz.
+- **Frequencies with I/Q.** The receiver tunes within ±21 kHz of the I/Q centre, with the filter's edges up to ±5.5 kHz from the carrier. At exactly 12 kHz, a quarter of the 48 kHz sample rate, a front end's third-order products fold onto the image, where no I/Q correction removes them; for the deepest image rejection put the station a little away, at about 10 kHz.
 - **I/Q balance.** The image rejection is the balance of the front end and the two ADC channels together. The receiver corrects errors of up to ±3 dB and ±10° (**I/Q gain**, **I/Q phase**, **Null image**; see [Input and I/Q correction](#input-and-iq-correction)); with the correction exact, its own image rejection exceeds 130 dB (measured with the internal test signal).
 
 ### What the receiver needs
@@ -444,7 +440,7 @@ With K2 open, `diag rx` reads about −98.5 dBFS (I) and −100 dBFS (Q) RMS ove
 - **A front end** that delivers a real IF or I and Q to K2, as above: a superhet's IF, a direct-conversion I/Q mixer, a quadrature sampling detector. The receiver tunes only within the band that K2 carries; it does not tune the front end.
 - **An antenna**, or for a bench check a signal generator into the front end's RF input, through attenuators.
 
-The receiver also runs without a front end: the internal test tone (on the Filter view), or a generator's audio-frequency IF or I and Q on K2, stands in for the band. A front end whose oscillator an Arduino Uno with the author's sketch SDRFrontend 1.0 drives can be tuned from the application: see [The author's test front end](#the-authors-test-front-end).
+The receiver also runs without a front end: the internal test tone (on the Filter view), or a generator's audio-frequency IF or I and Q on K2, stands in for the band.
 
 ### Connecting the front end
 
@@ -460,11 +456,10 @@ K2 is a plain line input of about 22.5 kΩ; nothing between the front end and th
 
 ### Getting it going
 
-1. Select **Receiver**. It starts in USB with the input I/Q, the offset at +10 kHz, the AGC at medium and the noise reduction LMS at level 0 (it passes the audio unchanged).
+1. Select **Receiver**. It starts in USB with the input I/Q, the IF at 12 kHz, the AGC at medium and the noise reduction LMS at level 0 (it passes the audio unchanged).
 2. Choose the **Input**: **I/Q** for I and Q, **IF** for a real IF.
-3. Only with the author's test front end: under **Front end on** choose the Uno's port and press **Connect**; the dial turns into **Frequency** (see [The author's test front end](#the-authors-test-front-end)).
-4. Tune with the dial (with an IF, set it to the IF), then press **Output on**.
-5. With the input I/Q and a steady carrier in the channel (a generator, or a steady station), press **Null image** once: it finds the I/Q correction (see [Input and I/Q correction](#input-and-iq-correction)).
+3. Set the **IF** dial (with an IF input, to your front end's IF; with I/Q, to the station's distance from the I/Q centre), then press **Output on**.
+4. With the input I/Q and a steady carrier in the channel (a generator, or a steady station), press **Null image** once: it finds the I/Q correction (see [Input and I/Q correction](#input-and-iq-correction)).
 
 ### The Receiver view
 
@@ -479,7 +474,7 @@ K2 is a plain line input of about 22.5 kΩ; nothing between the front end and th
 | CW | 500 Hz around the pitch (600 Hz: +350 to +850) | The carrier as a tone at the pitch |
 | FM | −5500 to +5500 | Narrow-band FM, with its deviation and de-emphasis |
 
-**The dial.** The dial is the receiver's **offset**, −21000 to +21000 Hz: with the input **IF** the IF, with **I/Q** the station's distance from the I/Q centre. Turn the mouse wheel over a digit, or click its upper or lower half, as on every digit dial; a fast spin tunes once per answer, to the newest value. With the author's test front end connected and the input I/Q, the dial is the RF frequency instead, and the line beneath it shows where the front end stands (see [Tuning with the test front end](#tuning-with-the-test-front-end)).
+**The IF dial.** The dial is the receiver's **IF**, −21000 to +21000 Hz, 12000 at the start (in the protocol the parameter `offset`): with the input **IF** the IF, with **I/Q** the station's distance from the I/Q centre. Turn the mouse wheel over a digit, or click its upper or lower half, as on every digit dial.
 
 **S-meter and meters.** The S-meter reads the level in the channel, after the channel filter, in dBFS, on a bar from −130 to 0 dBFS with the squelch's threshold marked; a steady carrier reads its level at K2 (see [What the receiver expects at K2](#what-the-receiver-expects-at-k2)). The line below gives the AGC's gain, the audio's level and the receiver's share of the ESP32's core (**CPU**); the next one whether the squelch is open, in FM the **FM offset** (how far the carrier lies off the dial, a tuning indicator), and with the spectral noise reduction its average gain. The board reports them five times a second. The S-meter is the AGC's detector: it rises at once and falls after the hang time at the decay rate.
 
@@ -504,15 +499,11 @@ The AGC aims at −12 dBFS of audio and looks ahead by one block (5.3 ms), so a 
 
 #### Input and I/Q correction
 
-**Input** chooses what K2 carries: **I/Q** (I left, Q right), **Q/I** (swapped), or **IF**, a real intermediate frequency on the left channel alone, where the offset is the IF.
+**Input** chooses what K2 carries: **I/Q** (I left, Q right), **Q/I** (swapped), or **IF**, a real intermediate frequency on the left channel alone, where the dial is set to the IF.
 
-A front end's I and Q are never exactly equal in level and never exactly 90° apart, and the two ADC channels add their own small difference. What is left of it lets a station show also on the mirror side of the I/Q centre, its image: uncorrected, about 32 dB below it with the author's test front end. **I/Q gain** (−3 to +3 dB) and **I/Q phase** (−10 to +10°) correct front end and ADCs together.
+A front end's I and Q are never exactly equal in level and never exactly 90° apart, and the two ADC channels add their own small difference. What is left of it lets a station show also on the mirror side of the I/Q centre, its image: uncorrected, typically some 30 dB below it. **I/Q gain** (−3 to +3 dB) and **I/Q phase** (−10 to +10°) correct front end and ADCs together.
 
-**Null image** finds the two values for you. Tune a steady carrier into the channel, ideally at an offset near +10 kHz, then press the key. The application tunes the receiver to the carrier's mirror, sets AM with a ±150 Hz filter and the AGC off, and searches phase and gain in turn, three rounds, for the lowest S-meter reading. Afterwards it puts mode, filter, offset and AGC back, also after **Cancel**, and keeps the corrections it found; the line beside the key gives the image rejection before and after and the values. With the author's test front end it went from about 32 dB to 66 to 72 dB, with corrections of about +0.41 dB and +1.1°. The corrections are values of the receiver like any other: they go back to 0 at the next start, so keep them in a stored setting (**Settings → Save**).
-
-#### The front-end card
-
-The **Front end on** card serves only a front end like the author's test front end, whose oscillator an Arduino Uno with the sketch SDRFrontend 1.0 drives: see [The author's test front end](#the-authors-test-front-end). With any other front end, leave it disconnected.
+**Null image** finds the two values for you. Tune a steady carrier into the channel, ideally at an IF near +10 kHz (not exactly 12 kHz, see above), then press the key. The application tunes the receiver to the carrier's mirror, sets AM with a ±150 Hz filter and the AGC off, and searches phase and gain in turn, three rounds, for the lowest S-meter reading. Afterwards it puts mode, filter, IF and AGC back, also after **Cancel**, and keeps the corrections it found; the line beside the key gives the image rejection before and after and the values. On the author's bench, with a QRP Labs I/Q module, it went from about 32 dB to 66 to 72 dB, with corrections of about +0.41 dB and +1.1°. The corrections are values of the receiver like any other: they go back to 0 at the next start, so keep them in a stored setting (**Settings → Save**).
 
 #### Equalizer
 
@@ -540,7 +531,7 @@ The lines below give the edges, the width and the centre, and the design the rec
 | Control | Range | Default | Notes |
 | --- | --- | --- | --- |
 | Test tone | Off, on | Off | Replaces the input while on |
-| Tone offset | −45000 to +45000 Hz | 1000 | From the receiver's offset |
+| Tone offset | −45000 to +45000 Hz | 1000 | From the IF |
 | Tone level | −120 to 0 dBFS | −20 | |
 | Noise | −150 to 0 dBFS | −150 (none) | White noise added, RMS |
 | Keying | 0 to 5000 ms | 0 (steady) | A period, half of it on, at least 100 ms |
@@ -570,73 +561,22 @@ The Designer makes filters the receiver's own design cannot: notches, several pa
 
 Tuning stays with the PC application and the front panel: a pot's reading moves by about 0.7 %, too coarse for a sideband signal.
 
-### The author's test front end
-
-This section is optional: it describes the front end the author tests the receiver with, and the application's support for it. Nothing else in the receiver needs it.
-
-It is a QRP Labs receiver module: a quadrature sampling detector whose local oscillator (LO) runs at four times the receive frequency, with QRP Labs' 20 m band-pass filter ahead of it; its I and Q go to K2 as above. The LO is an Si5351A synthesizer driven by an Arduino Uno on its own USB port, running SDRFrontend 1.0, the author's sketch, which keeps the frequency, the drive and a crystal correction in the Uno's EEPROM. SDRFrontend is not part of this repository. The application's **Front end on** card is a convenience for a front end of this kind: it tunes the LO and the receiver's offset together.
-
-| From | | To |
-| --- | --- | --- |
-| The module's I and Q | → | K2 left and right, as in [Connecting the front end](#connecting-the-front-end) |
-| The Uno's USB | → | The PC, a COM port of its own |
-| Antenna or generator | → | The module's RF input |
-
-#### Tuning with the test front end
-
-With the test front end connected and the input I/Q, the dial is the RF frequency in Hz, and the line beneath it shows where the front end stands, its LO and the receiver's offset. The receiver tunes with two things: the front end's frequency (its LO divided by four) and the receiver's **offset** from it. The station sits 6 to 18 kHz above the front end's frequency (why, see the frequencies in [What the receiver expects at K2](#what-the-receiver-expects-at-k2)). Tuning within that window moves only the offset, without a click; tuning out of it moves the front end so that the station sits at +10 kHz, the front end first and then the offset, so the station stays where it is on the dial. Outside 13.9 to 14.5 MHz a line warns that the station lies outside the 20 m band-pass filter.
-
-With the card disconnected, or with the input **IF**, the dial is the offset again.
-
-#### The card
-
-The **Front end on** card drives the Uno: choose its port (↻ looks for ports again), **Connect**, **Disconnect**. The status line gives the front end's frequency, its LO drive and its crystal correction; the line below the card its identity, for example `SDRFrontend 1.0 Si5351A ok on COM24`, or what went wrong. **LO drive** sets the Si5351A's output current (off, 2, 4, 6 or 8 mA); **Correction** the crystal correction in ppb (−100000 to 100000; Enter or **Set**). The Uno keeps all three in its EEPROM, and the application remembers the port. With the simulator as the board, **Simulated front end** is in the list too.
-
-To find the correction, tune a carrier of known frequency in FM and change the correction until the FM offset reads near 0 Hz. The author's module needs 325 ppb.
-
-#### The Uno's commands
-
-The Uno speaks a short text protocol at 115200 baud, lines ending with CR LF, if you want to give your own front end an oscillator that the card can tune:
-
-| Command | Answer | Meaning |
-| --- | --- | --- |
-| `I?` | `I SDRFrontend 1.0 Si5351A ok` | The identity, also sent once at start-up; it ends in `ok` when the Si5351A answers, `missing` when not |
-| `S?` | `S F=14074000 D=8 C=325 LO=56296000` | Frequency in Hz, drive in mA, correction in ppb, the LO in Hz |
-| `F <Hz>` | `F <Hz>` | The receive frequency, 100 kHz to 50 MHz; the LO runs at four times it |
-| `D <mA>` | `D <mA>` | The drive: 0 (off), 2, 4, 6, 8 |
-| `C <ppb>` | `C <ppb>` | The crystal correction, −100000 to 100000 |
-| | `E <text>` | A command refused |
-
-The application opens the Uno's port without a pulse on DTR. Programs that pulse it (the Arduino IDE's serial monitor, pyserial by default) reset the Uno, and its first answer is lost in the reset.
-
 ### Levels and sensitivity
 
-The receiver's own figures are those at K2, in [What the receiver expects at K2](#what-the-receiver-expects-at-k2): in 2.4 kHz a noise-equivalent input of about 3.7 µV RMS (−106 dBu) per channel with I/Q and 5.4 µV RMS (−103 dBu) with an IF, a full scale of 2.98 Vpp (+2.7 dBu), about 106 to 109 dB between them. What that makes at the antenna depends on the front end's gain and noise. Besides:
+The receiver's own figures are those at K2, in [What the receiver expects at K2](#what-the-receiver-expects-at-k2): in 2.4 kHz a noise-equivalent input of about 3.7 µV RMS (−106 dBu) per channel with I/Q and 5.4 µV RMS (−103 dBu) with an IF, a full scale of 2.98 Vpp (+2.7 dBu), about 106 to 109 dB between them. What that makes at the antenna depends on the front end's gain and noise; the simple rule of about 1 mV amplitude at K2 is in [What the receiver expects at K2](#what-the-receiver-expects-at-k2). Besides:
 
 | | Measured |
 | --- | --- |
 | Load | 15 % of one core (USB, 203 taps) to 31 % (FM, 511 taps, spectral noise reduction) |
 | Delay | About 25 to 45 ms, estimated from the blocks, the AGC's look-ahead and the channel filter's delay (8 to 21 ms) |
 
-**An example: the author's test front end.** Measured on the author's bench: the QRP Labs module (see [The author's test front end](#the-authors-test-front-end)), a generator's carrier at 14.1 MHz through attenuators, the carrier at +10 kHz, the I/Q correction set, the AGC off at 0 dB. The figures in dBm are the whole receiver's at the module's RF input; they belong to this front end, and another one has its own gain.
-
-| | Measured |
-| --- | --- |
-| S-meter and input | A carrier of −50 dBm at the RF input reads −40.5 dBFS: dBFS ≈ dBm + 9.5 |
-| Noise-equivalent input | About −102 dBm in 2.4 kHz with the generator's own noise in the channel (10 dB S/N at about −92 dBm); about −108 dBm with the generator off |
-| Clipping | About −18 dBm at the RF input (the carrier then at about −8.5 dBFS) |
-| Image rejection | About 32 dB uncorrected; 66 to 72 dB after **Null image** |
-| Across the window | The S-meter reads up to 4 dB lower with the station at 16.5 to 18 kHz than at 10 kHz, the slope of the module's output and of the ADCs, and jumps by that much when the front end re-centres; the AGC hides it in the audio |
-
-The −102 dBm were measured with the generator's carrier on, and the generator's own broadband noise lifted the floor by about 6 dB: with the generator off, this front end reaches about −108 dBm in 2.4 kHz. Whether the module's noise or the board's sets that is not measured yet; it decides whether more gain ahead of K2 helps. With it the receiver is some 10 to 15 dB short of hearing the 20 m band's own noise, and it has some 15 dB of headroom above the strongest stations (S9+40, about −33 dBm). The author's plan, decided but not fitted yet: a wideband RF amplifier of about 10 dB with a high IP3 ahead of the module, which moves the clipping to about −28 dBm (S9+45) and makes the S-meter read dBm + 19.5; what it gains in sensitivity, up to 10 dB, depends on the answer above.
-
 ### Behaviour worth knowing
 
-- **A test front end belongs to the PC.** The front panel tunes only the receiver's offset (±21 kHz), and the pots do not tune at all; the PC's dial follows. The author's test front end, on the PC's card, moves only when you tune on the PC.
+- **Tuning.** The PC's and the front panel's **IF** dials tune the receiver within ±21 kHz and follow each other; the pots do not tune. The receiver never tunes the front end.
 - **Values that follow each other.** A mode loads its filter, an AGC speed its hang and decay, the edges and the width follow each other, and in CW the filter moves with the pitch. The board reports each value it changed this way, so every window and the panel show it.
 - **One application at a time.** The receiver uses the DSP's serial output to the ESP32, as the analysis' THD does: `diag capture` and `diag record` answer `busy` while it runs.
 - **Mono.** The audio is the same on the left and the right channel.
-- **The simulator** runs the receiver too, with a simulated test front end, so the page can be tried without hardware.
+- **The simulator** runs the receiver too, so the page can be tried without hardware.
 
 ## Scripting and the console
 
@@ -1007,9 +947,9 @@ In the editor **−** and **+** step the value; hold them to repeat, and after a
 
 **Env** draws the loudness envelope, solid, and the filter's contour, dashed, from the key down through a held stretch to the end of the release, at one time scale.
 
-![The receiver: the offset dial with the chosen digit underlined, the S-meter with the squelch's mark, the mode keys, the width keys with the passband sketch, the noise reduction keys with the CPU load](images/panel/receiver.png)
+![The receiver: the IF dial with the chosen digit underlined, the S-meter with the squelch's mark, the mode keys, the width keys with the passband sketch, the noise reduction keys with the CPU load](images/panel/receiver.png)
 
-**Receiver.** The dial at the top tunes the receiver's **offset**, with a sign and five digits from 10 kHz down to 1 Hz. Tap a digit to choose it (it is underlined in teal, and its step shows on the left); **−** and **+** step it, and holding them repeats; or drag along the dial, one step for every 14 pixels, to the right to tune up. The panel moves only the offset, within ±21 kHz, and the PC's dial follows; the author's test front end, if you use it, is tuned from the PC application alone (see [The receiver](#the-receiver)). Below the dial, the S-meter: a bar from −130 to 0 dBFS with the squelch's threshold as a yellow mark, the level and the AGC's gain (in FM the FM offset instead), and a dot beside **Sql** that is teal while the squelch is open and grey while it mutes. Then three rows of keys: the modes **Off**, **AM**, **USB**, **LSB**, **CW** and **FM**; four widths that suit the mode (USB and LSB 1.8k, 2.4k, 2.7k, 3k; CW 200, 300, 500, 1k; FM 6k, 8k, 10k, 11k; AM and Off 4k, 6k, 8k, 10k), with a sketch of the passband around the carrier (the line), ±6 kHz across; and **NR off**, **LMS** and **Spectral**, with the receiver's CPU load beside them (and the spectral noise reduction's gain). The other parameters are tiles below, a scroll away: volume, squelch, NR level and the filter first, the equalizer and the test tone last. The meter's widgets redraw five times a second.
+**Receiver.** The dial at the top tunes the receiver's **IF**, with a sign and five digits from 10 kHz down to 1 Hz. Tap a digit to choose it (it is underlined in teal, and its step shows on the left); **−** and **+** step it, and holding them repeats; or drag along the dial, one step for every 14 pixels, to the right to tune up. The panel moves the IF within ±21 kHz, and the PC's dial follows. Below the dial, the S-meter: a bar from −130 to 0 dBFS with the squelch's threshold as a yellow mark, the level and the AGC's gain (in FM the FM offset instead), and a dot beside **Sql** that is teal while the squelch is open and grey while it mutes. Then three rows of keys: the modes **Off**, **AM**, **USB**, **LSB**, **CW** and **FM**; four widths that suit the mode (USB and LSB 1.8k, 2.4k, 2.7k, 3k; CW 200, 300, 500, 1k; FM 6k, 8k, 10k, 11k; AM and Off 4k, 6k, 8k, 10k), with a sketch of the passband around the carrier (the line), ±6 kHz across; and **NR off**, **LMS** and **Spectral**, with the receiver's CPU load beside them (and the spectral noise reduction's gain). The other parameters are tiles below, a scroll away: volume, squelch, NR level and the filter first, the equalizer and the test tone last. The meter's widgets redraw five times a second.
 
 **SigmaStudio.** The page says that your program runs; the knob strip shows the pots going to the DSP's ADC inputs.
 
@@ -1125,14 +1065,11 @@ The STL files are in millimetres and lie as they print: the lid and the front pl
 | THD or Spectrum shows `failed` | The DSP's serial output lost its clocks: the DSP runs another program (service mode) | Leave service mode and select **Analysis** again |
 | Spectrum shows a strong line at 50 Hz and its odd multiples | Mains hum: a ground loop between the board, the device and the PC | Power the device and the board from the same outlet; try a USB isolator or a laptop on battery |
 | Receiver: only noise from the generator's carrier, or levels some 28 dB off what the generator is set to | The cable is on the generator's sync output, or its main output is off: the sync output gives a square wave whose level does not follow the setting | Take the generator's main output and switch it on |
-| Receiver: a station also shows on the other side of the I/Q centre | The image: the I/Q correction is not set (it is 0 after every start) | Tune a steady carrier near +10 kHz and press **Null image**; keep the result in a stored setting |
+| Receiver: a station also shows on the other side of the I/Q centre | The image: the I/Q correction is not set (it is 0 after every start) | Tune a steady carrier to an IF near +10 kHz and press **Null image**; keep the result in a stored setting |
 | Receiver: USB sounds like LSB, the tuning runs backwards | I and Q swapped on K2 | Choose the input **Q/I**, or swap the cables |
-| Receiver: the dial says **Offset**, not **Frequency** | As it should, unless the author's test front end is in use: the dial shows the RF frequency only with that front end connected on its card and the input **I/Q** | With the test front end: connect it on its card; choose **I/Q** |
-| Receiver, test front end: "Not the SDR front end on COMn", or the front end does not answer | Another port, or another program holds or has just reset the Uno | Choose the Uno's port; close the Arduino IDE's serial monitor and press **Connect** again |
-| Receiver, test front end: "no Si5351A found!" | The Uno does not find the Si5351A on its I2C bus | Check the Si5351A's wiring and supply on the Uno |
-| Receiver: strong stations distort, extra carriers appear | The front end drives the ADCs into clipping: more than 2.98 Vpp (0 dBFS) at K2; with the author's test front end above about −18 dBm at its input | Less gain or an attenuator ahead of K2 or the front end; keep the signals together below about −6 dBFS |
+| Receiver: strong stations distort, extra carriers appear | The front end drives the ADCs into clipping: more than 2.98 Vpp (0 dBFS) at K2 | Less gain or an attenuator ahead of K2 or the front end; keep the signals together below about −6 dBFS |
 | Receiver: stations or whistles that tune the wrong way, or show where nothing should be | Signals or the front end's products above about 21 kHz at K2 fold back into the band: the board does not limit it | Low-pass the front end's output above about 21 kHz |
-| Receiver: the image null stops at about 56 dB | The station sits at an offset of 12 kHz, where the front end's third-order products fall onto the image | Tune so that the station sits near +10 kHz (with the test front end, a re-centre puts it there) |
+| Receiver: the image null stops at about 56 dB | With I/Q, the station sits at an IF of exactly 12 kHz, where the front end's third-order products fall onto the image | Tune so that the station sits near +10 kHz |
 | `diag capture` or `diag record` answers `busy` | The receiver holds the DSP's serial output | Select another application first |
 
 ## Technical notes

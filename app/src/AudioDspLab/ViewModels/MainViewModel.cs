@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Input;
 using System.Windows.Threading;
-using AudioDspLab.FrontEnd;
 using AudioDspLab.Protocol;
 using AudioDspLab.Receiver;
 using AudioDspLab.Settings;
@@ -79,7 +78,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Radio = new RadioViewModel(WriteParameterAsync, RunAsync);
         Analyzer = new AnalyzerPageViewModel(WriteParameterAsync, RunAsync);
         Synth = new SynthPageViewModel(WriteParameterAsync, RunAsync);
-        Receiver = new ReceiverPageViewModel(WriteParameterAsync, RunAsync, this.preferences);
+        Receiver = new ReceiverPageViewModel(WriteParameterAsync, RunAsync);
         pages = [Generator, Equalizer, Radio, Analyzer, Synth, Receiver];
         Potentiometers = [.. Enumerable.Range(0, 4).Select(index => new PotentiometerViewModel(index))];
 
@@ -539,7 +538,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
             BoardInfo info = await Task.Run(() => connecting.ConnectAsync()).ConfigureAwait(true);
             client = candidate;
-            Receiver.IsSimulatedBoard = port == SimulatorPort;
             FirmwareText = info.Kit.Length > 0 ? $"{info.Name} {info.Firmware} · {info.KitDisplayName}" : $"{info.Name} {info.Firmware}";
             preferences.LastPort = port;
             preferences.Save();
@@ -820,7 +818,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             BoardErrorException board => $"Refused: {board.Code} {board.Detail}".TrimEnd(),
             TimeoutException or IOException => exception.Message,
-            OperationCanceledException or InvalidOperationException or FilterDownloadException or FrontEndException => exception.Message,
+            OperationCanceledException or InvalidOperationException or FilterDownloadException => exception.Message,
             _ => $"Failed: {exception.Message}"
         };
 
@@ -1144,9 +1142,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception) when (exception is BoardErrorException or IOException or TimeoutException or FormatException
                                               or OperationCanceledException or InvalidOperationException
-                                              or FilterDownloadException or FrontEndException)
+                                              or FilterDownloadException)
         {
-            // also a page's own outcomes: a cancel, a refused download, the receiver's front end
+            // also a page's own outcomes: a cancel, a refused download
             Fail(Describe(exception));
         }
 
@@ -1248,9 +1246,6 @@ public sealed class AppPreferences
     /// <summary>The front panel's network address ("192.168.0.205", "audio-dsp-lab.local"), or null.</summary>
     public string? PanelAddress { get; set; }
 
-    /// <summary>The SDR front end's serial port (the receiver's Uno with the Si5351A), or null.</summary>
-    public string? FrontEndPort { get; set; }
-
     public static AppPreferences Load()
     {
         var preferences = new AppPreferences();
@@ -1270,10 +1265,6 @@ public sealed class AppPreferences
                 {
                     preferences.PanelAddress = line[6..].Trim();
                 }
-                else if (line.StartsWith("frontend=", StringComparison.Ordinal))
-                {
-                    preferences.FrontEndPort = line[9..].Trim();
-                }
             }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -1288,7 +1279,7 @@ public sealed class AppPreferences
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, $"port={LastPort}\ntheme={Theme}\npanel={PanelAddress}\nfrontend={FrontEndPort}\n");
+            File.WriteAllText(FilePath, $"port={LastPort}\ntheme={Theme}\npanel={PanelAddress}\n");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {

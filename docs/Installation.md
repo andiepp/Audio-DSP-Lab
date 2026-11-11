@@ -130,6 +130,16 @@ For your own DSP programs, install Analog Devices **SigmaStudio 4.7** and connec
 
 A touch panel on an ESP32-2432S028R ("CYD") display board runs the applications without a PC and lets the PC application work over WiFi. Three wires connect it to the board (CYD GPIO22 to the board's GPIO37, CYD GPIO35 to GPIO4, and GND); `firmware\Flash-Panel.cmd` writes its firmware over the CYD's own USB port. Wiring, power and use: the manual's chapter "The front panel", or [the front panel guide](Panel.md).
 
+## 10. Optional: a front end for the receiver
+
+The receiver is a backend from the IF on: your front end delivers a real IF on K2's left channel, or I on the left and Q on the right, and the receiver tunes, filters and demodulates them. Nothing else is needed between the front end and K2.
+
+1. Connect the front end's IF, or its I and Q, to K2 with a 3.5 mm stereo cable.
+2. Press **Receiver** and choose the **Input**: **IF** or **I/Q**.
+3. Set the **IF** dial (12 kHz at the start) to your front end's IF, or with I/Q to the station's distance from the I/Q centre, and press **Output on**.
+
+As a simple rule, the front end should deliver its signal at K2 at about **1 mV amplitude** (the S-meter then reads about −63.5 dBFS), and all signals together well below 3 Vpp, where K2 clips. Levels, noise and frequencies in detail: the manual's chapter "The receiver".
+
 ## Updating
 
 - **Firmware:** flash the new release with the flash tool (Option A). Stored settings stay.

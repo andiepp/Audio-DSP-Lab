@@ -383,7 +383,7 @@ The equalizer's eight parameters, `bass-gain` to `output`, with the same ranges 
 | Name | Kind | Range | Default | Pot |
 | --- | --- | --- | --- | --- |
 | `mode` | choice | `off`, `am`, `usb`, `lsb`, `cw`, `fm` | `usb` | |
-| `offset` | integer, Hz | -21000 to 21000: the receiver's tuning from the front end's frequency (with `input if`, the IF) | 10000 | |
+| `offset` | integer, Hz | -21000 to 21000: the receiver's IF, shown as **IF** in the application and on the panel (with `input if` the IF on K2 left; with I/Q the station's distance from the I/Q centre) | 12000 | |
 | `low` | integer, Hz | -5500 to 5450: the channel filter's lower edge at -6 dB, re the carrier | 300 | |
 | `high` | integer, Hz | -5450 to 5500: its upper edge | 2700 | |
 | `width` | integer, Hz | 100 to 11000: `high` - `low`, placed by the mode | 2400 | P1 |

@@ -1181,12 +1181,11 @@ static void buildSectionKeys() {
 
 // the dial, the S-meter and three rows of keys fill the content's first
 // screen; the tiles follow below the knob strip's edge, a scroll away. The
-// front end is the PC's (design/receiver.md, option B): the dial tunes the
-// receiver's offset, the PC's dial follows it.
+// dial tunes the receiver's IF (parameter "offset"), the PC's dial follows it.
 #define RX_DIAL_HEIGHT                40
 #define RX_METER_HEIGHT               26      // the first tile starts at the knob strip, not 2 px above it
 #define RX_KEY_HEIGHT                 30
-#define RX_DIGITS                     5       // the offset's digits, 10 kHz .. 1 Hz
+#define RX_DIGITS                     5       // the IF's digits, 10 kHz .. 1 Hz
 #define RX_DIGIT_WIDTH                19
 #define RX_DIGIT_GAP                  6       // between the thousands and the hundreds
 #define RX_SIGN_X                     86      // the sign's left edge in the dial
@@ -1336,7 +1335,7 @@ static lv_obj_t *smallKey(lv_obj_t *parent, const char *text, int width, const l
 }
 
 static void buildReceiverHeader() {
-  // the dial: "Offset" and the step, the sign and five digits, -/+
+  // the dial: "IF" and the step, the sign and five digits, -/+
   rxDial = lv_obj_create(content);
   plainBox(rxDial, COLOUR_CARD);
   lv_obj_set_size(rxDial, PLOT_WIDTH, RX_DIAL_HEIGHT);
@@ -1346,7 +1345,7 @@ static void buildReceiverHeader() {
   for (lv_event_code_t code : { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED }) {
     lv_obj_add_event_cb(rxDial, onRxDial, code, nullptr);
   }
-  lv_obj_t *title = label(rxDial, "Offset, Hz", &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_obj_t *title = label(rxDial, "IF, Hz", &lv_font_montserrat_12, COLOUR_MUTED);
   lv_obj_set_pos(title, 6, 3);
   rxStepLabel = label(rxDial, "", &lv_font_montserrat_12, COLOUR_MUTED);
   lv_obj_set_pos(rxStepLabel, 6, 21);

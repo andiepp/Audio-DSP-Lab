@@ -1,8 +1,5 @@
-using System.Collections.ObjectModel;
 using System.Globalization;
-using System.IO;
 using System.Windows.Input;
-using AudioDspLab.FrontEnd;
 using AudioDspLab.Protocol;
 using AudioDspLab.Receiver;
 
@@ -12,53 +9,28 @@ namespace AudioDspLab.ViewModels;
 /// The receiver application (design/receiver.md, section 8), ported from
 /// DSP-Box-Lab's Receiver, Filter and Designer pages: three views chosen as
 /// the analysis page chooses its parts. The Receiver view holds the mode, the
-/// frequency dial, the meters, AGC, NR, squelch, the input and its I/Q
-/// correction, the SDR front end and the equalizer; the Filter view the
+/// IF dial, the meters, AGC, NR, squelch, the input and its I/Q
+/// correction and the equalizer; the Filter view the
 /// channel filter's edges on a chart, its measurement and the test tone; the
 /// Designer view filters made on the PC and downloaded.
 /// </summary>
-/// <remarks>
-/// The front end (the Uno with the Si5351A) has its own serial port and is
-/// not a board action: its outcomes show on its card. The dial is the RF
-/// frequency while the front end is connected and the input is I/Q
-/// (<see cref="ReceiverTuner"/> moves the front end only when needed and sets
-/// the board's offset), the offset itself otherwise.
-/// </remarks>
 public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, IDisposable
 {
     public const string ReceiverView = "receiver";
     public const string FilterView = "filter";
     public const string DesignerView = "designer";
 
-    /// <summary>The front end's usual port (design/receiver.md, R4), until another was used.</summary>
-    public const string DefaultFrontEndPort = "COM24";
-
-    private static readonly int[] DriveSteps = [0, 2, 4, 6, 8];
-
-    private readonly AppPreferences? preferences;
-    private readonly LatestRequest<long> dialRequests = new();
     private string view = ReceiverView;
     private ReceiverMeter? meter;
-    private FrontEndClient? frontEnd;
-    private ReceiverTuner? tuner;
-    private BoardClient? tunerBoard;
-    private FrontEndStatus? frontEndStatus;
-    private string? selectedFrontEndPort;
-    private string frontEndText = "Not connected.";
-    private string correctionText = string.Empty;
     private string nullText = string.Empty;
-    private bool isConnectingFrontEnd;
-    private bool isSimulatedBoard;
     private bool isWorking;
     private CancellationTokenSource? cancel;
 
-    public ReceiverPageViewModel(ParameterWrite write, BoardAction run, AppPreferences? preferences = null)
+    public ReceiverPageViewModel(ParameterWrite write, BoardAction run)
         : base(write, run, Applications.Receiver)
     {
-        this.preferences = preferences;
-
         Mode = Choice("mode", "Mode", ("off", "Off"), ("am", "AM"), ("usb", "USB"), ("lsb", "LSB"), ("cw", "CW"), ("fm", "FM"));
-        Offset = Integer("offset", "Offset", -21000, 21000, "-- Hz --");
+        Offset = Integer("offset", "IF", -21000, 21000, "-- Hz --");
         Low = Integer("low", "Low edge", -5500, 5450, "-- Hz --");
         High = Integer("high", "High edge", -5450, 5500, "-- Hz --");
         Width = Integer("width", "Width", 100, 11000, "-- Hz --");
@@ -92,8 +64,7 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
         Volume = Number("volume", "Volume", -60, 0, "-- dB --");
         Output = Switch("output");
 
-        Offset.ValueChanged += _ => RaiseDial();
-        Input.ValueChanged += _ => RaiseDial();
+        Input.ValueChanged += _ => CommandManager.InvalidateRequerySuggested();
         Mode.ValueChanged += _ =>
         {
             RaisePropertyChanged(nameof(IsCw));
@@ -108,22 +79,11 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
         }
 
         ShowViewCommand = new RelayCommand(shown => View = shown as string ?? ReceiverView);
-        RefreshFrontEndPortsCommand = new RelayCommand(RefreshFrontEndPorts, () => frontEnd is null && !isConnectingFrontEnd);
-        ConnectFrontEndCommand = new RelayCommand(() => _ = ConnectFrontEndAsync(),
-            () => frontEnd is null && !isConnectingFrontEnd && selectedFrontEndPort is not null);
-        DisconnectFrontEndCommand = new RelayCommand(() => _ = DisconnectFrontEndAsync("Disconnected."), () => frontEnd is not null);
-        SelectDriveCommand = new RelayCommand(
-            drive => _ = SetDriveAsync(int.Parse((string)drive!, CultureInfo.InvariantCulture)),
-            drive => frontEnd is not null && drive is string);
-        DriveKeys = [.. DriveSteps.Select(ma => new ChoiceKey(ma.ToString(CultureInfo.InvariantCulture), ma == 0 ? "Off" : $"{ma} mA", SelectDriveCommand))];
-        SetCorrectionCommand = new RelayCommand(() => _ = SetCorrectionAsync(), () => frontEnd is not null);
         NullImageCommand = new RelayCommand(() => _ = NullImageAsync(), () => IsRunning && !isWorking && Input.Selected is not null and not "if");
         CancelCommand = new RelayCommand(() => cancel?.Cancel(), () => cancel is not null);
 
         InitializeFilter();
         InitializeDesigner();
-        selectedFrontEndPort = string.IsNullOrWhiteSpace(preferences?.FrontEndPort) ? DefaultFrontEndPort : preferences.FrontEndPort;
-        RefreshFrontEndPorts();
     }
 
     // --- views -----------------------------------------------------------------------------------
@@ -170,6 +130,7 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
 
     public ParameterViewModel Mode { get; }
 
+    /// <summary>The IF (parameter "offset"): with an IF input the IF, with I/Q the station's distance from the I/Q centre.</summary>
     public ParameterViewModel Offset { get; }
 
     public ParameterViewModel Low { get; }
@@ -263,115 +224,6 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
         RaiseMeters();
     }
 
-    // --- dial ------------------------------------------------------------------------------------
-
-    /// <summary>The dial is the RF frequency: the front end is connected and the input is I/Q.</summary>
-    public bool IsRfDial => frontEnd is not null && frontEndStatus is not null && Input.Selected is not null and not "if";
-
-    public bool IsOffsetDial => !IsRfDial;
-
-    public double RfMinimum => ReceiverDial.Minimum(true);
-
-    public double RfMaximum => ReceiverDial.Maximum(true);
-
-    /// <summary>The RF frequency the receiver listens to: front end plus offset; null without the front end.</summary>
-    public double? RfDialValue
-    {
-        get => IsRfDial ? ReceiverDial.Show(Offset.Value, frontEndStatus?.FrequencyHz) : null;
-        set
-        {
-            if (value is double dial && IsRfDial && IsRunning && dial != RfDialValue)
-            {
-                _ = TuneAsync(dial);
-            }
-        }
-    }
-
-    public string DialTitle => IsRfDial ? "Frequency" : "Offset";
-
-    public string DialUnitLine => IsRfDial ? "-- Hz, through the front end --" : "-- Hz, the receiver's offset --";
-
-    public string TuningText =>
-        IsRfDial && frontEndStatus is { } s
-            ? string.Format(CultureInfo.CurrentCulture, "Front end {0:#,0} Hz (LO {1:0.000000} MHz) · offset {2}",
-                s.FrequencyHz, s.LoHz / 1e6, Offset.Value is double o ? o.ToString("+#,0;-#,0;0", CultureInfo.CurrentCulture) + " Hz" : "--")
-            : frontEnd is not null
-                ? "The IF input: the dial sets the offset, the front end stays."
-                : "No front end: the dial sets the offset from the I/Q input's centre.";
-
-    public string BandText =>
-        RfDialValue is double rf && !SdrTuner.InBand((long)rf)
-            ? string.Format(CultureInfo.CurrentCulture, "Outside the 20 m band-pass filter ({0:0.0} to {1:0.0} MHz): strongly attenuated.",
-                SdrTuner.BandLowHz / 1e6, SdrTuner.BandHighHz / 1e6)
-            : string.Empty;
-
-    /// <summary>Tunes the dial (newest request wins while one is under way).</summary>
-    public Task TuneAsync(double dial) =>
-        dialRequests.SubmitAsync(ReceiverDial.RfFor(dial), hz => Run(
-            async board =>
-            {
-                if (frontEnd is null)
-                {
-                    return;
-                }
-
-                ReceiverTuner current = await TunerAsync(board).ConfigureAwait(true);
-                SdrTuning tuning = await current.TuneAsync(hz).ConfigureAwait(true);
-                Offset.Apply(tuning.OffsetHz.ToString(CultureInfo.InvariantCulture), fromBoard: false);
-                if (frontEndStatus is { } s && s.FrequencyHz != current.FrontEndHz)
-                {
-                    frontEndStatus = s with { FrequencyHz = current.FrontEndHz };
-                    RaiseFrontEnd();
-                }
-            },
-            string.Format(CultureInfo.CurrentCulture, "Tuned to {0:#,0} Hz.", hz)));
-
-    // --- front end -------------------------------------------------------------------------------
-
-    public ObservableCollection<string> FrontEndPorts { get; } = [];
-
-    public string? SelectedFrontEndPort
-    {
-        get => selectedFrontEndPort;
-        set => SetProperty(ref selectedFrontEndPort, value);
-    }
-
-    public ICommand RefreshFrontEndPortsCommand { get; }
-
-    public ICommand ConnectFrontEndCommand { get; }
-
-    public ICommand DisconnectFrontEndCommand { get; }
-
-    public bool IsFrontEndConnected => frontEnd is not null;
-
-    public bool IsFrontEndDisconnected => frontEnd is null;
-
-    /// <summary>The front end's identity, or why it is not connected.</summary>
-    public string FrontEndText
-    {
-        get => frontEndText;
-        private set => SetProperty(ref frontEndText, value);
-    }
-
-    public string FrontEndStatusText =>
-        frontEndStatus is { } s
-            ? string.Format(CultureInfo.CurrentCulture, "{0:#,0} Hz · drive {1} · {2} ppb",
-                s.FrequencyHz, s.DriveMa == 0 ? "off" : $"{s.DriveMa} mA", s.CorrectionPpb)
-            : string.Empty;
-
-    public IReadOnlyList<ChoiceKey> DriveKeys { get; }
-
-    public ICommand SelectDriveCommand { get; }
-
-    /// <summary>The crystal correction to set, ppb; Enter sets it.</summary>
-    public string CorrectionText
-    {
-        get => correctionText;
-        set => SetProperty(ref correctionText, value ?? string.Empty);
-    }
-
-    public ICommand SetCorrectionCommand { get; }
-
     public ICommand NullImageCommand { get; }
 
     /// <summary>The image null's progress or result.</summary>
@@ -379,140 +231,6 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
     {
         get => nullText;
         private set => SetProperty(ref nullText, value);
-    }
-
-    /// <summary>The board is the simulator: the simulated front end is offered too.</summary>
-    public bool IsSimulatedBoard
-    {
-        get => isSimulatedBoard;
-        set
-        {
-            if (SetProperty(ref isSimulatedBoard, value))
-            {
-                RefreshFrontEndPorts();
-            }
-        }
-    }
-
-    public void RefreshFrontEndPorts()
-    {
-        string? keep = selectedFrontEndPort;
-        FrontEndPorts.Clear();
-        if (isSimulatedBoard)
-        {
-            FrontEndPorts.Add(SimulatedFrontEndPort.SimulatorName);
-        }
-
-        foreach (string port in SerialLineTransport.PortNames())
-        {
-            FrontEndPorts.Add(port);
-        }
-
-        SelectedFrontEndPort = keep is not null && FrontEndPorts.Contains(keep)
-            ? keep
-            : isSimulatedBoard ? SimulatedFrontEndPort.SimulatorName : FrontEndPorts.FirstOrDefault();
-    }
-
-    public async Task ConnectFrontEndAsync()
-    {
-        if (frontEnd is not null || isConnectingFrontEnd || selectedFrontEndPort is not { } name)
-        {
-            return;
-        }
-
-        isConnectingFrontEnd = true;
-        CommandManager.InvalidateRequerySuggested();
-        FrontEndText = $"Opening {name} …";
-        var candidate = new FrontEndClient(name == SimulatedFrontEndPort.SimulatorName ? new SimulatedFrontEndPort() : new SerialFrontEndPort(name));
-        try
-        {
-            await candidate.OpenAsync().ConfigureAwait(true);
-            FrontEndStatus status = await candidate.StatusAsync().ConfigureAwait(true);
-            frontEnd = candidate;
-            tuner = null;
-            frontEndStatus = status;
-            CorrectionText = status.CorrectionPpb.ToString(CultureInfo.InvariantCulture);
-            FrontEndText = $"{candidate.Identity} on {candidate.Name}" + (candidate.SynthesizerFound ? "." : ": no Si5351A found!");
-            if (preferences is not null && name != SimulatedFrontEndPort.SimulatorName)
-            {
-                preferences.FrontEndPort = name;
-                preferences.Save();
-            }
-
-            RaiseFrontEnd();
-            RaiseDial();
-            // the station stays on the dial: the front end's frequency plus the offset in force
-            if (IsRfDial && IsRunning && Offset.Value is double offset)
-            {
-                await TuneAsync(status.FrequencyHz + offset).ConfigureAwait(true);
-            }
-        }
-        catch (Exception exception) when (exception is FrontEndException or TimeoutException or IOException or UnauthorizedAccessException
-                                              or InvalidOperationException or ArgumentException or FormatException)
-        {
-            await candidate.DisposeAsync().ConfigureAwait(true);
-            FrontEndText = $"{name}: {exception.Message}";
-        }
-        finally
-        {
-            isConnectingFrontEnd = false;
-            CommandManager.InvalidateRequerySuggested();
-        }
-    }
-
-    public async Task DisconnectFrontEndAsync(string message)
-    {
-        FrontEndClient? closing = frontEnd;
-        frontEnd = null;
-        tuner = null;
-        tunerBoard = null;
-        frontEndStatus = null;
-        if (closing is not null)
-        {
-            await closing.DisposeAsync().ConfigureAwait(true);
-        }
-
-        FrontEndText = message;
-        RaiseFrontEnd();
-        RaiseDial();
-    }
-
-    public async Task SetDriveAsync(int milliamps)
-    {
-        if (frontEnd is not { } client || frontEndStatus is not { } status)
-        {
-            return;
-        }
-
-        await FrontEndActionAsync(async () =>
-        {
-            int drive = await client.SetDriveAsync(milliamps).ConfigureAwait(true);
-            frontEndStatus = status with { DriveMa = drive };
-            return drive == 0 ? "LO drive off." : $"LO drive {drive} mA.";
-        }).ConfigureAwait(true);
-    }
-
-    public async Task SetCorrectionAsync()
-    {
-        if (frontEnd is not { } client || frontEndStatus is not { } status)
-        {
-            return;
-        }
-
-        if (!long.TryParse(correctionText.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long ppb))
-        {
-            CorrectionText = status.CorrectionPpb.ToString(CultureInfo.InvariantCulture);
-            FrontEndText = "The correction is a whole number of ppb, -100000 to 100000.";
-            return;
-        }
-
-        await FrontEndActionAsync(async () =>
-        {
-            long taken = await client.SetCorrectionAsync(ppb).ConfigureAwait(true);
-            frontEndStatus = status with { CorrectionPpb = taken };
-            CorrectionText = taken.ToString(CultureInfo.InvariantCulture);
-            return $"Crystal correction {taken} ppb.";
-        }).ConfigureAwait(true);
     }
 
     /// <summary>Searches the I/Q correction for the deepest image of a steady carrier in the channel.</summary>
@@ -580,23 +298,18 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
     {
         base.Forget();
         cancel?.Cancel();
-        tuner = null;
-        tunerBoard = null;
         ApplyMeter(null);
         ApplyFilterStatus(null);
-        RaiseDial();
     }
 
     protected override void OnRunningChanged()
     {
-        RaiseDial();
         CommandManager.InvalidateRequerySuggested();
     }
 
     public void Dispose()
     {
         cancel?.Cancel();
-        _ = DisconnectFrontEndAsync("Closed.");
     }
 
     // --- inside ----------------------------------------------------------------------------------
@@ -605,37 +318,6 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
         new(band,
             Number($"{name}-gain", $"{band} gain", -12, 12, "-- dB --"),
             Number($"{name}-frequency", band == EqualizerBand.Middle ? "Centre" : "Corner", minimumHertz, maximumHertz, "-- Hz --", 0));
-
-    private async Task<ReceiverTuner> TunerAsync(BoardClient board)
-    {
-        if (tuner is null || tunerBoard != board)
-        {
-            var created = ReceiverTuner.ForBoard(board, frontEnd!);
-            await created.InitializeAsync().ConfigureAwait(true);
-            tuner = created;
-            tunerBoard = board;
-        }
-
-        return tuner;
-    }
-
-    private async Task FrontEndActionAsync(Func<Task<string>> action)
-    {
-        try
-        {
-            FrontEndText = await action().ConfigureAwait(true);
-        }
-        catch (Exception exception) when (exception is FrontEndException or FormatException)
-        {
-            FrontEndText = exception.Message;
-        }
-        catch (Exception exception) when (exception is TimeoutException or IOException or InvalidOperationException)
-        {
-            await DisconnectFrontEndAsync($"The front end does not answer: {exception.Message}").ConfigureAwait(true);
-        }
-
-        RaiseFrontEnd();
-    }
 
     /// <summary>The values a board action changed by its own requests (the board reports only what it changed itself).</summary>
     private async Task RereadAsync(BoardClient board, params string[] names)
@@ -673,31 +355,6 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
         RaisePropertyChanged(nameof(IsSquelchClosed));
         RaisePropertyChanged(nameof(FmOffsetText));
         RaisePropertyChanged(nameof(NrGainText));
-    }
-
-    private void RaiseDial()
-    {
-        RaisePropertyChanged(nameof(IsRfDial));
-        RaisePropertyChanged(nameof(IsOffsetDial));
-        RaisePropertyChanged(nameof(RfDialValue));
-        RaisePropertyChanged(nameof(DialTitle));
-        RaisePropertyChanged(nameof(DialUnitLine));
-        RaisePropertyChanged(nameof(TuningText));
-        RaisePropertyChanged(nameof(BandText));
-        CommandManager.InvalidateRequerySuggested();
-    }
-
-    private void RaiseFrontEnd()
-    {
-        RaisePropertyChanged(nameof(IsFrontEndConnected));
-        RaisePropertyChanged(nameof(IsFrontEndDisconnected));
-        RaisePropertyChanged(nameof(FrontEndStatusText));
-        foreach (ChoiceKey key in DriveKeys)
-        {
-            key.IsSelected = frontEndStatus is { } s && key.Name == s.DriveMa.ToString(CultureInfo.InvariantCulture);
-        }
-
-        RaiseDial();
     }
 
     private static string Decibel(double value, string unit, bool plus = false) =>

@@ -707,3 +707,28 @@ NR, FM, I/Q; USB command `digit <n>` for screenshots. Panel firmware
 set elsewhere; tuning, keys and tiles tried by hand on the CYD. Not
 done: the optional panadapter (`rxspectrum`); screenshots for the
 manual come with R7.
+
+## 15 After 1.5: the front end support removed (2026-11-11)
+
+The receiver is the backend from the IF on, and the front end is the
+user's; the author's QRP Labs module with the Uno was a test rig only.
+So the application no longer drives a front end:
+
+- Removed: the **Front end on** card (port, LO drive, crystal
+  correction), the RF dial with its tuner split (`FrontEndClient`,
+  `SdrTuner`, `ReceiverTuner`, the simulated front end), the 20 m band
+  warning, `app/tools/RxTuneCheck`, the `frontend=` preference, and the
+  manual's sections on the test front end and its measurements.
+  Sections 6 and 14 (R4) above stay as the record of that work.
+- Kept: the I/Q correction and **Null image** (`ImageNull`, now in
+  `AudioDspLab.Receiver`), which serve any I/Q front end.
+- The dial is called **IF** in the application and on the panel; the
+  protocol keeps the parameter name `offset`. Its default is now 12000
+  (was 10000): 12 kHz is the usual IF for an IF front end. With I/Q,
+  12 kHz is fs/4, where a front end's third-order products fold onto
+  the image (R3); the manual says to put the station near 10 kHz for
+  the deepest image null.
+- The specification at K2 (section "What the receiver expects at K2" in
+  the manual) stays; what a front end should deliver is now one simple
+  rule: about 1 mV amplitude at K2 (-63.5 dBFS, 42 to 46 dB above the
+  noise in 2.4 kHz, more than 60 dB below full scale).

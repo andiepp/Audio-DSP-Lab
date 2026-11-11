@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.6 — the receiver as a backend only
+
+Firmware 1.6, protocol 1 (unchanged), application 1.6, panel firmware 1.6.
 
 - Receiver: the application no longer drives a front end. The **Front end on** card (the author's test front end: an Arduino Uno with the Si5351A), the RF dial and its tuning, the 20 m band warning and `app/tools/RxTuneCheck` are removed; the front end is entirely yours. **Null image** and the I/Q correction stay.
 - Receiver: the dial is called **IF** in the application and on the front panel (the protocol's parameter stays `offset`), and it starts at **12 kHz** instead of 10 kHz.

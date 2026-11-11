@@ -141,7 +141,7 @@ The application binds each page to parameters by their protocol names; ranges, u
 
 ### The simulator
 
-`SimulatedBoard` answers the protocol as firmware 1.5 does, with made-up measurements: a 5 kHz low-pass as the device under test, harmonics, mains hum and noise for THD and Spectrum, a radio that "plays" when a network is set, an arpeggio on the synthesizer in demo mode, a receiver with its parameters, meters and filter download. The tests run against it, and the application offers it as **Simulator (demo)**.
+`SimulatedBoard` answers the protocol as firmware 1.6 does, with made-up measurements: a 5 kHz low-pass as the device under test, harmonics, mains hum and noise for THD and Spectrum, a radio that "plays" when a network is set, an arpeggio on the synthesizer in demo mode, a receiver with its parameters, meters and filter download. The tests run against it, and the application offers it as **Simulator (demo)**.
 
 ## A release
 

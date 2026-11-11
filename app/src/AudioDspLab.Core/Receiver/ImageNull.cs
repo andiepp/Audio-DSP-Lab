@@ -26,10 +26,10 @@ public sealed record ImageNullResult(double GainDb, double PhaseDeg, double Sign
 /// While searching, the receiver runs in AM (no CW pitch shift) with a ±150 Hz
 /// filter around the carrier (a low noise floor), the AGC off and the S-meter
 /// fast (hang 0, decay 200 dB/s). Mode, filter edges, offset and AGC are
-/// restored afterwards, also on cancel; the corrections found stay. At an IF
-/// of exactly 12 kHz (a quarter of the sample rate) a front end's third-order
-/// distortion folds onto the image and caps the null (design/receiver.md, R3):
-/// put the carrier a little away from it for the search.
+/// restored afterwards, also on cancel; the corrections found stay. Avoid an
+/// IF of 12 kHz (a quarter of the sample rate): there a front end's
+/// third-order distortion folds onto the image and caps the null
+/// (design/receiver.md, R3); the default 10 kHz keeps clear of it.
 /// </remarks>
 public static class ImageNull
 {

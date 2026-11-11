@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7 — the receiver's IF back at 10 kHz
+
+Firmware 1.7, protocol 1 (unchanged), application 1.7, panel firmware 1.7.
+
+- Receiver: the **IF** starts at **10 kHz** again (1.6: 12 kHz). With I/Q, 12 kHz is a quarter of the sample rate, where a front end's third-order products fold onto the image and cap the image null (56 dB against 67 dB at 10 kHz on the author's bench); 10 kHz keeps clear of that and of the noise near a front end's LO. An IF front end sets the dial to its own IF.
+- Docs: the manual, the installation guide and the protocol give 10 kHz as the default and explain why; screenshots of the application and the panel at 1.7.
+
 ## 1.6 — the receiver as a backend only
 
 Firmware 1.6, protocol 1 (unchanged), application 1.6, panel firmware 1.6.

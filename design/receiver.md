@@ -723,11 +723,11 @@ So the application no longer drives a front end:
 - Kept: the I/Q correction and **Null image** (`ImageNull`, now in
   `AudioDspLab.Receiver`), which serve any I/Q front end.
 - The dial is called **IF** in the application and on the panel; the
-  protocol keeps the parameter name `offset`. Its default is now 12000
-  (was 10000): 12 kHz is the usual IF for an IF front end. With I/Q,
-  12 kHz is fs/4, where a front end's third-order products fold onto
-  the image (R3); the manual says to put the station near 10 kHz for
-  the deepest image null.
+  protocol keeps the parameter name `offset`. In 1.6 its default was
+  12000, the usual IF of an IF front end; 1.7 takes it back to 10000
+  (the user's decision after reading the docs): with I/Q, 12 kHz is
+  fs/4, where a front end's third-order products fold onto the image
+  (R3), and 10 kHz is clear of that and of the noise near the LO.
 - The specification at K2 (section "What the receiver expects at K2" in
   the manual) stays; what a front end should deliver is now one simple
   rule: about 1 mV amplitude at K2 (-63.5 dBFS, 42 to 46 dB above the

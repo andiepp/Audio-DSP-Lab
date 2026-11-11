@@ -1,6 +1,6 @@
 # Installation guide
 
-As of 2026-11-11, for firmware 1.6 and application 1.6.
+As of 2026-11-11, for firmware 1.7 and application 1.7.
 
 This guide takes you from an Elektor Audio-DSP-FX board to a running Audio-DSP-Lab: prepare the board, flash the firmware, install the application, connect. Plan about 20 minutes. Everything you need to download is at **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**.
 
@@ -86,7 +86,7 @@ There is no installer: `AudioDspLab.exe` in the unzipped release folder is the w
 
 1. Double-click **AudioDspLab.exe**. The first time, Windows SmartScreen may warn about an unknown publisher (the program is not code-signed): choose **More info**, then **Run anyway**.
 2. Under **Board on**, choose the board's COM port and press **Connect**.
-3. The status line shows `Connected to COM5: Audio-DSP-Lab 1.6.` and the application row shows **SigmaStudio** running: the board starts in SigmaStudio mode at every power-up.
+3. The status line shows `Connected to COM5: Audio-DSP-Lab 1.7.` and the application row shows **SigmaStudio** running: the board starts in SigmaStudio mode at every power-up.
 
 The application remembers the port and connects by itself next time. It keeps its own files in `%LocalAppData%\Audio-DSP-Lab` (the stored settings and the last port). To uninstall, delete the folder you unzipped and that one.
 
@@ -136,7 +136,7 @@ The receiver is a backend from the IF on: your front end delivers a real IF on K
 
 1. Connect the front end's IF, or its I and Q, to K2 with a 3.5 mm stereo cable.
 2. Press **Receiver** and choose the **Input**: **IF** or **I/Q**.
-3. Set the **IF** dial (12 kHz at the start) to your front end's IF, or with I/Q to the station's distance from the I/Q centre, and press **Output on**.
+3. Set the **IF** dial (10 kHz at the start) to your front end's IF, or with I/Q to the station's distance from the I/Q centre, and press **Output on**.
 
 As a simple rule, the front end should deliver its signal at K2 at about **1 mV amplitude** (the S-meter then reads about −63.5 dBFS), and all signals together well below 3 Vpp, where K2 clips. Levels, noise and frequencies in detail: the manual's chapter "The receiver".
 

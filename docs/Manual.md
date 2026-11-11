@@ -2,7 +2,7 @@
 
 As of 2026-11-11.
 
-Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into seven audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, a Minimoog-style synthesizer, and an SDR receiver backend that takes a real IF or the I/Q output of your front end. This manual covers firmware 1.6 and application 1.6, and the optional front panel (panel firmware 1.6).
+Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into seven audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, a Minimoog-style synthesizer, and an SDR receiver backend that takes a real IF or the I/Q output of your front end. This manual covers firmware 1.7 and application 1.7, and the optional front panel (panel firmware 1.7).
 
 Audio-DSP-Lab lives on GitHub at **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**: the source code, the releases (application, firmware and these documents to download) and the documentation, this manual among it.
 
@@ -249,7 +249,7 @@ The **Power-up** key chooses what the board starts when it is switched on. The c
 | **Last application** | The application you selected last, with its defaults |
 
 - With **Last application**, the radio, the synthesizer and the receiver come up sounding: their output is switched on, at the default volume of −20 dB. The generator and the analysis stay off, since they may drive a device under test.
-- The receiver comes up with its defaults (USB, IF 12 kHz).
+- The receiver comes up with its defaults (USB, IF 10 kHz).
 - Service mode is never restored, and Pot control is off at every power-up.
 - Before another application's program replaces yours at power-up, the firmware keeps a copy of your SigmaStudio program. If the chosen application cannot start, the board starts SigmaStudio mode instead and the window shows the error.
 - **Last application** lets the board play the radio, or wait for the keyboard, as soon as it is powered, with no PC at all: a USB power supply is enough.
@@ -431,8 +431,8 @@ With K2 open, `diag rx` reads about −98.5 dBFS (I) and −100 dBFS (Q) RMS ove
 
 - **Headroom.** Keep the sum of all strong signals at K2 below full scale: −6 dBFS is about 1.5 Vpp. Above 0 dBFS the ADC clips, strong stations distort and extra carriers appear.
 - **Band-limiting.** Nothing on the board limits the band: the ADCs pass up to 24 kHz (−2.7 dB at about 23 kHz). Whatever reaches K2 above that, a signal or a product of the front end, folds back into the band. Filter the front end's output above about 21 kHz.
-- **Frequencies with an IF.** Keep the IF and the filter's edges together inside about 0.5 to 22 kHz: USB at the default IF of 12 kHz takes 12.3 to 14.7 kHz.
-- **Frequencies with I/Q.** The receiver tunes within ±21 kHz of the I/Q centre, with the filter's edges up to ±5.5 kHz from the carrier. At exactly 12 kHz, a quarter of the 48 kHz sample rate, a front end's third-order products fold onto the image, where no I/Q correction removes them; for the deepest image rejection put the station a little away, at about 10 kHz.
+- **Frequencies with an IF.** Keep the IF and the filter's edges together inside about 0.5 to 22 kHz: USB at the default IF of 10 kHz takes 10.3 to 12.7 kHz.
+- **Frequencies with I/Q.** The receiver tunes within ±21 kHz of the I/Q centre, with the filter's edges up to ±5.5 kHz from the carrier. The default of 10 kHz keeps the station clear of two traps: below about 8 kHz a real front end's noise rises near its LO, and at exactly 12 kHz, a quarter of the 48 kHz sample rate, a front end's third-order products fold onto the image, where no I/Q correction removes them (on the author's bench the image null stopped at 56 dB there, against 67 dB at 10 kHz).
 - **I/Q balance.** The image rejection is the balance of the front end and the two ADC channels together. The receiver corrects errors of up to ±3 dB and ±10° (**I/Q gain**, **I/Q phase**, **Null image**; see [Input and I/Q correction](#input-and-iq-correction)); with the correction exact, its own image rejection exceeds 130 dB (measured with the internal test signal).
 
 ### What the receiver needs
@@ -474,7 +474,7 @@ K2 is a plain line input of about 22.5 kΩ; nothing between the front end and th
 | CW | 500 Hz around the pitch (600 Hz: +350 to +850) | The carrier as a tone at the pitch |
 | FM | −5500 to +5500 | Narrow-band FM, with its deviation and de-emphasis |
 
-**The IF dial.** The dial is the receiver's **IF**, −21000 to +21000 Hz, 12000 at the start (in the protocol the parameter `offset`): with the input **IF** the IF, with **I/Q** the station's distance from the I/Q centre. Turn the mouse wheel over a digit, or click its upper or lower half, as on every digit dial.
+**The IF dial.** The dial is the receiver's **IF**, −21000 to +21000 Hz, 10000 at the start (in the protocol the parameter `offset`): with the input **IF** the IF, with **I/Q** the station's distance from the I/Q centre. Turn the mouse wheel over a digit, or click its upper or lower half, as on every digit dial.
 
 **S-meter and meters.** The S-meter reads the level in the channel, after the channel filter, in dBFS, on a bar from −130 to 0 dBFS with the squelch's threshold marked; a steady carrier reads its level at K2 (see [What the receiver expects at K2](#what-the-receiver-expects-at-k2)). The line below gives the AGC's gain, the audio's level and the receiver's share of the ESP32's core (**CPU**); the next one whether the squelch is open, in FM the **FM offset** (how far the carrier lies off the dial, a tuning indicator), and with the spectral noise reduction its average gain. The board reports them five times a second. The S-meter is the AGC's detector: it rises at once and falls after the hang time at the decay rate.
 
@@ -503,7 +503,7 @@ The AGC aims at −12 dBFS of audio and looks ahead by one block (5.3 ms), so a 
 
 A front end's I and Q are never exactly equal in level and never exactly 90° apart, and the two ADC channels add their own small difference. What is left of it lets a station show also on the mirror side of the I/Q centre, its image: uncorrected, typically some 30 dB below it. **I/Q gain** (−3 to +3 dB) and **I/Q phase** (−10 to +10°) correct front end and ADCs together.
 
-**Null image** finds the two values for you. Tune a steady carrier into the channel, ideally at an IF near +10 kHz (not exactly 12 kHz, see above), then press the key. The application tunes the receiver to the carrier's mirror, sets AM with a ±150 Hz filter and the AGC off, and searches phase and gain in turn, three rounds, for the lowest S-meter reading. Afterwards it puts mode, filter, IF and AGC back, also after **Cancel**, and keeps the corrections it found; the line beside the key gives the image rejection before and after and the values. On the author's bench, with a QRP Labs I/Q module, it went from about 32 dB to 66 to 72 dB, with corrections of about +0.41 dB and +1.1°. The corrections are values of the receiver like any other: they go back to 0 at the next start, so keep them in a stored setting (**Settings → Save**).
+**Null image** finds the two values for you. Tune a steady carrier into the channel, ideally at the default IF of +10 kHz (not at 12 kHz, see above), then press the key. The application tunes the receiver to the carrier's mirror, sets AM with a ±150 Hz filter and the AGC off, and searches phase and gain in turn, three rounds, for the lowest S-meter reading. Afterwards it puts mode, filter, IF and AGC back, also after **Cancel**, and keeps the corrections it found; the line beside the key gives the image rejection before and after and the values. On the author's bench, with a QRP Labs I/Q module, it went from about 32 dB to 66 to 72 dB, with corrections of about +0.41 dB and +1.1°. The corrections are values of the receiver like any other: they go back to 0 at the next start, so keep them in a stored setting (**Settings → Save**).
 
 #### Equalizer
 
@@ -592,7 +592,7 @@ The window follows what you do in the console: after a request that changes some
 
 ```
 > info
-ok Audio-DSP-Lab 1.6 1 esp32-pico-kit
+ok Audio-DSP-Lab 1.7 1 esp32-pico-kit
 > status
 ok sigmastudio running none
 > apps

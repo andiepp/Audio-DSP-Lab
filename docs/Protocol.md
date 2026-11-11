@@ -1,6 +1,6 @@
 # Audio-DSP-Lab serial protocol
 
-Protocol version 1, firmware 1.6. The project: **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**.
+Protocol version 1, firmware 1.7. The project: **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**.
 
 The board speaks a line-based text protocol on its USB serial port. You can use it from the Audio-DSP-Lab application, from a serial terminal, or from your own scripts. [`tools/adl.py`](../tools/adl.py) is a small Python client.
 
@@ -127,7 +127,7 @@ The board keeps numbers in hundredths. A request with more decimals is rounded, 
 | `help` | `* <usage>` per command, `ok` | |
 | `ping` | `ok` | |
 | `echo <word>` | `ok <word>` | for resynchronising |
-| `info` | `ok Audio-DSP-Lab <firmware> <protocol> <kit>` | e.g. `ok Audio-DSP-Lab 1.6 1 esp32-pico-kit`; kit `esp32-pico-kit` (PICO-D4) or `esp32-pico-kit-1` (PICO-V3) |
+| `info` | `ok Audio-DSP-Lab <firmware> <protocol> <kit>` | e.g. `ok Audio-DSP-Lab 1.7 1 esp32-pico-kit`; kit `esp32-pico-kit` (PICO-D4) or `esp32-pico-kit-1` (PICO-V3) |
 | `events [on\|off]` | `ok on\|off` | [events](#events) are off after every reset |
 | `status` | `ok <application> <state> <last-error>` | state: `idle`, `loading`, `running`, `failed`, `service`; last error: an error code or `none` |
 | `led [on\|off]` | `ok on\|off` | the ESP32 kit's LED |
@@ -298,7 +298,7 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 
 ## Parameters per application
 
-`params` is the authoritative list; this table gives the firmware 1.6 ranges.
+`params` is the authoritative list; this table gives the firmware 1.7 ranges.
 
 ### generator
 
@@ -383,7 +383,7 @@ The equalizer's eight parameters, `bass-gain` to `output`, with the same ranges 
 | Name | Kind | Range | Default | Pot |
 | --- | --- | --- | --- | --- |
 | `mode` | choice | `off`, `am`, `usb`, `lsb`, `cw`, `fm` | `usb` | |
-| `offset` | integer, Hz | -21000 to 21000: the receiver's IF, shown as **IF** in the application and on the panel (with `input if` the IF on K2 left; with I/Q the station's distance from the I/Q centre) | 12000 | |
+| `offset` | integer, Hz | -21000 to 21000: the receiver's IF, shown as **IF** in the application and on the panel (with `input if` the IF on K2 left; with I/Q the station's distance from the I/Q centre) | 10000 | |
 | `low` | integer, Hz | -5500 to 5450: the channel filter's lower edge at -6 dB, re the carrier | 300 | |
 | `high` | integer, Hz | -5450 to 5500: its upper edge | 2700 | |
 | `width` | integer, Hz | 100 to 11000: `high` - `low`, placed by the mode | 2400 | P1 |
@@ -418,7 +418,7 @@ The SigmaStudio mode has no parameters.
 
 ```
 > info
-< ok Audio-DSP-Lab 1.6 1 esp32-pico-kit
+< ok Audio-DSP-Lab 1.7 1 esp32-pico-kit
 > events on
 < ok on
 > app generator

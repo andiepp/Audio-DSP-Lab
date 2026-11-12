@@ -10,7 +10,7 @@ It has the home screen and a settings screen, each application's parameters as t
 
 ## What you need
 
-- An ESP32-2432S028R. The common version with one micro-USB port has an ILI9341 display, which the firmware expects. The version with two ports (USB-C and micro-USB) has an ST7789: set `DISPLAY_ST7789` to 1 in `firmware/AudioDspLabPanel/Config.h` and build it yourself. Checked on such a board: the picture, the touch and the colours are right. Should another batch show the colours inverted (the dark background light, teal as red), set `DISPLAY_INVERT` to 1 as well.
+- An ESP32-2432S028R. The common version with one micro-USB port has an ILI9341 display, which the firmware expects. The version with two ports (USB-C and micro-USB) has an ST7789: the release carries a second panel image for it (see Flashing), or build it yourself with `DISPLAY_ST7789` set to 1 in `firmware/AudioDspLabPanel/Config.h`. Checked on such a board: the picture, the touch and the colours are right. Should another batch show the colours inverted (the dark background light, teal as red), set `DISPLAY_INVERT` to 1 as well.
 - Three wires, and a 10 kΩ resistor (recommended).
 - The board with firmware from this release or later: it has the panel port.
 
@@ -38,7 +38,7 @@ Connect the CYD by USB; it usually shows up as "USB-SERIAL CH340 (COMn)". In the
 .\Flash-Panel.cmd COM18
 ```
 
-(or double-click `Flash-Panel.cmd` and type the port). It writes the panel's single image, `AudioDspLabPanel-merged.bin`, at address 0. The panel keeps one setting of its own, the brightness; flashing resets it to full.
+(or double-click `Flash-Panel.cmd` and type the port). It writes the panel's single image, `AudioDspLabPanel-merged.bin`, at address 0. For the CYD with two USB ports (micro-USB and USB-C), whose display is an ST7789, add `-ST7789`: `.\Flash-Panel.cmd COM18 -ST7789` writes `AudioDspLabPanel-ST7789-merged.bin` instead. The panel keeps one setting of its own, the brightness; flashing resets it to full.
 
 ## Using the panel
 

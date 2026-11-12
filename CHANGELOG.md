@@ -1,7 +1,10 @@
 # Changelog
 
-## Unreleased
+## 1.7.1 — the panel on the two-USB CYD
 
+Board firmware 1.7 (unchanged), protocol 1, application 1.7.1, panel firmware 1.7.1.
+
+- Release: a second panel image for the CYD with two USB ports (micro-USB and USB-C) and its ST7789 display, `AudioDspLabPanel-ST7789-merged.bin`; `Flash-Panel.cmd COMn -ST7789` writes it. `DISPLAY_ST7789` and `DISPLAY_INVERT` can now come from the build.
 - Panel: built with `DISPLAY_ST7789` for the two-USB CYD, the firmware no longer inverts the ST7789's colours (checked on such a board: picture, touch and colours right); a new `DISPLAY_INVERT` in `Config.h` inverts them for a batch that needs it. Panel guide and manual say so.
 
 ## 1.7 — the receiver's IF back at 10 kHz

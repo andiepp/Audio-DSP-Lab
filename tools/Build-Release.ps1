@@ -29,6 +29,7 @@
 #>
 [CmdletBinding()]
 param(
+    [string] $Version,
     [string] $ArduinoCli,
     [string] $Python,
     [switch] $SkipTests
@@ -57,8 +58,13 @@ function Find-ArduinoCli {
 $config = Get-Content (Join-Path $root 'firmware\AudioDspLab\Config.h') -Raw
 $major = [regex]::Match($config, 'FIRMWARE_VERSION_MAJOR\s+(\d+)').Groups[1].Value
 $minor = [regex]::Match($config, 'FIRMWARE_VERSION_MINOR\s+(\d+)').Groups[1].Value
-$version = "$major.$minor"
-Write-Host "Audio-DSP-Lab $version"
+$firmwareVersion = "$major.$minor"
+# a release may be a patch of the firmware's version (1.7.1: the panel only)
+$version = if ($Version) { $Version } else { $firmwareVersion }
+if ($version -ne $firmwareVersion -and -not $version.StartsWith("$firmwareVersion.")) {
+    throw "Release $version does not belong to firmware $firmwareVersion."
+}
+Write-Host "Audio-DSP-Lab $version (board firmware $firmwareVersion)"
 
 Remove-Item $build, $dist -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $build, $dist | Out-Null
@@ -94,8 +100,16 @@ if ($LASTEXITCODE -ne 0 -and -not (Test-Path (Join-Path $panelOut 'AudioDspLabPa
     throw "The panel firmware did not compile (exit code $LASTEXITCODE)."
 }
 Copy-Item (Join-Path $panelOut 'AudioDspLabPanel.ino.merged.bin') (Join-Path $firmware 'AudioDspLabPanel-merged.bin')
+# the same for the two-USB CYD with its ST7789 display
+$panelSt7789Out = Join-Path $build 'panel-st7789-raw'
+& $cli compile --fqbn 'esp32:esp32:esp32:PartitionScheme=huge_app' --libraries (Join-Path $root 'firmware\libraries') --warnings default `
+    --build-property 'compiler.cpp.extra_flags=-DDISPLAY_ST7789=1' --output-dir $panelSt7789Out (Join-Path $root 'firmware\AudioDspLabPanel')
+if ($LASTEXITCODE -ne 0 -and -not (Test-Path (Join-Path $panelSt7789Out 'AudioDspLabPanel.ino.merged.bin'))) {
+    throw "The panel firmware for the ST7789 did not compile (exit code $LASTEXITCODE)."
+}
+Copy-Item (Join-Path $panelSt7789Out 'AudioDspLabPanel.ino.merged.bin') (Join-Path $firmware 'AudioDspLabPanel-ST7789-merged.bin')
 @"
-Audio-DSP-Lab firmware $version for the Elektor Audio-DSP-FX board (ESP32-PICO-D4)
+Audio-DSP-Lab firmware $version for the Elektor Audio-DSP-FX board (ESP32-PICO-D4); the board reports $firmwareVersion
 
 Flash it with Flash-Firmware.cmd (double-click) or:
   powershell -ExecutionPolicy Bypass -File Flash-Firmware.ps1 -Port COM5
@@ -110,7 +124,9 @@ or AudioDspLab-merged.bin alone at 0x0 (erases every stored setting).
 The front panel (an ESP32-2432S028R "CYD" display board on the board's
 panel port, see docs/Panel.md): Flash-Panel.cmd, or
   powershell -ExecutionPolicy Bypass -File Flash-Firmware.ps1 -Port COM18 -Panel
-It writes AudioDspLabPanel-merged.bin at 0x0.
+It writes AudioDspLabPanel-merged.bin at 0x0. For the CYD with two USB
+ports (micro-USB and USB-C, an ST7789 display): Flash-Panel.cmd COM18 -ST7789,
+which writes AudioDspLabPanel-ST7789-merged.bin.
 
 The compiled firmware contains arduino-audio-tools and libhelix (GPL-3.0),
 the panel firmware LVGL (MIT); see THIRD-PARTY-NOTICES.md. Source: https://github.com/andiepp/Audio-DSP-Lab

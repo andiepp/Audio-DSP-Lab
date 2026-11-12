@@ -10,7 +10,8 @@
     reference, the copy of your SigmaStudio program) unless -Erase is given.
 
     With -Panel it writes the front panel's one image (AudioDspLabPanel-merged.bin)
-    at address 0; the panel keeps no settings.
+    at address 0; the panel keeps no settings. With -Panel -ST7789 it writes
+    the image for the CYD with two USB ports (AudioDspLabPanel-ST7789-merged.bin).
 
     esptool is looked for, in this order: esptool.exe beside this script,
     esptool(.exe) on the PATH, the Arduino IDE's ESP32 core, and Python's
@@ -32,11 +33,17 @@
 .PARAMETER Panel
     Flashes the front panel (the CYD display board) instead of the Audio-DSP-FX board.
 
+.PARAMETER ST7789
+    With -Panel: the CYD with two USB ports (micro-USB and USB-C), whose display is an ST7789.
+
 .EXAMPLE
     .\Flash-Firmware.ps1 -Port COM5
 
 .EXAMPLE
     .\Flash-Firmware.ps1 -Port COM18 -Panel
+
+.EXAMPLE
+    .\Flash-Firmware.ps1 -Port COM18 -Panel -ST7789
 #>
 [CmdletBinding()]
 param(
@@ -44,7 +51,8 @@ param(
     [string] $Folder,
     [switch] $Erase,
     [int] $Baud = 460800,
-    [switch] $Panel
+    [switch] $Panel,
+    [switch] $ST7789
 )
 
 $ErrorActionPreference = 'Stop'
@@ -86,7 +94,8 @@ if (-not $Port) {
     return
 }
 
-$marker = if ($Panel) { 'AudioDspLabPanel-merged.bin' } else { 'AudioDspLab.bin' }
+$panelImage = if ($ST7789) { 'AudioDspLabPanel-ST7789-merged.bin' } else { 'AudioDspLabPanel-merged.bin' }
+$marker = if ($Panel) { $panelImage } else { 'AudioDspLab.bin' }
 if (-not $Folder) {
     $Folder = @((Join-Path $PSScriptRoot 'firmware'), $PSScriptRoot) |
         Where-Object { Test-Path (Join-Path $_ $marker) } | Select-Object -First 1
@@ -94,7 +103,7 @@ if (-not $Folder) {
 }
 
 $parts = if ($Panel) {
-    [ordered]@{ '0x0' = 'AudioDspLabPanel-merged.bin' }
+    [ordered]@{ '0x0' = $panelImage }
 } else {
     [ordered]@{
         '0x1000'  = 'AudioDspLab.bootloader.bin'

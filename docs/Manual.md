@@ -2,7 +2,7 @@
 
 As of 2026-11-11.
 
-Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into seven audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, a Minimoog-style synthesizer, and an SDR receiver backend that takes a real IF or the I/Q output of your front end. This manual covers firmware 1.7 and application 1.7, and the optional front panel (panel firmware 1.7).
+Audio-DSP-Lab turns the Elektor Audio-DSP-FX board into seven audio instruments that you run from a Windows PC over USB: a signal generator, an equalizer, an internet radio, an analysis application (frequency response and harmonic distortion), a SigmaStudio mode for your own DSP programs, a Minimoog-style synthesizer, and an SDR receiver backend that takes a real IF or the I/Q output of your front end. This manual covers firmware 1.7 and application 1.7.1, and the optional front panel (panel firmware 1.7.1).
 
 Audio-DSP-Lab lives on GitHub at **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**: the source code, the releases (application, firmware and these documents to download) and the documentation, this manual among it.
 
@@ -867,7 +867,7 @@ The panel does two jobs, as the overview at the start of this manual shows: on i
 
 ### What you need
 
-- An **ESP32-2432S028R**. The common version with one micro-USB port has an ILI9341 display, which the firmware expects. The version with two ports (USB-C and micro-USB) has an ST7789: its firmware has to be built with `DISPLAY_ST7789` set to 1 (see the front panel guide).
+- An **ESP32-2432S028R**. The common version with one micro-USB port has an ILI9341 display, which the firmware expects. The version with two ports (USB-C and micro-USB) has an ST7789: flash it with `Flash-Panel.cmd COM18 -ST7789`, the release's second panel image (see Flashing below).
 - Three wires, and a 10 kΩ resistor (recommended).
 - The board with this release's firmware: it has the panel port.
 
@@ -891,7 +891,7 @@ Connect the CYD by USB; it usually shows up as "USB-SERIAL CH340 (COMn)". In the
 .\Flash-Panel.cmd COM18
 ```
 
-(or double-click `Flash-Panel.cmd` and type the port). It writes the panel's single image, `AudioDspLabPanel-merged.bin`, at address 0. The panel keeps one setting of its own, the brightness; flashing resets it to full. Flash the panel and the board from the same release: the panel speaks the board's protocol.
+(or double-click `Flash-Panel.cmd` and type the port). It writes the panel's single image, `AudioDspLabPanel-merged.bin`, at address 0. For the CYD with two USB ports (micro-USB and USB-C), whose display is an ST7789, add `-ST7789`: `.\Flash-Panel.cmd COM18 -ST7789` writes `AudioDspLabPanel-ST7789-merged.bin` instead. The panel keeps one setting of its own, the brightness; flashing resets it to full. Flash the panel and the board from the same release: the panel speaks the board's protocol.
 
 ### Home and settings
 
@@ -967,7 +967,7 @@ Anyone on your network can reach the board this way, as anyone with the USB cabl
 | | TX and RX swapped, or GND missing | CYD GPIO22 to the board's GPIO37, CYD GPIO35 to GPIO4, GND to GND |
 | The link drops now and then | GPIO37 floats while the panel restarts | Fit the 10 kΩ pull-up from GPIO37 to 3.3 V |
 | Touches land beside their target | Another CYD's touch calibration | Tap the corners and adjust `Config.h` (the front panel guide, "For developers") |
-| Colours swapped or the picture upside down | The two-USB CYD with its ST7789 display | Build the panel firmware with `DISPLAY_ST7789` set to 1 |
+| Colours swapped, the picture garbled or upside down | The two-USB CYD with its ST7789 display, flashed with the ILI9341 image | Flash it with `Flash-Panel.cmd COMn -ST7789` |
 | Two-USB CYD: picture right, but colours inverted (dark looks light, teal looks red) | That batch's ST7789 wants its colours inverted | Build with `DISPLAY_INVERT` set to 1 as well |
 | Settings shows "WiFi: none" | No network stored on the board | Enter one in **WiFi networks …** (it serves the radio too) |
 | Settings shows "WiFi: failed" | Neither network answers, or a 5 GHz-only network | The panel tries again every 30 s; use a 2.4 GHz network |

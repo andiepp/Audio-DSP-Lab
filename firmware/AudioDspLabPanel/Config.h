@@ -12,13 +12,18 @@
 #define PANEL_CONFIG_H
 
 #define PANEL_NAME                    "Audio-DSP-Lab panel"
-#define PANEL_VERSION                 "1.7"
+#define PANEL_VERSION                 "1.7.1"
 
 // display: the one-USB ESP32-2432S028R carries an ILI9341, the two-USB
 // (USB-C) version an ST7789; 1 selects the ST7789. DISPLAY_INVERT 1 inverts
-// the ST7789's colours, for a batch that shows dark as light and teal as red
+// the ST7789's colours, for a batch that shows dark as light and teal as red.
+// Both can come from the build (-DDISPLAY_ST7789=1: the release's second image)
+#ifndef DISPLAY_ST7789
 #define DISPLAY_ST7789                0
+#endif
+#ifndef DISPLAY_INVERT
 #define DISPLAY_INVERT                0
+#endif
 #define DISPLAY_WIDTH                 320
 #define DISPLAY_HEIGHT                240
 #define PIN_TFT_SCK                   14

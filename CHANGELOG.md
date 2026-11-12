@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Panel: finds out at start-up which display the CYD carries: it reads the controller's ID (ILI9341: D3h through D9h, ST7789: 04h) and drives the one it finds, so one image serves both CYD versions. `DISPLAY_ST7789` only decides for a display that gives no ID; the start-up log names the controller and the raw ID reads. Checked on the two-USB CYD with the ILI9341-fallback image: ST7789 found, picture, colours and touch right; on the one-USB CYD: ILI9341 found.
+
 ## 1.7.1 — the panel on the two-USB CYD
 
 Board firmware 1.7 (unchanged), protocol 1, application 1.7.1, panel firmware 1.7.1.

@@ -34,6 +34,72 @@ static void displayWrite(const uint8_t *cmd, size_t cmdSize, const uint8_t *para
   displaySpi.endTransaction();
 }
 
+// four bytes read after a command, slowly: reads take a longer clock period
+static uint32_t displayRead(uint8_t command) {
+  displaySpi.beginTransaction(SPISettings(TFT_READ_SPI_HZ, MSBFIRST, SPI_MODE0));
+  digitalWrite(PIN_TFT_CS, LOW);
+  digitalWrite(PIN_TFT_DC, LOW);
+  displaySpi.transfer(command);
+  digitalWrite(PIN_TFT_DC, HIGH);
+  uint32_t value = 0;
+  for (int i = 0; i < 4; i++) value = (value << 8) | displaySpi.transfer(0);
+  digitalWrite(PIN_TFT_CS, HIGH);
+  displaySpi.endTransaction();
+  return value;
+}
+
+// true when the read holds the pattern at some bit position: the dummy
+// clock before the data is a bit on one controller, a byte on the other
+static bool readHolds(uint32_t value, uint32_t pattern, uint32_t mask, int bits) {
+  for (int shift = 0; shift <= 32 - bits; shift++) {
+    if (((value >> shift) & mask) == pattern) return true;
+  }
+  return false;
+}
+
+// the ILI9341's ID (D3h), a byte at a time: over SPI the chip answers D3h
+// only after D9h has pointed it at a byte (the plain read gives zeros, seen
+// on the one-USB CYD 2026-11-12). Other controllers ignore D9h and D3h.
+static uint32_t ili9341Id() {
+  static const uint8_t indexCommand = 0xD9;
+  uint32_t id = 0;
+  for (uint8_t i = 1; i <= 3; i++) {
+    const uint8_t index = 0x10 + i;
+    displayWrite(&indexCommand, 1, &index, 1);
+    id = (id << 8) | (displayRead(0xD3) >> 24);
+  }
+  return id;
+}
+
+// which controller the CYD carries, asked at start-up: the one-USB CYD's
+// ILI9341 answers its ID request (D3h) with 00 93 41, the two-USB CYD's
+// ST7789 its own (04h) with 85 85 52. A display that answers neither (its
+// data line not wired) gets the build's choice, DISPLAY_ST7789.
+static bool st7789 = DISPLAY_ST7789;
+static const char *controllerName = "";
+
+static void detectController() {
+  static const uint8_t softwareReset = 0x01;
+  displayWrite(&softwareReset, 1, nullptr, 0);   // a clean state to read from
+  delay(120);
+  const uint32_t ili = ili9341Id();
+  const uint32_t st = displayRead(0x04);
+  if (readHolds(ili, 0x9341, 0xFFFF, 16)) {
+    st7789 = false;
+    controllerName = "ILI9341";
+  } else if (readHolds(st, 0x858500, 0xFFFF00, 24)) {
+    st7789 = true;
+    controllerName = "ST7789";
+  } else {
+    controllerName = DISPLAY_ST7789 ? "ST7789 (not detected, build setting)" : "ILI9341 (not detected, build setting)";
+  }
+  Serial.printf("display: %s (D3h %08lX, 04h %08lX)\n", controllerName, (unsigned long)ili, (unsigned long)st);
+}
+
+const char *displayController() {
+  return controllerName;
+}
+
 // the window the next pixels go to, as LVGL's driver sets it (column and
 // page address set, in the turned coordinates the controller works in)
 static uint16_t windowX1, windowX2, windowY1, windowY2;
@@ -194,13 +260,15 @@ void displayBegin() {
   lv_init();
   lv_tick_set_cb(tick);
   lv_log_register_print_cb(logLine);
+  detectController();
   // the controller's native orientation is portrait; LVGL turns it
-#if DISPLAY_ST7789
-  lv_display_t *display = lv_st7789_create(DISPLAY_HEIGHT, DISPLAY_WIDTH, LV_LCD_FLAG_NONE, sendCommand, sendColour);
-  lv_lcd_generic_mipi_set_invert(display, DISPLAY_INVERT);   // off on the two-USB CYD tried (2026-11-12)
-#else
-  lv_display_t *display = lv_ili9341_create(DISPLAY_HEIGHT, DISPLAY_WIDTH, LV_LCD_FLAG_NONE, sendCommand, sendColour);   // RGB order on the CYD
-#endif
+  lv_display_t *display;
+  if (st7789) {
+    display = lv_st7789_create(DISPLAY_HEIGHT, DISPLAY_WIDTH, LV_LCD_FLAG_NONE, sendCommand, sendColour);
+    lv_lcd_generic_mipi_set_invert(display, DISPLAY_INVERT);   // off on the two-USB CYD tried (2026-11-12)
+  } else {
+    display = lv_ili9341_create(DISPLAY_HEIGHT, DISPLAY_WIDTH, LV_LCD_FLAG_NONE, sendCommand, sendColour);   // RGB order on the CYD
+  }
   // the buffers first: turning the display redraws it
   lv_display_set_buffers(display, drawBuffer1, drawBuffer2, sizeof(drawBuffer1), LV_DISPLAY_RENDER_MODE_PARTIAL);
   lv_display_set_rotation(display, LV_DISPLAY_ROTATION_270);   // 90 shows it upside down on the CYD

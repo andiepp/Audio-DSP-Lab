@@ -10,7 +10,7 @@ It has the home screen and a settings screen, each application's parameters as t
 
 ## What you need
 
-- An ESP32-2432S028R. The common version with one micro-USB port has an ILI9341 display, which the firmware expects. The version with two ports (USB-C and micro-USB) has an ST7789: the release carries a second panel image for it (see Flashing), or build it yourself with `DISPLAY_ST7789` set to 1 in `firmware/AudioDspLabPanel/Config.h`. Checked on such a board: the picture, the touch and the colours are right. Should another batch show the colours inverted (the dark background light, teal as red), set `DISPLAY_INVERT` to 1 as well.
+- An ESP32-2432S028R. The common version with one micro-USB port has an ILI9341 display, which the firmware expects. The version with two ports (USB-C and micro-USB) has an ST7789. The firmware reads the controller's ID at start-up and drives either; `DISPLAY_ST7789` in `firmware/AudioDspLabPanel/Config.h` only decides for a display that gives no ID. Checked on such a board: the picture, the touch and the colours are right. Should another batch show the colours inverted (the dark background light, teal as red), set `DISPLAY_INVERT` to 1 as well.
 - Three wires, and a 10 kΩ resistor (recommended).
 - The board with firmware from this release or later: it has the panel port.
 
@@ -38,7 +38,7 @@ Connect the CYD by USB; it usually shows up as "USB-SERIAL CH340 (COMn)". In the
 .\Flash-Panel.cmd COM18
 ```
 
-(or double-click `Flash-Panel.cmd` and type the port). It writes the panel's single image, `AudioDspLabPanel-merged.bin`, at address 0. For the CYD with two USB ports (micro-USB and USB-C), whose display is an ST7789, add `-ST7789`: `.\Flash-Panel.cmd COM18 -ST7789` writes `AudioDspLabPanel-ST7789-merged.bin` instead. The panel keeps one setting of its own, the brightness; flashing resets it to full.
+(or double-click `Flash-Panel.cmd` and type the port). It writes the panel's single image, `AudioDspLabPanel-merged.bin`, at address 0. The same image serves both CYD versions: at start-up the panel reads its display controller's ID and drives the ILI9341 or the ST7789 it finds. Only a CYD whose display gives no ID (its data line not wired) falls back to the image's own choice: there `.\Flash-Panel.cmd COM18 -ST7789` writes `AudioDspLabPanel-ST7789-merged.bin`, which falls back to the ST7789. The panel keeps one setting of its own, the brightness; flashing resets it to full.
 
 ## Using the panel
 
@@ -76,7 +76,7 @@ Anyone on your network can reach the board this way, as anyone with the USB cabl
 
 ## For developers
 
-- **Source:** `firmware/AudioDspLabPanel`, an Arduino sketch for the ESP32 core 3.3.10, board **ESP32 Dev Module** (`esp32:esp32:esp32`) with the partition scheme **Huge APP** (`PartitionScheme=huge_app`: with WiFi the firmware outgrows the default 1.3 MB), with **LVGL 9.2.2** from `firmware/libraries` (configured by `firmware/libraries/lv_conf.h`). `Display.cpp` drives the display through LVGL's ILI9341/ST7789 driver and reads the XPT2046 touch controller; `Link.cpp` is the protocol client; `Ui.cpp` the screens.
+- **Source:** `firmware/AudioDspLabPanel`, an Arduino sketch for the ESP32 core 3.3.10, board **ESP32 Dev Module** (`esp32:esp32:esp32`) with the partition scheme **Huge APP** (`PartitionScheme=huge_app`: with WiFi the firmware outgrows the default 1.3 MB), with **LVGL 9.2.2** from `firmware/libraries` (configured by `firmware/libraries/lv_conf.h`). `Display.cpp` reads the display controller's ID (ILI9341: `00 93 41` to D3h, a byte at a time after D9h; ST7789: `85 85 52` to 04h, one dummy bit late; the USB log shows it as `display: ...`), drives it through LVGL's ILI9341 or ST7789 driver and reads the XPT2046 touch controller; `Link.cpp` is the protocol client; `Ui.cpp` the screens.
 - **Build:** `arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app --libraries firmware/libraries firmware/AudioDspLabPanel`.
 - **Network:** `Wireless.cpp` joins the WiFi and serves TCP port 7000; `Link.cpp` shares the cable between the PC and the screens. LVGL takes its memory from the C heap (`lv_conf.h`): a static pool and WiFi do not fit the ESP32's DRAM together.
 - **Log:** the CYD's USB port (115200 baud) logs the link's state and every touch: its raw readings and the screen position they map to. The touch calibration, the raw values at the screen's edges, is in `Config.h`; tap the corners and compare if touches land beside their target on your CYD.

@@ -15,8 +15,10 @@
 #define PANEL_VERSION                 "1.7.1"
 
 // display: the one-USB ESP32-2432S028R carries an ILI9341, the two-USB
-// (USB-C) version an ST7789; 1 selects the ST7789. DISPLAY_INVERT 1 inverts
-// the ST7789's colours, for a batch that shows dark as light and teal as red.
+// (USB-C) version an ST7789. The panel reads the controller's ID at
+// start-up and drives the one it finds; DISPLAY_ST7789 1 picks the ST7789
+// only when no ID can be read. DISPLAY_INVERT 1 inverts the ST7789's
+// colours, for a batch that shows dark as light and teal as red.
 // Both can come from the build (-DDISPLAY_ST7789=1: the release's second image)
 #ifndef DISPLAY_ST7789
 #define DISPLAY_ST7789                0
@@ -33,6 +35,7 @@
 #define PIN_TFT_DC                    2
 #define PIN_TFT_BACKLIGHT             21
 #define TFT_SPI_HZ                    40000000
+#define TFT_READ_SPI_HZ               2000000   // reading the controller's ID
 
 // touch: XPT2046 on its own SPI bus
 #define PIN_TOUCH_CLK                 25

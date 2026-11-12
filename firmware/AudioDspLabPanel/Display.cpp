@@ -197,7 +197,7 @@ void displayBegin() {
   // the controller's native orientation is portrait; LVGL turns it
 #if DISPLAY_ST7789
   lv_display_t *display = lv_st7789_create(DISPLAY_HEIGHT, DISPLAY_WIDTH, LV_LCD_FLAG_NONE, sendCommand, sendColour);
-  lv_lcd_generic_mipi_set_invert(display, true);
+  lv_lcd_generic_mipi_set_invert(display, DISPLAY_INVERT);   // off on the two-USB CYD tried (2026-11-12)
 #else
   lv_display_t *display = lv_ili9341_create(DISPLAY_HEIGHT, DISPLAY_WIDTH, LV_LCD_FLAG_NONE, sendCommand, sendColour);   // RGB order on the CYD
 #endif

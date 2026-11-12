@@ -10,7 +10,7 @@ It has the home screen and a settings screen, each application's parameters as t
 
 ## What you need
 
-- An ESP32-2432S028R. The common version with one micro-USB port has an ILI9341 display, which the firmware expects. The version with two ports (USB-C and micro-USB) has an ST7789: set `DISPLAY_ST7789` to 1 in `firmware/AudioDspLabPanel/Config.h` and build it yourself.
+- An ESP32-2432S028R. The common version with one micro-USB port has an ILI9341 display, which the firmware expects. The version with two ports (USB-C and micro-USB) has an ST7789: set `DISPLAY_ST7789` to 1 in `firmware/AudioDspLabPanel/Config.h` and build it yourself. Checked on such a board: the picture, the touch and the colours are right. Should another batch show the colours inverted (the dark background light, teal as red), set `DISPLAY_INVERT` to 1 as well.
 - Three wires, and a 10 kΩ resistor (recommended).
 - The board with firmware from this release or later: it has the panel port.
 

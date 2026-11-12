@@ -15,8 +15,10 @@
 #define PANEL_VERSION                 "1.7"
 
 // display: the one-USB ESP32-2432S028R carries an ILI9341, the two-USB
-// (USB-C) version an ST7789; 1 selects the ST7789
+// (USB-C) version an ST7789; 1 selects the ST7789. DISPLAY_INVERT 1 inverts
+// the ST7789's colours, for a batch that shows dark as light and teal as red
 #define DISPLAY_ST7789                0
+#define DISPLAY_INVERT                0
 #define DISPLAY_WIDTH                 320
 #define DISPLAY_HEIGHT                240
 #define PIN_TFT_SCK                   14

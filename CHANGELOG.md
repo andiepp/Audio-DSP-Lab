@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Panel: built with `DISPLAY_ST7789` for the two-USB CYD, the firmware no longer inverts the ST7789's colours (checked on such a board: picture, touch and colours right); a new `DISPLAY_INVERT` in `Config.h` inverts them for a batch that needs it. Panel guide and manual say so.
+
 ## 1.7 — the receiver's IF back at 10 kHz
 
 Firmware 1.7, protocol 1 (unchanged), application 1.7, panel firmware 1.7.

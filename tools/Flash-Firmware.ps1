@@ -10,8 +10,9 @@
     reference, the copy of your SigmaStudio program) unless -Erase is given.
 
     With -Panel it writes the front panel's one image (AudioDspLabPanel-merged.bin)
-    at address 0; the panel keeps no settings. With -Panel -ST7789 it writes
-    the image for the CYD with two USB ports (AudioDspLabPanel-ST7789-merged.bin).
+    at address 0; the panel keeps no settings. The image finds out which display
+    the CYD carries. With -Panel -ST7789 it writes AudioDspLabPanel-ST7789-merged.bin,
+    whose fallback for a display that gives no ID is the ST7789.
 
     esptool is looked for, in this order: esptool.exe beside this script,
     esptool(.exe) on the PATH, the Arduino IDE's ESP32 core, and Python's
@@ -34,7 +35,7 @@
     Flashes the front panel (the CYD display board) instead of the Audio-DSP-FX board.
 
 .PARAMETER ST7789
-    With -Panel: the CYD with two USB ports (micro-USB and USB-C), whose display is an ST7789.
+    With -Panel: the image that falls back to the ST7789 (the two-USB CYD's display) when the display gives no ID.
 
 .EXAMPLE
     .\Flash-Firmware.ps1 -Port COM5

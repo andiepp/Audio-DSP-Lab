@@ -1,6 +1,6 @@
 # Installation guide
 
-As of 2026-11-12, for firmware 1.7 and application 1.7.1.
+As of 2026-11-12, for firmware 1.7 and application 1.7.2.
 
 This guide takes you from an Elektor Audio-DSP-FX board to a running Audio-DSP-Lab: prepare the board, flash the firmware, install the application, connect. Plan about 20 minutes. Everything you need to download is at **[github.com/andiepp/Audio-DSP-Lab](https://github.com/andiepp/Audio-DSP-Lab)**.
 

@@ -152,7 +152,7 @@ $docs = Join-Path $build 'docs'
 New-Item -ItemType Directory -Force $docs | Out-Null
 if (-not $Python) { $Python = (Get-Command py, python -ErrorAction SilentlyContinue | Select-Object -First 1).Source }
 if ($Python) {
-    foreach ($document in 'Manual', 'Installation') {
+    foreach ($document in 'Manual', 'Installation', 'Implementation-Details') {
         & $Python (Join-Path $PSScriptRoot 'Build-ManualPdf.py') (Join-Path $root "docs\$document.md") (Join-Path $docs "$document.pdf")
     }
 }

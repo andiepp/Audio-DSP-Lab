@@ -456,7 +456,7 @@ K2 is a plain line input of about 22.5 kΩ; nothing between the front end and th
 
 ### Getting it going
 
-1. Select **Receiver**. It starts in USB with the input I/Q, the IF at 12 kHz, the AGC at medium and the noise reduction LMS at level 0 (it passes the audio unchanged).
+1. Select **Receiver**. It starts in USB with the input I/Q, the IF at 10 kHz, the AGC at medium and the noise reduction LMS at level 0 (it passes the audio unchanged).
 2. Choose the **Input**: **I/Q** for I and Q, **IF** for a real IF.
 3. Set the **IF** dial (with an IF input, to your front end's IF; with I/Q, to the station's distance from the I/Q centre), then press **Output on**.
 4. With the input I/Q and a steady carrier in the channel (a generator, or a steady station), press **Null image** once: it finds the I/Q correction (see [Input and I/Q correction](#input-and-iq-correction)).

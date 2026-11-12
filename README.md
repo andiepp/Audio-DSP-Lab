@@ -55,6 +55,7 @@ Step by step: **[Installation guide](docs/Installation.md)**.
 | [SigmaStudio](docs/SigmaStudio.md) | Your own DSP programs on the board; the built-in applications' projects |
 | [Front panel](docs/Panel.md) | A touch panel on an ESP32 "CYD" display board, and WiFi control through it: wiring, flashing, use |
 | [Building from source](docs/Building.md) | Firmware and application builds, tests, releases, code structure |
+| [Implementation details](docs/Implementation-Details.md) ([PDF](docs/Implementation-Details.pdf)) | How it is built: the board and its clocks, the DSP programs, the firmware's runtime, the protocol, the signal processing and the receiver, the panel, the application, the tools |
 
 ## Requirements
 

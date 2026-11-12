@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Docs: `docs/Implementation-Details.md`, also as `docs/Implementation-Details.pdf` (made by `tools/Build-ManualPdf.py`; its diagrams by `tools/Make-DesignFigures.py`): how the board, the DSP programs, the firmware, the protocol, the signal processing, the receiver, the panel and the application are built. The release package carries the PDF.
+- Manual: the receiver starts at an IF of 10 kHz (a step still said 12 kHz). The PDFs' cover says seven applications.
+
 ## 1.7.2 — one panel image for both CYDs
 
 Board firmware 1.7 (unchanged), protocol 1, application 1.7.2, panel firmware 1.7.2.

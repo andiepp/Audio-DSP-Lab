@@ -117,7 +117,7 @@ class ManualDoc(BaseDocTemplate):
         canv.setFont('UI-B', 40)
         canv.drawString(MARGIN_X, PAGE_H - 64 * mm, COVER['title'])
         canv.setFont('UI', 13)
-        canv.drawString(MARGIN_X, PAGE_H - 78 * mm, 'Six audio applications for the ADAU1701 and ESP32,')
+        canv.drawString(MARGIN_X, PAGE_H - 78 * mm, 'Seven audio applications for the ADAU1701 and ESP32,')
         canv.drawString(MARGIN_X, PAGE_H - 85 * mm, 'run from a PC over USB')
         canv.setFont('UI', 10)
         canv.setFillColor(colors.HexColor('#C9D6EA'))

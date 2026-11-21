@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.8 — RTTY and weather fax
 
-Board firmware 1.8, protocol 1 (new commands and events only), panel firmware 1.8.
+Board firmware 1.8, protocol 1 (new commands and events only), application 1.8, panel firmware 1.8.
 
 - Receiver: **RTTY and weather fax decoders** on the board (design/rtty-fax.md), the SDR-IQ Receiver's DWD RTTY and WEATHER FAX decoders ported to C++: from the down-converter's output, with the station's listed frequency on the IF and an AFC of ±300 Hz. RTTY: 50 baud ITA2, shift 85 to 850 Hz, both polarities decoded side by side (DWD sends mark on the lower tone). Fax: 60 to 240 lines a minute, IOC 288 or 576, start and stop tones, phasing, slant. New parameters `decoder`, `rtty-shift`, `rtty-polarity`, `fax-lpm`, `fax-ioc`, `fax-slant`, `decoder-afc`; requests `rtty`, `fax`, `fax events`; events `! rtty`, `! decoder`, `! fax`. About 4 to 5 % of a block of CPU and 20 to 30 KB of heap while one runs.
 - Receiver: the test signal sends RTTY (a test text) or fax (a test chart) besides the tone (`test-mode`).

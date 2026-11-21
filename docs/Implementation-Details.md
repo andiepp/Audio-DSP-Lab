@@ -2,7 +2,7 @@
 
 This document describes how Audio-DSP-Lab is built: the Elektor Audio-DSP-FX board with its ESP32 and ADAU1701, the DSP programs, the firmware that runs the seven applications, the text protocol, the signal processing on the ESP32 (the receiver's in detail), the front panel, the Windows application and the tools that build and check all of it. It is written for someone who wants to understand, change or extend the project; how to use it is in the [user manual](Manual.md), the protocol's commands in [Protocol.md](Protocol.md), the panel in [Panel.md](Panel.md) and the build steps in [Building.md](Building.md).
 
-As of 2026-11-12, for firmware 1.7, application and panel firmware 1.7.2. The PDF, `Implementation-Details.pdf`, is made from this file by `python tools/Build-ManualPdf.py docs/Implementation-Details.md docs/Implementation-Details.pdf`.
+As of 2026-11-21, for firmware, application and panel firmware 1.8. The PDF, `Implementation-Details.pdf`, is made from this file by `python tools/Build-ManualPdf.py docs/Implementation-Details.md docs/Implementation-Details.pdf`.
 
 ![The system: the PC application and the front panel talk to the board's ESP32, which runs the applications and drives the ADAU1701](images/design/system.png)
 
@@ -73,7 +73,7 @@ What happens when the user turns the equalizer's bass up on the PC:
 | 1.6 | The receiver as a backend only (front-end control removed) |
 | 1.7 | The receiver's IF back at 10 kHz |
 | 1.7.1, 1.7.2 | Panel firmware only: the two-USB CYD, then display detection |
-| 1.8 (in preparation) | RTTY and weather fax decoders in the receiver |
+| 1.8 | RTTY and weather fax decoders in the receiver |
 
 ## The board
 
@@ -617,7 +617,7 @@ The receiver's PC code predicts and measures what the board does:
 
 ### The simulator
 
-`SimulatedBoard` is an `ILineTransport` that answers the protocol as firmware 1.7 does, on its own worker thread, one request at a time like the firmware's loop. Its parameter tables mirror the firmware's; it simulates pots, stations, a radio that changes titles, a sweep through a 5 kHz low-pass, THD and spectra with hum and noise, a synthesizer arpeggio, and the receiver with its filter, test tone, S-meter and downloads. It has test hooks to swallow requests, restart and unplug the board.
+`SimulatedBoard` is an `ILineTransport` that answers the protocol as firmware 1.8 does, on its own worker thread, one request at a time like the firmware's loop. Its parameter tables mirror the firmware's; it simulates pots, stations, a radio that changes titles, a sweep through a 5 kHz low-pass, THD and spectra with hum and noise, a synthesizer arpeggio, and the receiver with its filter, test tone, S-meter, downloads and decoders. It has test hooks to swallow requests, restart and unplug the board.
 
 It serves three purposes: the "Simulator (demo)" entry in the port list, the unit tests, and the screenshot tool, which drives every page in all three themes against it.
 

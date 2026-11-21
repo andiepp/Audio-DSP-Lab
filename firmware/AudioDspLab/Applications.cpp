@@ -22,6 +22,7 @@
 #include "DspImageAnalysis.h"
 #include "DspImageReceiver.h"
 #include "Receiver.h"
+#include "RxDecode.h"
 
 #define MAX_PARAMS                    56      // the synthesizer has 48
 #define POT_PICKUP_THRESHOLD          80      // counts of 4095 (~2 %)
@@ -636,7 +637,19 @@ static const PotMap synthPots[] = {
 #define RX_P_TEST_IQ_GAIN             34      // 0.01 dB: the test tone's Q gain error
 #define RX_P_TEST_IQ_PHASE            35      // 0.01 degree: its Q phase error
 #define RX_P_FILTER                   36      // designed, downloaded (rxfilter); setting designed designs again
-#define RX_P_LAST                     RX_P_FILTER
+#define RX_P_DECODER                  37      // RxDecoderKind: off, rtty, fax (design/rtty-fax.md)
+#define RX_P_RTTY_SHIFT               38      // index: 85, 170, 450, 850 Hz
+#define RX_P_RTTY_POLARITY            39      // RxPolarity: auto, normal, reverse
+#define RX_P_FAX_LPM                  40      // index: 60, 90, 120, 240 lines per minute
+#define RX_P_FAX_IOC                  41      // index: 288, 576
+#define RX_P_FAX_SLANT                42      // ppm of the line length
+#define RX_P_DECODER_AFC              43      // off, on
+#define RX_P_TEST_MODE                44      // RxTestMode: tone, rtty, fax
+#define RX_P_LAST                     RX_P_TEST_MODE
+
+static const int16_t rxShifts[] = { 85, 170, 450, 850 };
+static const int16_t rxLpms[] = { 60, 90, 120, 240 };
+static const int16_t rxIocs[] = { 288, 576 };
 
 #define RX_SSB_LOW_EDGE               300     // Hz: where USB and LSB filters start
 #define RX_EDGE_GAP                   50      // Hz: the least width
@@ -674,6 +687,14 @@ static RxConfig rxConfigOf(Values v) {
   c.nrLevel = (float)v(RX_P_NR_LEVEL);
   c.testIqGain = v(RX_P_TEST_IQ_GAIN) / 100.0f;
   c.testIqPhase = v(RX_P_TEST_IQ_PHASE) / 100.0f;
+  c.testMode = (uint8_t)v(RX_P_TEST_MODE);
+  c.decoder = (uint8_t)v(RX_P_DECODER);
+  c.rttyShift = rxShifts[constrain(v(RX_P_RTTY_SHIFT), 0, 3)];
+  c.rttyPolarity = (uint8_t)v(RX_P_RTTY_POLARITY);
+  c.decoderAfc = v(RX_P_DECODER_AFC) != 0;
+  c.faxLpm = rxLpms[constrain(v(RX_P_FAX_LPM), 0, 3)];
+  c.faxIoc = (uint16_t)rxIocs[constrain(v(RX_P_FAX_IOC), 0, 1)];
+  c.faxSlant = (float)v(RX_P_FAX_SLANT);
   return c;
 }
 
@@ -810,6 +831,17 @@ static bool rxFilter(int32_t value) {
   return value == currentValue(RX_P_FILTER);
 }
 
+// the decoders; their settings also shape the RTTY and fax test signals
+static bool rxDecoderSetting(uint8_t id, int32_t value) { return rxApply(id, value, RX_DIRTY_DECODER | RX_DIRTY_TEST); }
+static bool rxDecoder(int32_t value) { return rxDecoderSetting(RX_P_DECODER, value); }
+static bool rxRttyShift(int32_t value) { return rxDecoderSetting(RX_P_RTTY_SHIFT, value); }
+static bool rxRttyPolarity(int32_t value) { return rxDecoderSetting(RX_P_RTTY_POLARITY, value); }
+static bool rxFaxLpm(int32_t value) { return rxDecoderSetting(RX_P_FAX_LPM, value); }
+static bool rxFaxIoc(int32_t value) { return rxDecoderSetting(RX_P_FAX_IOC, value); }
+static bool rxFaxSlant(int32_t value) { return rxDecoderSetting(RX_P_FAX_SLANT, value); }
+static bool rxDecoderAfc(int32_t value) { return rxDecoderSetting(RX_P_DECODER_AFC, value); }
+static bool rxTestMode(int32_t value) { return rxApply(RX_P_TEST_MODE, value, RX_DIRTY_TEST); }
+
 static const ParamDef receiverParams[] = {
   { EQ_BASS_GAIN,        -1200, 1200,    0,       eqBassGain,        false },
   { EQ_BASS_FREQUENCY,   5000,  40000,   20000,   eqBassFrequency,   false },
@@ -846,6 +878,14 @@ static const ParamDef receiverParams[] = {
   { RX_P_TEST_IQ_GAIN,   -300,  300,     0,       rxTestIqGain,      false },
   { RX_P_TEST_IQ_PHASE,  -1000, 1000,    0,       rxTestIqPhase,     false },
   { RX_P_FILTER,         0,     1,       0,       rxFilter,          true },
+  { RX_P_DECODER,        0,     RX_DECODER_FAX, RX_DECODER_OFF, rxDecoder, false },
+  { RX_P_RTTY_SHIFT,     0,     3,       2,       rxRttyShift,       false },   // 450 Hz: DDH9, DDH8
+  { RX_P_RTTY_POLARITY,  0,     2,       RX_POLARITY_AUTO, rxRttyPolarity, false },
+  { RX_P_FAX_LPM,        0,     3,       2,       rxFaxLpm,          false },   // 120
+  { RX_P_FAX_IOC,        0,     1,       1,       rxFaxIoc,          false },   // 576
+  { RX_P_FAX_SLANT,      -200,  200,     0,       rxFaxSlant,        false },
+  { RX_P_DECODER_AFC,    0,     1,       1,       rxDecoderAfc,      false },
+  { RX_P_TEST_MODE,      0,     RX_TEST_FAX, RX_TEST_TONE, rxTestMode, false },
 };
 #define RECEIVER_PARAM_COUNT          (sizeof(receiverParams) / sizeof(receiverParams[0]))
 

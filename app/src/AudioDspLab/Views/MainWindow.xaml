@@ -1036,9 +1036,13 @@
                                      IsChecked="{Binding IsFilterView, Mode=OneWay}"
                                      Command="{Binding ShowViewCommand}" CommandParameter="filter" />
                         <RadioButton x:Name="DesignerViewChoice" GroupName="ReceiverView" Foreground="{DynamicResource AudioLabText}" VerticalContentAlignment="Center"
-                                     Content="Designer" FontWeight="Bold"
+                                     Margin="0,0,10,0" Content="Designer" FontWeight="Bold"
                                      IsChecked="{Binding IsDesignerView, Mode=OneWay}"
                                      Command="{Binding ShowViewCommand}" CommandParameter="designer" />
+                        <RadioButton x:Name="DecoderViewChoice" GroupName="ReceiverView" Foreground="{DynamicResource AudioLabText}" VerticalContentAlignment="Center"
+                                     Content="Decoder" FontWeight="Bold"
+                                     IsChecked="{Binding IsDecoderView, Mode=OneWay}"
+                                     Command="{Binding ShowViewCommand}" CommandParameter="decoder" />
                     </StackPanel>
                     <TextBlock x:Name="ReceiverFilterState" Foreground="{StaticResource AudioLabDimText}" VerticalAlignment="Center"
                                HorizontalAlignment="Right" Text="{Binding FilterStatusText}" TextTrimming="CharacterEllipsis" />
@@ -1454,6 +1458,113 @@
                                        Text="{Binding DesignerMessage}" />
                         </StackPanel>
                     </Grid>
+                </StackPanel>
+
+                <!-- ===== Decoder view (design/rtty-fax.md) ===== -->
+                <StackPanel x:Name="DecoderViewPanel" Visibility="{Binding IsDecoderView, Converter={StaticResource VisibleWhen}}">
+                    <Border Style="{StaticResource AudioLabHeaderRuleStyle}">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource HintStyle}" Text="The station's listed frequency on the IF: the RTTY tones' centre, the fax centre" />
+                            <TextBlock Style="{StaticResource SynthHeaderStyle}" Text="Decoder" />
+                        </DockPanel>
+                    </Border>
+                    <Grid Margin="2,0,2,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="230" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ContentControl x:Name="DecoderKeys" Content="{Binding Decoder}" ContentTemplate="{StaticResource ChoiceKeys}" />
+                        <ToggleButton x:Name="DecoderAfcKey" Grid.Column="1" Style="{StaticResource AudioLabToggleStyle}" Width="80" Height="24" Margin="2,0,14,0"
+                                      Content="AFC" ToolTip="Follows the station within ±300 Hz"
+                                      IsChecked="{Binding DecoderAfc.IsOn, Mode=OneWay}" Command="{Binding DecoderAfc.ToggleCommand}" />
+                        <DockPanel Grid.Column="2">
+                            <TextBlock DockPanel.Dock="Left" Style="{StaticResource AudioLabSettingsLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0"
+                                       Text="Test signal" />
+                            <ToggleButton x:Name="DecoderTestKey" DockPanel.Dock="Left" Style="{StaticResource AudioLabToggleStyle}" Width="50" Height="24"
+                                          Margin="0,0,6,0" Content="On" IsChecked="{Binding Test.IsOn, Mode=OneWay}"
+                                          Command="{Binding Test.ToggleCommand}"
+                                          ToolTip="The board's test signal instead of K2: RTTY with DWD's polarity, or a test chart (offset, level and noise in the Filter view)" />
+                            <ContentControl x:Name="TestModeKeys" Content="{Binding TestMode}" ContentTemplate="{StaticResource ChoiceKeys}" />
+                        </DockPanel>
+                    </Grid>
+
+                    <!-- RTTY -->
+                    <StackPanel x:Name="RttyPanel" Visibility="{Binding IsRtty, Converter={StaticResource VisibleWhen}}">
+                        <Grid Margin="2,2,2,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource AudioLabSettingsLabelStyle}" VerticalAlignment="Center" Margin="2,0,6,0" Text="Shift" />
+                            <ContentControl x:Name="RttyShiftKeys" Grid.Column="1" Content="{Binding RttyShift}" ContentTemplate="{StaticResource ChoiceKeys}" />
+                            <TextBlock Grid.Column="2" Style="{StaticResource AudioLabSettingsLabelStyle}" VerticalAlignment="Center" Margin="8,0,6,0"
+                                       Text="Mark" ToolTip="Auto decides from the frames; DWD sends mark on the lower tone (Reverse)" />
+                            <ContentControl x:Name="RttyPolarityKeys" Grid.Column="3" Content="{Binding RttyPolarity}" ContentTemplate="{StaticResource ChoiceKeys}" />
+                        </Grid>
+                        <DockPanel Margin="4,2,4,2">
+                            <ProgressBar x:Name="RttyQualityBar" DockPanel.Dock="Left" Width="120" Height="10" Minimum="0" Maximum="1"
+                                         Value="{Binding RttyQuality, Mode=OneWay}" ToolTip="Quality: 0 noise, 1 clean" />
+                            <TextBlock x:Name="RttyStatus" Margin="8,0,0,0" Foreground="{DynamicResource AudioLabText}" TextTrimming="CharacterEllipsis"
+                                       Text="{Binding RttyStatusText}" />
+                        </DockPanel>
+                        <TextBox x:Name="RttyTextBox" Height="230" Margin="2,0,2,0" IsReadOnly="True" FontFamily="Consolas" FontSize="12"
+                                 TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Text="{Binding RttyText, Mode=OneWay}"
+                                 TextChanged="RttyText_TextChanged" />
+                        <DockPanel Margin="2,4,2,0">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Style="{StaticResource AudioLabKeyStyle}" Content="Clear" Command="{Binding ClearTextCommand}" />
+                                <Button x:Name="RttyFolderKey" Style="{StaticResource AudioLabKeyStyle}" Content="Open log folder"
+                                        ToolTip="The daily logs and the saved messages" Command="{Binding OpenFolderCommand}" CommandParameter="rtty" />
+                            </StackPanel>
+                            <TextBlock Foreground="{StaticResource AudioLabDimText}" VerticalAlignment="Center"
+                                       Text="Messages (ZCZC to NNNN), each saved on its own; double-click opens one" />
+                        </DockPanel>
+                        <ListBox x:Name="MessageList" Height="70" Margin="2,2,2,0" ItemsSource="{Binding Messages}" DisplayMemberPath="Text"
+                                 Background="{Binding Background, ElementName=RttyTextBox}" Foreground="{Binding Foreground, ElementName=RttyTextBox}"
+                                 BorderBrush="{Binding BorderBrush, ElementName=RttyTextBox}"
+                                 MouseDoubleClick="Message_DoubleClick" />
+                    </StackPanel>
+
+                    <!-- weather fax -->
+                    <StackPanel x:Name="FaxPanel" Visibility="{Binding IsFax, Converter={StaticResource VisibleWhen}}">
+                        <Grid Margin="2,2,2,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="130" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource AudioLabSettingsLabelStyle}" VerticalAlignment="Center" Margin="2,0,6,0" Text="Lines/min" />
+                            <ContentControl x:Name="FaxLpmKeys" Grid.Column="1" Content="{Binding FaxLpm}" ContentTemplate="{StaticResource ChoiceKeys}" />
+                            <TextBlock Grid.Column="2" Style="{StaticResource AudioLabSettingsLabelStyle}" VerticalAlignment="Center" Margin="8,0,6,0" Text="IOC" />
+                            <ContentControl x:Name="FaxIocKeys" Grid.Column="3" Content="{Binding FaxIoc}" ContentTemplate="{StaticResource ChoiceKeys}" />
+                            <ContentControl x:Name="FaxSlantDial" Grid.Column="4" Content="{Binding FaxSlant}" ContentTemplate="{StaticResource SmallDial}" />
+                        </Grid>
+                        <TextBlock x:Name="FaxStatus" Margin="4,0,4,2" Foreground="{DynamicResource AudioLabText}" TextTrimming="CharacterEllipsis"
+                                   Text="{Binding FaxStatusText}" />
+                        <Border Margin="2,0,2,0" Height="330" BorderBrush="{StaticResource AudioLabSeparator}" BorderThickness="1" Background="White">
+                            <ScrollViewer x:Name="FaxScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <Image x:Name="FaxChartImage" Source="{Binding FaxImage}" Stretch="Uniform" VerticalAlignment="Top" Cursor="Cross"
+                                       RenderOptions.BitmapScalingMode="HighQuality" ToolTip="Click a column to make it the chart's left edge"
+                                       MouseLeftButtonDown="FaxChart_MouseLeftButtonDown" SizeChanged="FaxChart_SizeChanged" />
+                            </ScrollViewer>
+                        </Border>
+                        <StackPanel Orientation="Horizontal" Margin="2,4,2,0">
+                            <Button x:Name="NewChartKey" Style="{StaticResource AudioLabKeyStyle}" Content="New chart"
+                                    ToolTip="Saves the chart (50 lines or more) and starts a new one" Command="{Binding NewChartCommand}" />
+                            <Button x:Name="SaveChartKey" Style="{StaticResource AudioLabKeyStyle}" Content="Save chart" Command="{Binding SaveChartCommand}" />
+                            <Button x:Name="FaxFolderKey" Style="{StaticResource AudioLabKeyStyle}" Content="Open chart folder"
+                                    Command="{Binding OpenFolderCommand}" CommandParameter="fax" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock x:Name="DecoderOffHint" Margin="6,8,6,0" Foreground="{StaticResource AudioLabDimText}" TextWrapping="Wrap"
+                               Visibility="{Binding IsDecoderOff, Converter={StaticResource VisibleWhen}}"
+                               Text="RTTY decodes DWD's weather reports for shipping (50 baud; DDH9 11039 kHz and DDH8 14467.3 kHz with 450 Hz shift, DDH47 147.3 kHz with 85 Hz); Fax receives weather charts (DDH3 3855, DDK3 7880, DDK6 13882.5 kHz; 120 lines a minute, IOC 576). The front end puts the station's listed frequency on the IF; for listening, CW with a filter of about 1 kHz passes both tones." />
                 </StackPanel>
             </StackPanel>
 

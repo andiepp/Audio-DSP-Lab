@@ -49,6 +49,20 @@ public sealed class BoardClient : IDisposable
     /// <summary>The receiver's meters, five times a second while it runs.</summary>
     public event Action<Receiver.ReceiverMeter>? MeterChanged;
 
+    /// <summary>"! rtty": decoded text, and whether a line ends after it.</summary>
+    public event Action<string, bool>? RttyReceived;
+
+    /// <summary>"! decoder": the decoder's status, twice a second while one runs.</summary>
+    public event Action<Receiver.DecoderStatus>? DecoderChanged;
+
+    /// <summary>"! fax line": a complete fax line (its parts put together).</summary>
+    public event Action<Receiver.FaxLine>? FaxLineReceived;
+
+    /// <summary>"! fax start", "! fax stop", "! fax phase n": the chart's marks (the phase, or -1).</summary>
+    public event Action<string, int>? FaxMarked;
+
+    private readonly Receiver.FaxLineAssembler faxLines = new();
+
     public event Action<Exception>? Disconnected;
 
     /// <summary>Every event line as it came, for a console.</summary>
@@ -396,6 +410,22 @@ public sealed class BoardClient : IDisposable
                     break;
                 case "meter" when values.Count >= 6:
                     MeterChanged?.Invoke(Receiver.ReceiverMeter.Parse(values));
+                    break;
+                case "rtty" when values.Count >= 1:
+                    RttyReceived?.Invoke(values[0], values.Count >= 2 && values[1] == "1");
+                    break;
+                case "decoder" when values.Count >= 1:
+                    DecoderChanged?.Invoke(Receiver.DecoderStatus.Parse(values));
+                    break;
+                case "fax" when values.Count >= 6 && values[0] == "line":
+                    if (faxLines.Add([.. values.Skip(1)]) is Receiver.FaxLine line)
+                    {
+                        FaxLineReceived?.Invoke(line);
+                    }
+
+                    break;
+                case "fax" when values.Count >= 1:
+                    FaxMarked?.Invoke(values[0], values.Count >= 2 ? ProtocolText.ParseInteger(values[1]) : -1);
                     break;
             }
         }

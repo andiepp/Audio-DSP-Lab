@@ -246,6 +246,16 @@ ok downloaded 3 0 ready 2
 
 The receiver and the analysis' THD and Spectrum use the same port of the ESP32: while the receiver runs, `diag capture` and `diag record` answer `err busy`. `diag rx` (below) shows the receiver's input and timing.
 
+**The decoders** (firmware 1.8): with `decoder rtty` or `decoder fax` (parameters below) the board decodes DWD-style RTTY or HF weather fax from the down-converter's output, with the station's listed frequency on the IF.
+
+| Request | Response | Notes |
+| --- | --- | --- |
+| `rtty` | `* "<text>" <1\|0>` per line, then `ok <count> <decoder state>` | the last 1000 characters decoded, a data line per text line (`1`: the line ended, `0`: the last one goes on), then the characters decoded since the start and the decoder's state as in `! decoder` |
+| `fax` | `ok <decoder state>` | the decoder's state as in `! decoder` |
+| `fax events off\|full\|<width>` | `ok off\|<width>` | fax lines to this port as `! fax line` events: none (the default), full width (1810 pixels at IOC 576, 905 at 288) or averaged down to 16 .. 1810 pixels; each port chooses its own (the PC application takes full width, the panel 300) |
+
+**A fax line** is 4-bit grey as text: a hex digit is a pixel (its grey's upper four bits, `0` black, `f` white), a letter `g` to `z` repeats the pixel before it 1 to 20 more times (`z` after `z` goes on repeating). A white line of 1810 pixels is 92 characters; a busy one at most as many characters as pixels. The text is cut into parts of 300 characters, each its own event.
+
 ### SigmaStudio mode
 
 | Request | Response | Notes |
@@ -295,6 +305,12 @@ Events come only after `events on`, except `! ready`, which every start sends. T
 | `! spectrum <state> <results> <rms-L> <rms-R>` | the Spectrum has a new result, or its state changed; as `spectrum` |
 | `! voice <note> <gate> <held> <channel> <mod-strip> <stage>` | the synthesizer's voice changed; at most 20 per second |
 | `! meter <s-meter> <agc-gain> <fm-offset> <squelch> <audio> <cpu> <nr-gain>` | five times a second while the receiver runs; as `meter` |
+| `! rtty "<text>" <1\|0>` | the RTTY decoder decoded text: at most five a second, a piece per text line, `1` when a line ends after it |
+| `! decoder rtty <quality> <afc> normal\|reverse <good> <bad>` | twice a second while the RTTY decoder runs: its quality (0 noise .. 1 clean), the AFC's correction in Hz, which tone is mark (`reverse`: the lower, as DWD sends), the frames decoded and rejected |
+| `! decoder fax <lines> <afc> <start> <stop> phasing\|lines <phase>` | twice a second while the fax decoder runs: the lines so far, the AFC's correction in Hz, the start and stop tone's share of the grey signal (0 .. 1), whether it is phasing, the line start found (pixels, -1 none) |
+| `! decoder off`, `! decoder no-memory` | the decoder stopped; or it could not start for want of memory |
+| `! fax start`, `! fax stop`, `! fax phase <pixel>` | the start tone (a new chart), the stop tone (the chart is complete), phasing found the line start |
+| `! fax line <n> <part> <parts> <width> <data>` | a fax line, to a port that asked with `fax events` |
 
 ## Parameters per application
 
@@ -409,6 +425,14 @@ The equalizer's eight parameters, `bass-gain` to `output`, with the same ranges 
 | `test-iq-gain` | number, dB | -3 to 3: a gain error given to the test signal's Q | 0 | |
 | `test-iq-phase` | number, deg | -10 to 10: a phase error given to its Q | 0 | |
 | `filter` | choice | `designed`, `downloaded`: only a download (`rxfilter`) makes it `downloaded`; `set filter designed` designs from the edges again, `set filter downloaded` is refused (`err dsp-write-failed`) unless it already is | `designed` | |
+| `decoder` | choice | `off`, `rtty`, `fax`: the decoder on the down-converter's output (the station's listed frequency on the IF; in CW the decoders allow for the pitch) | `off` | |
+| `rtty-shift` | choice | `85`, `170`, `450`, `850`: the RTTY shift in Hz (DDH47 85, DDH9 and DDH8 450) | `450` | |
+| `rtty-polarity` | choice | `auto` (from the frames), `normal` (mark the upper tone), `reverse` (mark the lower, as DWD sends) | `auto` | |
+| `fax-lpm` | choice | `60`, `90`, `120`, `240`: lines per minute | `120` | |
+| `fax-ioc` | choice | `288`, `576`: index of cooperation (905 or 1810 pixels a line) | `576` | |
+| `fax-slant` | integer, ppm | -200 to 200: corrects the line length, which follows the board's crystal | 0 | |
+| `decoder-afc` | switch | the decoders follow the station within ±300 Hz | on | |
+| `test-mode` | choice | `tone` (the test tone, keyed by `test-key`), `rtty` (a test text at 50 baud, `rtty-shift` wide, mark on the lower tone), `fax` (start tone, phasing, a test chart, stop tone, at `fax-lpm` and `fax-ioc`), all at `offset` + `test-offset` | `tone` | |
 
 Some values follow others, as on a receiver's front panel: `mode` loads its filter (`off` and `am` -3000 to 3000, `usb` 300 to 2700, `lsb` -2700 to -300, `cw` 500 Hz around `pitch`, `fm` -5500 to 5500); an `agc` speed loads `hang` and `decay` (`fast` 0.1 s and 100 dB/s, `medium` 0.5 and 20, `slow` 1.5 and 10); `low`, `high` and `width` follow each other (an edge that would pass the other pushes it to 50 Hz away); in CW the edges move with `pitch`; and every change to the filter's shape sets `filter` to `designed`. Each value that follows is reported as a `! value` event. P1 sets `width` from 100 Hz to 11 kHz logarithmically in 10 Hz steps; P3 sets `squelch` to -150 over the first 5 % of its travel, then -130 to -30 dBFS.
 

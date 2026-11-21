@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+Board firmware 1.8, protocol 1 (new commands and events only), panel firmware 1.8.
+
+- Receiver: **RTTY and weather fax decoders** on the board (design/rtty-fax.md), the SDR-IQ Receiver's DWD RTTY and WEATHER FAX decoders ported to C++: from the down-converter's output, with the station's listed frequency on the IF and an AFC of ±300 Hz. RTTY: 50 baud ITA2, shift 85 to 850 Hz, both polarities decoded side by side (DWD sends mark on the lower tone). Fax: 60 to 240 lines a minute, IOC 288 or 576, start and stop tones, phasing, slant. New parameters `decoder`, `rtty-shift`, `rtty-polarity`, `fax-lpm`, `fax-ioc`, `fax-slant`, `decoder-afc`; requests `rtty`, `fax`, `fax events`; events `! rtty`, `! decoder`, `! fax`. About 4 to 5 % of a block of CPU and 20 to 30 KB of heap while one runs.
+- Receiver: the test signal sends RTTY (a test text) or fax (a test chart) besides the tone (`test-mode`).
+- Fax lines: the phased line is the end of one received line and the start of the next, so a chart has no one-line step at the phase column (the SDR-IQ Receiver rotates within one line).
+- Application: a **Decoder** view on the Receiver page: the RTTY text with its daily log and the ZCZC..NNNN messages saved on their own, the weather chart as it arrives, saved as PNG; the simulator plays a DWD text and a chart; screenshots `receiver-rtty.png` and `receiver-fax.png`.
+- Panel: decoder keys on the receiver page, RTTY's last lines and the chart's newest rows; the `scroll` test command.
 - Docs: `docs/Implementation-Details.md`, also as `docs/Implementation-Details.pdf` (made by `tools/Build-ManualPdf.py`; its diagrams by `tools/Make-DesignFigures.py`): how the board, the DSP programs, the firmware, the protocol, the signal processing, the receiver, the panel and the application are built. The release package carries the PDF.
 - Manual: the receiver starts at an IF of 10 kHz (a step still said 12 kHz). The PDFs' cover says seven applications.
 

@@ -67,6 +67,14 @@ static const ParamInfo receiverInfo[] = {
   { 34, "test-iq-gain",      KIND_NUMBER,  2, "dB",    nullptr },
   { 35, "test-iq-phase",     KIND_NUMBER,  2, "deg",   nullptr },
   { 36, "filter",            KIND_CHOICE,  0, "",      "designed,downloaded" },
+  { 37, "decoder",           KIND_CHOICE,  0, "",      "off,rtty,fax" },
+  { 38, "rtty-shift",        KIND_CHOICE,  0, "",      "85,170,450,850" },
+  { 39, "rtty-polarity",     KIND_CHOICE,  0, "",      "auto,normal,reverse" },
+  { 40, "fax-lpm",           KIND_CHOICE,  0, "",      "60,90,120,240" },
+  { 41, "fax-ioc",           KIND_CHOICE,  0, "",      "288,576" },
+  { 42, "fax-slant",         KIND_INTEGER, 0, "ppm",   nullptr },
+  { 43, "decoder-afc",       KIND_SWITCH,  0, "",      nullptr },
+  { 44, "test-mode",         KIND_CHOICE,  0, "",      "tone,rtty,fax" },
 };
 
 // application 0x04 - analysis: Frequency Response and THD

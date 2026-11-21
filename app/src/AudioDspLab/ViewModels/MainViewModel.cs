@@ -524,6 +524,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                     Receiver.ApplyMeter(meter);
                 }
             });
+            candidate.RttyReceived += (text, lineEnd) => Post(() => Receiver.ApplyRtty(text, lineEnd));
+            candidate.DecoderChanged += status => Post(() => Receiver.ApplyDecoder(status));
+            candidate.FaxLineReceived += line => Post(() => Receiver.ApplyFaxLine(line));
+            candidate.FaxMarked += (kind, value) => Post(() => Receiver.ApplyFaxMark(kind, value));
             candidate.Restarted += info => Post(() => _ = OnRestartedAsync());
             BoardClient connecting = candidate;
             candidate.DistortionChanged += status => Post(() => _ = Analyzer.ApplyDistortionAsync(connecting, status));
@@ -1211,6 +1215,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             _ = Receiver.RefreshFilterStatusAsync(receiverBoard);
         }
+
+        // the weather chart, when fax lines came
+        Receiver.DrawFax();
     }
 
     private async Task MeasureInputAsync(BoardClient board)

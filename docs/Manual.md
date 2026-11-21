@@ -440,7 +440,7 @@ With K2 open, `diag rx` reads about −98.5 dBFS (I) and −100 dBFS (Q) RMS ove
 - **A front end** that delivers a real IF or I and Q to K2, as above: a superhet's IF, a direct-conversion I/Q mixer, a quadrature sampling detector. The receiver tunes only within the band that K2 carries; it does not tune the front end.
 - **An antenna**, or for a bench check a signal generator into the front end's RF input, through attenuators.
 
-The receiver also runs without a front end: the internal test tone (on the Filter view), or a generator's audio-frequency IF or I and Q on K2, stands in for the band.
+The receiver also runs without a front end: the internal test tone (on the Filter view) or its RTTY and fax test signals (on the Decoder view), or a generator's audio-frequency IF or I and Q on K2, stands in for the band.
 
 ### Connecting the front end
 
@@ -549,6 +549,22 @@ The Designer makes filters the receiver's own design cannot: notches, several pa
 **Import CSV …** reads coefficients from a file, one tap per line in natural order: `k,re,im` (as **Export CSV …** writes them), `re,im`, or one real value; lines starting with `#` or a letter are skipped, and 1 to 511 taps are taken. **Use the mask** returns from the imported coefficients to the mask.
 
 **Designs kept on this PC.** Type a name and press **Save**; **Load** and **Delete** work on the design chosen in the list. Each design is a JSON file in `%LocalAppData%\Audio-DSP-Lab\Filter designs`.
+
+### The Decoder view
+
+![The receiver page, Decoder view with RTTY: the decoder keys, AFC, the test signal, shift and polarity, the quality bar, the text and the saved messages](images/screenshots/receiver-rtty.png)
+
+The board decodes two of the Deutscher Wetterdienst's transmissions for shipping, as the SDR-IQ Receiver's DWD RTTY and WEATHER FAX tabs do: **RTTY** (50 baud, ITA2; DDH9 on 11039 kHz and DDH8 on 14467.3 kHz with 450 Hz shift, DDH47 on 147.3 kHz with 85 Hz) and **weather fax** (DDH3 3855, DDK3 7880 and DDK6 13882.5 kHz; 120 lines a minute, IOC 576, strongest at night). The decoding runs on the board, beside the receiver, from the down-converter's output; the audio goes on in the mode chosen.
+
+**Tuning.** The front end puts the station's listed frequency on the IF: the centre between the two RTTY tones, the fax's centre (the SDR-IQ Receiver's IF mode does exactly this when it is tuned to the listed frequency). **AFC** follows the station within ±300 Hz, so a front end's clock error of 100 Hz does not matter. To hear the station, choose CW with a filter of about 1 kHz: both tones pass, and the decoders allow for the CW pitch.
+
+**RTTY.** **Shift** must match the station; **Mark** chooses which tone is mark: **Auto** decodes both and lets the better one speak (DWD sends mark on the lower tone, so Auto settles on **Reverse**). The bar shows the quality (0 noise, 1 clean), the line beside it the AFC's correction, which tone is mark, and the frames decoded and rejected. Nothing is shown until the decoder has a few more good frames than rejected ones, which keeps the noise of the first seconds out of the text. Everything decoded goes into a daily log, `%LocalAppData%\Audio-DSP-Lab\DWD\yyyy-mm-dd.txt`, each line with its UTC time; every message between `ZCZC` and `NNNN` (a complete report, about half an hour) is also saved on its own in `DWD\messages` and listed below the text, where a double-click opens it.
+
+![The receiver page, Decoder view with fax: lines per minute, IOC and slant, the decoder's state and the chart as it arrives](images/screenshots/receiver-fax.png)
+
+**Weather fax.** **Lines/min** and **IOC** must match the station (DWD: 120 and 576). The chart grows as the lines arrive, the newest at the bottom. The start tone begins a new chart, phasing finds the line start in the 20 s after it, and the stop tone ends the chart; a chart of 50 lines or more is saved as a PNG in `%LocalAppData%\Audio-DSP-Lab\Fax` at the stop tone, at a new start tone, with **New chart**, **Save chart**, when it reaches 2000 lines and when the receiver stops. A click on the chart makes that column the left edge, for a chart that came without phasing. The line length follows the board's crystal: should a chart lean, **Slant** straightens it (ppm of the line length).
+
+**Without a front end.** **Test signal** sends the board's own test signal into the receiver: **RTTY** a test text at 50 baud with the shift chosen and mark on the lower tone, **Fax** a start tone, phasing, a test chart (a grey wedge, a grid, a diagonal) and a stop tone, again and again. Its offset, level and noise are set in the Filter view; set the offset to 0 (or to 100 Hz, to watch the AFC).
 
 ### The receiver's pots
 
@@ -950,6 +966,10 @@ In the editor **−** and **+** step the value; hold them to repeat, and after a
 ![The receiver: the IF dial with the chosen digit underlined, the S-meter with the squelch's mark, the mode keys, the width keys with the passband sketch, the noise reduction keys with the CPU load](images/panel/receiver.png)
 
 **Receiver.** The dial at the top tunes the receiver's **IF**, with a sign and five digits from 10 kHz down to 1 Hz. Tap a digit to choose it (it is underlined in teal, and its step shows on the left); **−** and **+** step it, and holding them repeats; or drag along the dial, one step for every 14 pixels, to the right to tune up. The panel moves the IF within ±21 kHz, and the PC's dial follows. Below the dial, the S-meter: a bar from −130 to 0 dBFS with the squelch's threshold as a yellow mark, the level and the AGC's gain (in FM the FM offset instead), and a dot beside **Sql** that is teal while the squelch is open and grey while it mutes. Then three rows of keys: the modes **Off**, **AM**, **USB**, **LSB**, **CW** and **FM**; four widths that suit the mode (USB and LSB 1.8k, 2.4k, 2.7k, 3k; CW 200, 300, 500, 1k; FM 6k, 8k, 10k, 11k; AM and Off 4k, 6k, 8k, 10k), with a sketch of the passband around the carrier (the line), ±6 kHz across; and **NR off**, **LMS** and **Spectral**, with the receiver's CPU load beside them (and the spectral noise reduction's gain). The other parameters are tiles below, a scroll away: volume, squelch, NR level and the filter first, the equalizer and the test tone last. The meter's widgets redraw five times a second.
+
+![The receiver's decoders on the panel: RTTY's last lines with its quality and AFC, and the newest rows of a weather chart](images/panel/receiver-decoders.png)
+
+**The decoders** follow, below the noise reduction: **Off**, **RTTY** and **Fax**, and beside them the decoder's state (RTTY its quality, the AFC and `rev` when mark is the lower tone; fax its line count and AFC). With RTTY the last six lines of text appear below the keys, with fax the newest 110 rows of the chart, 300 pixels wide; the shift, polarity, lines per minute, IOC, slant, AFC and the test signal are tiles. The panel's fax lines come at a sixth of the full width, so its cable is not swamped.
 
 **SigmaStudio.** The page says that your program runs; the knob strip shows the pots going to the DSP's ADC inputs.
 

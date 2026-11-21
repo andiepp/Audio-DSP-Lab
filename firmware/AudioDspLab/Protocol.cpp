@@ -15,6 +15,7 @@
 #include "Synth.h"
 #include "Capture.h"
 #include "Receiver.h"
+#include "RxDecode.h"
 #include <Arduino.h>
 #include <esp_system.h>
 #include <esp_rom_sys.h>
@@ -46,6 +47,7 @@ struct Port {
   bool eventsOn;
   uint64_t pendingValues;                    // bit = parameter index
   uint32_t valuesSentAt;
+  uint16_t faxWidth;                         // fax lines to this port: 0 none, else their width
 };
 
 static Port ports[] = {
@@ -1125,6 +1127,105 @@ static void cmdRxFilter() {
   fail(ERR_BAD_ARGUMENT);
 }
 
+// --- decoders (design/rtty-fax.md) -------------------------------------------------
+
+#define RTTY_HISTORY_ANSWER           1000    // characters "rtty" answers
+#define FAX_PART                      300     // characters of a line in one event
+#define FAX_TEXT_MAX                  (RX_FAX_WIDTH_MAX + 8)
+
+// the decoder's status: rtty <quality> <afc Hz> normal|reverse <good> <bad>,
+// fax <lines> <afc Hz> <start tone> <stop tone> phasing|lines <phase>, off,
+// or no-memory when the decoder could not start
+static void decoderText(char *text, size_t size) {
+  RxDecodeStatus s;
+  rxDecodeGetStatus(s);
+  if (s.noMemory) {
+    snprintf(text, size, "no-memory");
+  } else if (s.decoder == RX_DECODER_RTTY) {
+    snprintf(text, size, "rtty %.2f %.0f %s %lu %lu", s.quality, s.afcHz, s.reverse ? "reverse" : "normal",
+             (unsigned long)s.good, (unsigned long)s.bad);
+  } else if (s.decoder == RX_DECODER_FAX) {
+    snprintf(text, size, "fax %lu %.0f %.2f %.2f %s %d", (unsigned long)s.lines, s.afcHz, s.startLevel, s.stopLevel,
+             s.phasing ? "phasing" : "lines", s.phase);
+  } else {
+    snprintf(text, size, "off");
+  }
+}
+
+// a fax line as text: a hex digit per pixel (its upper four bits), a letter
+// g..z repeating the pixel before it 1..20 times more; the line averaged
+// down to width pixels first
+static size_t faxEncode(const uint8_t *pixels, uint16_t full, uint16_t width, char *out, size_t size) {
+  static const char hex[] = "0123456789abcdef";
+  size_t n = 0;
+  int last = -1, run = 0;
+  for (uint16_t j = 0; j < width && n + 3 < size; j++) {
+    const uint32_t from = (uint32_t)j * full / width, to = max((uint32_t)(j + 1) * full / width, from + 1);
+    uint32_t sum = 0;
+    for (uint32_t i = from; i < to; i++) sum += pixels[i];
+    const int level = (int)(sum / (to - from)) >> 4;
+    if (level == last) {
+      if (++run == 20) {                  // a full run: the next letter repeats the same pixel again
+        out[n++] = 'z';
+        run = 0;
+      }
+      continue;
+    }
+    if (run > 0) out[n++] = (char)('f' + run);
+    run = 0;
+    out[n++] = hex[level];
+    last = level;
+  }
+  if (run > 0) out[n++] = (char)('f' + run);
+  out[n] = '\0';
+  return n;
+}
+
+// rtty: the last characters decoded, a data line per text line
+static void cmdRtty() {
+  if (!runningApp(APP_RECEIVER)) return;
+  const uint32_t count = rxDecodeTextCount();
+  uint32_t cursor = count > RTTY_HISTORY_ANSWER ? count - RTTY_HISTORY_ANSWER : 0;
+  char text[RTTY_HISTORY_ANSWER + 1];
+  rxDecodeText(cursor, text, sizeof(text));
+  char *line = text;
+  for (char *c = text;; c++) {
+    if (*c == '\n' || *c == '\0') {
+      const bool end = *c == '\0';
+      *c = '\0';
+      if (!end || *line != '\0') {
+        char quoted[2 * RTTY_HISTORY_ANSWER + 4];
+        quote(quoted, sizeof(quoted), line);
+        dataf("%s %d", quoted, end ? 0 : 1);
+      }
+      if (end) break;
+      line = c + 1;
+    }
+  }
+  char status[96];
+  decoderText(status, sizeof(status));
+  okf("%lu %s", (unsigned long)count, status);
+}
+
+// fax: the decoder's status; fax events off|full|<width>: fax lines to this port
+static void cmdFax() {
+  if (tokenCount == 3 && is(1, "events")) {
+    if (is(2, "off")) out->faxWidth = 0;
+    else if (is(2, "full")) out->faxWidth = RX_FAX_WIDTH_MAX;
+    else {
+      long width;
+      if (!parseLong(tokens[2], 16, RX_FAX_WIDTH_MAX, width)) return fail(ERR_BAD_ARGUMENT);
+      out->faxWidth = (uint16_t)width;
+    }
+    return out->faxWidth == 0 ? okf("off") : okf("%u", out->faxWidth);
+  }
+  if (tokenCount != 1) return fail(ERR_BAD_ARGUMENT);
+  if (!runningApp(APP_RECEIVER)) return;
+  char status[96];
+  decoderText(status, sizeof(status));
+  okf("%s", status);
+}
+
 // --- synthesizer ------------------------------------------------------------------
 
 static void voiceText(char *out, size_t size) {
@@ -1400,6 +1501,8 @@ static const Command commands[] = {
   { "voice",     cmdVoice,      "voice" },
   { "meter",     cmdMeter,      "meter" },
   { "rxfilter",  cmdRxFilter,   "rxfilter [load <taps> real|complex | data <v> ... | end <crc32>]" },
+  { "rtty",      cmdRtty,       "rtty" },
+  { "fax",       cmdFax,        "fax [events off|full|<width>]" },
   { "midi",      cmdMidi,       "midi" },
   { "load",      cmdLoad,       "load" },
   { "aux",       cmdAux,        "aux" },
@@ -1631,6 +1734,93 @@ static void meterEvents(uint32_t now) {
   eventf("meter %s", text);
 }
 
+// the decoders: new RTTY text (a piece per text line, 1 when a line ends),
+// the status twice a second, the fax's start, stop and phase, and its lines
+// to each port that asked for them, in the width it asked for
+static uint32_t rttyCursor = 0;
+static uint32_t rttySentAt = 0, decoderSentAt = 0;
+static uint32_t seenStarts = 0, seenStops = 0, seenPhases = 0;
+static bool decoderSeen = false;
+
+static void faxLineEvents(const uint8_t *pixels, uint16_t full, uint32_t number) {
+  static char text[FAX_TEXT_MAX];
+  Port *asked = out;
+  broadcasting = false;
+  for (uint8_t i = 0; i < portCount; i++) {
+    Port &port = ports[i];
+    if (!port.eventsOn || port.faxWidth == 0) continue;
+    out = &port;
+    const size_t length = faxEncode(pixels, full, min(port.faxWidth, full), text, sizeof(text));
+    const unsigned parts = (unsigned)((length + FAX_PART - 1) / FAX_PART);
+    for (unsigned p = 0; p < parts; p++) {
+      const size_t from = p * FAX_PART;
+      const char saved = text[min(from + FAX_PART, length)];
+      text[min(from + FAX_PART, length)] = '\0';
+      eventf("fax line %lu %u %u %u %s", (unsigned long)number, p + 1, parts, min(port.faxWidth, full), text + from);
+      text[min(from + FAX_PART, length)] = saved;
+    }
+  }
+  out = asked;
+  broadcasting = true;
+}
+
+static void decoderEvents(uint32_t now) {
+  if (!appRunning(APP_RECEIVER)) {
+    decoderSeen = false;
+    return;
+  }
+  if (!decoderSeen) {                     // what came before is not news
+    decoderSeen = true;
+    rttyCursor = rxDecodeTextCount();
+    RxDecodeStatus s;
+    rxDecodeGetStatus(s);
+    seenStarts = s.starts;
+    seenStops = s.stops;
+    seenPhases = s.phases;
+  }
+  RxDecodeStatus s;
+  rxDecodeGetStatus(s);
+  if (s.decoder == RX_DECODER_OFF && !s.noMemory) {
+    rttyCursor = rxDecodeTextCount();
+    return;
+  }
+  if (now - rttySentAt >= PROTOCOL_RTTY_EVENT_MS && rttyCursor != rxDecodeTextCount()) {
+    rttySentAt = now;
+    char text[256];
+    rxDecodeText(rttyCursor, text, sizeof(text));
+    char *line = text;
+    for (char *c = text;; c++) {
+      if (*c == '\n' || *c == '\0') {
+        const bool end = *c == '\0';
+        *c = '\0';
+        if (!end || *line != '\0') {
+          char quoted[2 * sizeof(text) + 4];
+          quote(quoted, sizeof(quoted), line);
+          eventf("rtty %s %d", quoted, end ? 0 : 1);
+        }
+        if (end) break;
+        line = c + 1;
+      }
+    }
+  }
+  if (s.starts != seenStarts) eventf("fax start");
+  if (s.phases != seenPhases) eventf("fax phase %d", s.phase);
+  if (s.stops != seenStops) eventf("fax stop");
+  seenStarts = s.starts;
+  seenStops = s.stops;
+  seenPhases = s.phases;
+  static uint8_t pixels[RX_FAX_WIDTH_MAX];
+  uint16_t width;
+  uint32_t number;
+  while (rxDecodeTakeLine(pixels, width, number)) faxLineEvents(pixels, width, number);
+  if (now - decoderSentAt >= PROTOCOL_DECODER_EVENT_MS) {
+    decoderSentAt = now;
+    char text[96];
+    decoderText(text, sizeof(text));
+    eventf("decoder %s", text);
+  }
+}
+
 static void events() {
   const uint32_t now = millis();
   if (now - eventsCheckedAt < EVENT_CHECK_MS) return;
@@ -1653,6 +1843,7 @@ static void events() {
     thdEvents();
     voiceEvents(now);
     meterEvents(now);
+    decoderEvents(now);
   }
   broadcasting = false;
 }

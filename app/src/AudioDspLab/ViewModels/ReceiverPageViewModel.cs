@@ -12,7 +12,8 @@ namespace AudioDspLab.ViewModels;
 /// IF dial, the meters, AGC, NR, squelch, the input and its I/Q
 /// correction and the equalizer; the Filter view the
 /// channel filter's edges on a chart, its measurement and the test tone; the
-/// Designer view filters made on the PC and downloaded.
+/// Designer view filters made on the PC and downloaded; the Decoder view
+/// the board's RTTY and weather fax decoders.
 /// </summary>
 public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, IDisposable
 {
@@ -84,13 +85,14 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
 
         InitializeFilter();
         InitializeDesigner();
+        InitializeDecoder();
     }
 
     // --- views -----------------------------------------------------------------------------------
 
     public ICommand ShowViewCommand { get; }
 
-    /// <summary>The view on show: <see cref="ReceiverView"/>, <see cref="FilterView"/> or <see cref="DesignerView"/>.</summary>
+    /// <summary>The view on show: <see cref="ReceiverView"/>, <see cref="FilterView"/>, <see cref="DesignerView"/> or <see cref="DecoderView"/>.</summary>
     public string View
     {
         get => view;
@@ -101,6 +103,7 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
                 RaisePropertyChanged(nameof(IsReceiverView));
                 RaisePropertyChanged(nameof(IsFilterView));
                 RaisePropertyChanged(nameof(IsDesignerView));
+                RaisePropertyChanged(nameof(IsDecoderView));
             }
         }
     }
@@ -292,6 +295,7 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
     {
         ApplyMeter(await board.GetMeterAsync().ConfigureAwait(true));
         await RefreshFilterStatusAsync(board).ConfigureAwait(true);
+        await LoadDecoderAsync(board).ConfigureAwait(true);
     }
 
     internal override void Forget()
@@ -300,6 +304,7 @@ public sealed partial class ReceiverPageViewModel : ApplicationPageViewModel, ID
         cancel?.Cancel();
         ApplyMeter(null);
         ApplyFilterStatus(null);
+        ForgetDecoder();
     }
 
     protected override void OnRunningChanged()

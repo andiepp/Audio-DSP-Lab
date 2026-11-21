@@ -13,6 +13,7 @@
 
 #include <Arduino.h>
 #include <vector>
+#include "Config.h"
 
 enum ParamKind : uint8_t { KIND_NUMBER, KIND_INTEGER, KIND_CHOICE, KIND_SWITCH };
 
@@ -89,6 +90,17 @@ struct Board {
   float rxCpu = NAN;            // %
   float nrGain = NAN;           // dB, the spectral NR's
   uint32_t meterVersion = 0;
+  // the receiver's decoders ("! decoder", "! rtty", "! fax"); decoderVersion
+  // alone counts them: the page redraws only the decoder's widgets
+  String decoder;               // "off", "rtty", "fax", "no-memory"
+  float decoderQuality = NAN;   // RTTY: 0 noise .. 1 clean
+  float decoderAfc = NAN;       // Hz
+  bool decoderReverse = false;  // RTTY: mark the lower tone
+  long faxLines = 0;
+  bool faxPhasing = false;
+  std::vector<String> rttyLines;          // the last lines, the newest (perhaps unfinished) last
+  uint8_t faxPixels[LINK_FAX_ROWS * LINK_FAX_WIDTH];   // 8-bit grey, the newest line at the bottom
+  uint32_t decoderVersion = 0;
 };
 
 extern Board board;

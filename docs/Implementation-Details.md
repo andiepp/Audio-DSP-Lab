@@ -73,6 +73,7 @@ What happens when the user turns the equalizer's bass up on the PC:
 | 1.6 | The receiver as a backend only (front-end control removed) |
 | 1.7 | The receiver's IF back at 10 kHz |
 | 1.7.1, 1.7.2 | Panel firmware only: the two-USB CYD, then display detection |
+| 1.8 (in preparation) | RTTY and weather fax decoders in the receiver |
 
 ## The board
 
@@ -192,6 +193,7 @@ The board firmware is one Arduino sketch: a loop on core 1 that owns the serial 
 | `Radio` | Internet radio |
 | `Analyzer`, `Distortion` | Frequency response; THD and spectrum |
 | `Receiver`, `RxChain` | The receiver's task and its signal chain |
+| `RxDecode` | The receiver's RTTY and weather fax decoders |
 | `DspImage*.h` | The DSP programs as EEPROM images |
 
 ### Boot and loop
@@ -316,7 +318,7 @@ There is no binary data. A spectrum is 256 lines `* i hz left right`; a recordin
 | Radio and network | stations, station, radio, wifi, panel |
 | Analysis | sweep, points, reference, thd, harmonics, spectrum, level |
 | Synthesizer | voice, midi, load |
-| Receiver | meter, rxfilter |
+| Receiver | meter, rxfilter, rtty, fax |
 | SigmaStudio mode | aux, backup |
 | Diagnostics | diag boot, heap, dsp, eeprom, scan, tone, meter, blocks, thd-test, capture, record, rx, clocks, raw and more |
 
@@ -333,6 +335,9 @@ Events are checked every 20 ms, and only when some port has them on (`events on`
 | `thd`, `spectrum` | a new result | |
 | `voice` | the synthesizer's gate or note changed | 50 ms |
 | `meter` | the receiver's S-meter | 200 ms |
+| `rtty` | the RTTY decoder decoded text | 200 ms |
+| `decoder` | the decoder's state | 500 ms |
+| `fax` | a fax line (to the ports that asked, at their width), the start and stop tones, phasing | |
 
 A value set from one port is reported to the other ports as `! value`, never back to the port that set it: that port has its answer. The panel and the PC can therefore work at the same time; the panel, which relays the PC's requests over WiFi on its single cable, mirrors those answers into its own model (section 8.5).
 
@@ -471,6 +476,26 @@ The PC's **Null image** finds the values on a real carrier: it tunes to the carr
 
 With I/Q, a station's position relative to the I/Q centre is a choice. Below about 8 kHz a real front end's noise rises near its LO. At exactly **12 kHz, a quarter of the sample rate**, a front end's third-order product of the station (at 3 × 12 = 36 kHz) folds back across 48 kHz to −12 kHz, which is exactly the station's image: no I/Q correction can remove it, and the image null stopped at 56 dB there against 66.6 dB at 10 kHz. 16 kHz has the same trap for the second order (2 × 16 = 32 kHz folds to −16 kHz). The default IF is therefore 10 kHz; a tuning range of 6 to 18 kHz with a 3 kHz filter reaches 21 kHz, within the converters' smooth roll-off (−2.7 dB at 23 kHz).
 
+### RTTY and weather fax
+
+The receiver also decodes two of the Deutscher Wetterdienst's transmissions for shipping: RTTY (50 baud ITA2, 85 or 450 Hz shift) and HF weather fax (120 lines a minute, IOC 576, black 400 Hz below the centre, white 400 Hz above). The decoders are those of the SDR-IQ Receiver, ported to C++ with the same algorithms and numbers (design/rtty-fax.md); there the PC had the I/Q, here only the board has it, so they run in the receiver's task (`RxDecode.cpp`, -O2) and send their results as events.
+
+They take the **down-converter's output** (12 kHz complex, centred on the IF dial, before the channel filter, whose edges belong to the audio), with the station's listed frequency on the IF; in CW, where the down-converter sits at the IF minus the pitch, they allow for the pitch. The mixers are rotating phasors: one complex multiplication a sample, the step and the length set once a block (a sine per sample cost the first build 17 % of a block).
+
+| | RTTY | Fax |
+|---|---|---|
+| Input | mixed to 0 Hz, 95-tap low-pass, every sixth sample: 2000 S/s | mixed to 0 Hz with the AFC's correction, 31-tap low-pass (±1.3 kHz), every other sample: 6000 S/s |
+| Detector | each tone mixed to 0 Hz and summed over one bit (a matched filter); decision (abs U - abs L) / (abs U + abs L), independent of level and of one tone fading | FM by the phase step between samples, smoothed over 0.5 ms; grey (f + 400) / 800, 10 % and below black, 90 % and above white |
+| Timing | start-stop framing: a mark-to-space crossing, the start bit space, five data bits in their middles, the stop bit mark, else the frame is rejected | lines of IOC × π pixels (1810) at the lines per minute, timed by the board's crystal; slant corrects the line length in ppm |
+| Decoding | ITA2 letters and figures, LTRS and FIGS shifts, a space returns to letters | the start tone (300 Hz at IOC 576) and stop tone (450 Hz) by their share of the grey signal's AC power over half a second, two seconds of it count |
+| Polarity, phasing | both polarities decode side by side; their scores (+1 a good frame, -1 a rejected one, decaying) choose; nothing is shown until the better one leads by three frames | the 40 lines after the start tone, summed per column: the 5 %-wide band that differs most from the median is the phasing pulse, its centre the line start |
+| AFC | each second the 512-point spectra (3.9 Hz bins) are searched within ±300 Hz for the tone pair, one shift apart, followed when it stands 20 times above the average bin | white is the commonest level: the histogram's peak between +200 and +700 Hz over 4 s is put at +400 Hz |
+| Out | text into a 2 KB history; the loop sends it as `! rtty` | finished lines into a queue of four; the loop sends each as `! fax line` to every port that asked, at that port's width |
+
+A phased line is the end of one received line followed by the start of the next: rotating one received line, as the SDR-IQ Receiver does, puts a one-line step into the chart at column width minus phase. A fax line travels as text, a hex digit per pixel (its grey's upper four bits) and a letter for a run of up to 20 more: a white line of 1810 pixels is 92 characters, a busy one at most 1810, in parts of 300. The PC takes the full width, the panel 300 pixels (averaged by the board), so its 115,200-baud cable carries at most about 0.6 KB/s of chart.
+
+The test signal has an RTTY mode (a test text with `ZCZC` and `NNNN`, mark on the lower tone as DWD's) and a fax mode (start tone, phasing, a test chart with a grey wedge, a grid and a diagonal, stop tone), so both decoders can be checked without a front end. On the board they decode the test text whole (quality 0.98, AUTO on reverse) and the test chart clean, also 120 Hz off and with noise (the AFC at 110 Hz). On the PC the Decoder view keeps the daily RTTY log and the messages (the SDR-IQ Receiver's `TelexMessages`) and saves the charts as PNG.
+
 ### The CPU budget
 
 | Case (share of a 5.33 ms block, one core) | Share |
@@ -479,6 +504,8 @@ With I/Q, a station's position relative to the I/Q centre is a choice. Below abo
 | FM, 511 taps, no noise reduction | 19.6 % |
 | FM, 511 taps, LMS | 26.4 % |
 | FM, 511 taps, spectral | 30.9 % (longest block 31.1 %) |
+| The RTTY decoder, besides | +3.6 % |
+| The fax decoder, besides | +4.9 % |
 | Benchmark: direct-form 511-tap filter alone | 40.5 % (-O2), 71 % (-Os) |
 
 The task measures its own time per block (last, longest, and a running average) and reports the share in `! meter` and `diag rx`. The chain takes about 53 KB of heap in pieces of at most 13 KB, and the whole path from K2 to K3 delays the audio by about 25 to 45 ms, depending on the filter and the noise reduction.
@@ -523,6 +550,8 @@ The spectrum (256 points, about 7 KB, roughly 0.6 s at 115,200 baud) is only ask
 ### The UI
 
 The screen has a fixed frame: a top bar (home, title, link dot, output switch, settings), a scrolling content area of 320 × 182 pixels with a visible scrollbar (on a resistive screen a list that goes on is not obvious), a strip of the four pots in their colours, an error toast and a cover with the wiring hint while there is no link.
+
+**The receiver's decoders** have keys of their own below the noise reduction, the last six lines of RTTY text or the newest 110 rows of a chart (a 300 × 110 grey image in LVGL's L8 format, 33 KB, moved up a row per line).
 
 **Application pages are generated** from the `params` lines: every parameter becomes a tile with its pot's colour; a number opens an editor with − and + (long-press repeats), a slider (logarithmic when the range spans 100:1 or more) and a ×10 key; a choice opens a key grid; a switch toggles. Steps follow a 1-2-5 series. Above the generated tiles, each application has a hand-made header: the radio's stations and title, the analysis plot (response, THD, spectrum) with a touch cursor, the equalizer's curve, the synthesizer's sections with filter and envelope curves, and the receiver's IF dial, S-meter, mode and width keys and passband sketch.
 
@@ -570,7 +599,7 @@ Only two things are polled: the analyzer's input level twice a second while it i
 | Equalizer, Radio | Three bands and volume with the response curve computed on the PC; the radio's station keys, state and title |
 | Analysis | Frequency response with reference; THD and THD+N with harmonics; spectrum with peaks |
 | Synthesizer | Three oscillators and noise, ladder filter and contour, envelopes, two LFOs; curves computed by `SynthCurves`, which mirrors `Synth.cpp` |
-| Receiver | Receiver view (IF dial, meters, mode, AGC, NR, squelch, I/Q correction), Filter view, Designer view |
+| Receiver | Receiver view (IF dial, meters, mode, AGC, NR, squelch, I/Q correction), Filter view, Designer view, Decoder view (RTTY text, log and messages; the weather chart, saved as PNG) |
 | SigmaStudio | Auxiliary inputs, backup |
 
 The controls are `FrameworkElement`s with their own `OnRender`: response curves, the sweep chart, the spectrum chart, the receiver's filter chart (edges, passband and stop band draggable), the S-meter bar and the envelope graph; the `DigitDial` steps each digit with the wheel, a click or the keyboard.
@@ -596,13 +625,14 @@ It serves three purposes: the "Simulator (demo)" entry in the port list, the uni
 
 ### Tests
 
-The core project has 45 xUnit tests (about 56 cases with the theories), run with `dotnet test app/AudioDspLab.slnx`:
+The core project has 51 xUnit tests (62 cases with the theories), run with `dotnet test app/AudioDspLab.slnx`:
 
 | Tests | Cover |
 |---|---|
 | BoardClientTests | Connect, application start, set and refusal, pots, sweep, THD, spectrum, stations, WiFi, timeout then resynchronisation, restart, unplug |
 | ProtocolTextTests | Tokenizing, quoting, number format, `params` parsing |
 | ReceiverTests | The filter design against the firmware's numbers, the download CRC against zlib's, downloads and designs, the sweep |
+| DecoderTests | Fax line text both ways, its parts put together, the decoder's state, telex messages cut out, RTTY text and fax lines from the simulator |
 | SynthCurvesTests | The ladder filter's −12 dB at cutoff and 24 dB per octave, emphasis, contour, envelopes |
 | TcpLineTransportTests | Address parsing, lines both ways, a panel that does not answer |
 | FirmwareTableTests | Parses `Applications.cpp`, `ParamInfo.cpp`, `Applications.h` and `RxChain.h` and checks the simulator's tables against them for every application |

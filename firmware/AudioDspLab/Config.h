@@ -20,7 +20,7 @@
 // --- firmware ---------------------------------------------------------------
 #define FIRMWARE_NAME                 "Audio-DSP-Lab"
 #define FIRMWARE_VERSION_MAJOR        1
-#define FIRMWARE_VERSION_MINOR        7
+#define FIRMWARE_VERSION_MINOR        8
 #define PROTOCOL_VERSION              1
 
 // --- serial protocol (docs/Protocol.md) ---------------------------------------
@@ -35,6 +35,8 @@
                                               // scaled readings jitter by up to about 65 counts)
 #define PROTOCOL_VOICE_EVENT_MS       50      // synthesizer voice: at most 20 events/s
 #define PROTOCOL_METER_EVENT_MS       200     // receiver meter: 5 events/s
+#define PROTOCOL_RTTY_EVENT_MS        200     // decoded RTTY text: at most 5 events/s
+#define PROTOCOL_DECODER_EVENT_MS     500     // a decoder's status: 2 events/s
 
 // --- pins -------------------------------------------------------------------
 #define PIN_LED                       2

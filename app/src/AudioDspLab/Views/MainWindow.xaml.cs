@@ -98,6 +98,40 @@ public partial class MainWindow : Window
         }
     }
 
+    // --- the receiver's decoders --------------------------------------------------------------
+
+    // the newest text in view
+    private void RttyText_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs eventArgs)
+    {
+        if (sender is System.Windows.Controls.TextBox box)
+        {
+            box.ScrollToEnd();
+        }
+    }
+
+    private void Message_DoubleClick(object sender, MouseButtonEventArgs eventArgs)
+    {
+        if (sender is System.Windows.Controls.ListBox { SelectedItem: DecoderMessage message })
+        {
+            viewModel.Receiver.OpenMessageCommand.Execute(message);
+        }
+    }
+
+    // a click on the chart: that column becomes the left edge
+    private void FaxChart_MouseLeftButtonDown(object sender, MouseButtonEventArgs eventArgs)
+    {
+        if (sender is FrameworkElement image && image.ActualWidth > 0)
+        {
+            viewModel.Receiver.SetFaxLeftEdge(eventArgs.GetPosition(image).X / image.ActualWidth);
+        }
+    }
+
+    // the newest lines in view as the chart grows
+    private void FaxChart_SizeChanged(object sender, SizeChangedEventArgs eventArgs)
+    {
+        FaxScroll.ScrollToEnd();
+    }
+
     private void ImportCoefficients_Click(object sender, RoutedEventArgs eventArgs)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog

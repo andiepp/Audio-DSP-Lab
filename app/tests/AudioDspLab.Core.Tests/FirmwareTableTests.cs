@@ -49,6 +49,12 @@ public partial class FirmwareTableTests
         symbols["RX_INPUT_IQ"] = "0";
         symbols["RX_NR_LMS"] = "1";
         symbols["RX_NR_SPECTRAL"] = "2";
+        symbols["RX_TEST_TONE"] = "0";
+        symbols["RX_TEST_FAX"] = "2";
+        // RxDecode.h's enums
+        symbols["RX_DECODER_OFF"] = "0";
+        symbols["RX_DECODER_FAX"] = "2";
+        symbols["RX_POLARITY_AUTO"] = "0";
 
         var info = Rows(paramInfo, infoTable).ToDictionary(row => int.Parse(row[0], CultureInfo.InvariantCulture));
         var pots = Rows(applications, potTable).ToDictionary(row => Resolve(row[1], symbols), row => $"P{int.Parse(row[0], CultureInfo.InvariantCulture) + 1}");

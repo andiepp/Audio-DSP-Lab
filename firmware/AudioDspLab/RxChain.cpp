@@ -3,6 +3,7 @@
 #pragma GCC optimize("O2")
 
 #include "RxChain.h"
+#include "RxDecode.h"
 #include <Arduino.h>
 #include <math.h>
 #include <string.h>
@@ -48,6 +49,10 @@
 #define NR_XIMIN                      0.003f              // -25 dB: the least a-priori SNR
 #define LMS_L                         64                  // LMS taps
 #define LMS_D                         16                  // LMS decorrelation delay
+#define FFT_TABLE                     512                 // esp-dsp's table: NR (256) and the RTTY AFC (512)
+#define TEST_RTTY_BAUD                50.0f
+#define TEST_TEXT_MAX                 400                 // ITA2 codes of the test text
+#define TEST_FAX_LINES                240                 // the test chart's height
 
 struct cfloat { float re, im; };
 
@@ -91,6 +96,17 @@ struct TestGen {
   uint32_t keyPeriod, keyPos;             // samples; 0 = steady
   float keyEnv;
   uint32_t noiseSeed;
+  // RTTY and fax: the frequency moves around the tone
+  uint8_t mode;                           // RxTestMode
+  int32_t markInc, spaceInc;              // RTTY: added to inc (mark the lower tone, as DWD)
+  uint8_t codes[TEST_TEXT_MAX];
+  uint16_t codeCount, codeAt;
+  uint32_t frameAt;                       // samples into the character
+  float faxLine;                          // fax: samples a line
+  uint16_t faxWidth;
+  float faxStartHz;
+  uint8_t faxStage;                       // start tone, phasing, chart, stop tone, white
+  uint32_t faxAt;                         // samples into the stage
 };
 
 struct Chain {
@@ -787,8 +803,53 @@ static void nrProcess(Nr &n, cfloat *audio) {
 //  noise and keying
 // ----------------------------------------------------------------------------
 
+// the test text in ITA2, LTRS and FIGS put in as needed; a line ends CR LF
+static void testText(TestGen &t) {
+  static const char text[] =
+    "RYRYRYRY CQ CQ CQ DE DDH47 DDH9 DDH8 TEST\n"
+    "ZCZC 001\n"
+    "FEBQ52 EDZW 211200\n"
+    "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 (-/:.,?)\n"
+    "NNNN\n";
+  bool figures = true;                    // so the first character shifts
+  t.codeCount = 0;
+  for (const char *p = text; *p != '\0' && t.codeCount + 3 < TEST_TEXT_MAX; p++) {
+    if (*p == '\n') {
+      t.codes[t.codeCount++] = 0x08;      // CR
+      t.codes[t.codeCount++] = 0x02;      // LF
+      continue;
+    }
+    if (*p == ' ') {
+      t.codes[t.codeCount++] = 0x04;      // a space returns the receiver to letters
+      figures = false;
+      continue;
+    }
+    int code = rxIta2Code(*p, figures);
+    if (code < 0) {
+      figures = !figures;
+      code = rxIta2Code(*p, figures);
+      if (code < 0) continue;
+      t.codes[t.codeCount++] = figures ? 0x1B : 0x1F;
+    }
+    t.codes[t.codeCount++] = (uint8_t)code;
+  }
+  t.codeAt = 0;
+  t.frameAt = 0;
+}
+
 static void testConfigure(TestGen &t, const RxConfig &c) {
   t.inc = ncoInc(c.offset + c.testOffset, FS);
+  if (c.testMode != t.mode || (c.testMode == RX_TEST_RTTY && t.codeCount == 0)) {
+    t.mode = c.testMode;
+    if (t.mode == RX_TEST_RTTY) testText(t);
+    t.faxStage = 0;
+    t.faxAt = 0;
+  }
+  t.markInc = -(int32_t)ncoInc(0.5f * c.rttyShift, FS);
+  t.spaceInc = (int32_t)ncoInc(0.5f * c.rttyShift, FS);
+  t.faxLine = FS * 60.0f / c.faxLpm;
+  t.faxWidth = (uint16_t)lroundf(c.faxIoc * PI_F);
+  t.faxStartHz = c.faxIoc == 288 ? 675.0f : 300.0f;
   t.amp = 32768.0f * powf(10.0f, c.testLevel / 20.0f);
   t.noise = c.testNoise <= -150.0f ? 0.0f : 32768.0f * powf(10.0f, c.testNoise / 20.0f);
   t.keyPeriod = c.testKey > 0.0f ? (uint32_t)(c.testKey * (FS / 1000.0f)) : 0;
@@ -806,10 +867,74 @@ static inline float testNoise(TestGen &t) {
   return u * (1.7320508f / 4294967296.0f);
 }
 
+// the RTTY test signal's shift at this sample: start bit space, five data
+// bits (LSB first), 1.5 stop bits mark, 50 baud
+static int32_t testRttyInc(TestGen &t) {
+  const uint32_t bit = (uint32_t)(FS / TEST_RTTY_BAUD);
+  const uint32_t index = t.frameAt / bit;
+  bool mark = true;
+  if (index == 0) mark = false;
+  else if (index <= 5) mark = (t.codes[t.codeAt] >> (index - 1)) & 1;
+  if (++t.frameAt >= bit * 15 / 2) {
+    t.frameAt = 0;
+    if (++t.codeAt >= t.codeCount) t.codeAt = 0;
+  }
+  return mark ? t.markInc : t.spaceInc;
+}
+
+// the test chart: a grey wedge, a grid, a diagonal
+static float testChart(float x, uint16_t y) {
+  if (y < 20) return floorf(x * 8.0f) / 7.0f;
+  if (fmodf(x * 10.0f, 1.0f) < 0.004f || y % 40 < 2) return 0.0f;
+  if (fabsf(x - y / (float)TEST_FAX_LINES) < 0.004f) return 0.0f;
+  return 1.0f;
+}
+
+// the fax test signal's frequency step at this sample: black -400 Hz, white
+// +400 Hz. Start tone 5 s, phasing 60 lines (black, a white pulse at the
+// line start), the chart, stop tone 5 s, white 10 s, again
+static int32_t testFaxInc(TestGen &t) {
+  float grey = 1.0f;
+  const uint32_t at = t.faxAt++;
+  const float line = at / t.faxLine;
+  uint32_t stageLength = 0;
+  switch (t.faxStage) {
+    case 0:                               // start tone: black and white at 300 Hz
+      grey = (uint32_t)(at * 2.0f * t.faxStartHz / FS) & 1 ? 1.0f : 0.0f;
+      stageLength = (uint32_t)(5 * FS);
+      break;
+    case 1: {                             // phasing
+      const float x = line - floorf(line);
+      grey = x < 0.05f ? 1.0f : 0.0f;
+      stageLength = (uint32_t)(60 * t.faxLine);
+      break;
+    }
+    case 2:
+      grey = testChart(line - floorf(line), (uint16_t)line);
+      stageLength = (uint32_t)(TEST_FAX_LINES * t.faxLine);
+      break;
+    case 3:                               // stop tone: 450 Hz
+      grey = (uint32_t)(at * 2.0f * 450.0f / FS) & 1 ? 1.0f : 0.0f;
+      stageLength = (uint32_t)(5 * FS);
+      break;
+    default:
+      stageLength = (uint32_t)(10 * FS);
+      break;
+  }
+  if (t.faxAt >= stageLength) {
+    t.faxAt = 0;
+    t.faxStage = (uint8_t)((t.faxStage + 1) % 5);
+  }
+  return (int32_t)lroundf((-400.0f + 800.0f * grey) * (4294967296.0f / FS));
+}
+
 static void testGenerate(TestGen &t, bool iq, float *i, float *q) {
   for (int n = 0; n < BLOCK; n++) {
     float key = 1.0f;
-    if (t.keyPeriod > 0) {
+    int32_t shift = 0;
+    if (t.mode == RX_TEST_RTTY && t.codeCount > 0) shift = testRttyInc(t);
+    else if (t.mode == RX_TEST_FAX) shift = testFaxInc(t);
+    else if (t.keyPeriod > 0) {
       const bool on = t.keyPos < t.keyPeriod / 2;
       if (on && t.keyEnv < 1.0f) t.keyEnv += 1.0f / 240.0f;      // 5 ms ramps
       if (!on && t.keyEnv > 0.0f) t.keyEnv -= 1.0f / 240.0f;
@@ -830,7 +955,7 @@ static void testGenerate(TestGen &t, bool iq, float *i, float *q) {
       i[n] += t.noise * testNoise(t);
       if (iq) q[n] += t.noise * testNoise(t);
     }
-    t.phase += t.inc;
+    t.phase += t.inc + (uint32_t)shift;
   }
 }
 
@@ -853,6 +978,18 @@ static void apply(Chain &c, uint32_t dirty) {
   if (dirty & (RX_DIRTY_TEST | RX_DIRTY_TUNE)) testConfigure(c.test, cfg);
   if (dirty & RX_DIRTY_NR) nrConfig(*nr, cfg.nr, cfg.nrLevel);
   if (dirty & RX_DIRTY_FILTER) requestDesign(cfg.low, cfg.high, cfg.stopband);
+  if (dirty & RX_DIRTY_DECODER) {
+    RxDecodeConfig d;
+    d.decoder = cfg.decoder;
+    d.rttyShift = cfg.rttyShift;
+    d.rttyBaud = 50.0f;
+    d.polarity = cfg.rttyPolarity;
+    d.afc = cfg.decoderAfc;
+    d.faxLpm = cfg.faxLpm;
+    d.faxIoc = cfg.faxIoc;
+    d.faxSlant = cfg.faxSlant;
+    rxDecodeConfigure(d);
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -882,6 +1019,7 @@ static void freeAll() {
     inputSpectra[p] = nullptr;
   }
   dsps_fft2r_deinit_fc32();
+  rxDecodeFree();
 }
 
 bool rxChainBegin(const RxConfig &config) {
@@ -899,7 +1037,7 @@ bool rxChainBegin(const RxConfig &config) {
   for (int p = 0; p < UP_PMAX && ok; p++) ok = (inputSpectra[p] = (float *)calloc(1, spectrum)) != nullptr;
   if (ok) {
     // one table serves every length up to its own
-    const esp_err_t fft = dsps_fft2r_init_fc32(NULL, NR_N);
+    const esp_err_t fft = dsps_fft2r_init_fc32(NULL, FFT_TABLE);
     ok = fft == ESP_OK || fft == ESP_ERR_DSP_REINITIALIZED;
   }
   if (!ok) {
@@ -998,6 +1136,9 @@ void rxChainProcess(const int32_t *in, int16_t *out) {
   }
   if (iq) ddcProcessIq(c.ddc, c.inI, c.inQ, c.bb);
   else ddcProcessReal(c.ddc, c.inI, c.bb);
+
+  // the decoders: the station's centre on the dial, in CW at the pitch
+  if (cfg.decoder != 0) rxDecodeProcess((const float *)c.bb, RXB, cfg.mode == RX_CW ? cfg.pitch : 0.0f);
 
   filterProcess(c.bb, c.bbf);
   agcProcess(c.agc, c.bbf, c.bba);

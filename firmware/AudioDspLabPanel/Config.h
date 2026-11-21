@@ -12,7 +12,7 @@
 #define PANEL_CONFIG_H
 
 #define PANEL_NAME                    "Audio-DSP-Lab panel"
-#define PANEL_VERSION                 "1.7.2"
+#define PANEL_VERSION                 "1.8"
 
 // display: the one-USB ESP32-2432S028R carries an ILI9341, the two-USB
 // (USB-C) version an ST7789. The panel reads the controller's ID at
@@ -66,6 +66,14 @@
 #define LINK_RX_BUFFER                16384   // a whole spectrum answer (about 7 KB) while the screen draws
 #define LINK_SPECTRUM_POINTS          256     // the board's whole spectrum, 20 Hz to 24 kHz
 #define LINK_SPECTRUM_POINTS_TEXT     "256"
+// the receiver's decoders (design/rtty-fax.md): fax lines at this width (an
+// event of at most 300 characters each, about 0.6 KB/s on the cable), the
+// newest rows kept as the page's preview; RTTY's last lines
+#define LINK_FAX_WIDTH                300
+#define LINK_FAX_WIDTH_TEXT           "300"
+#define LINK_FAX_ROWS                 110
+#define LINK_RTTY_LINES               6
+#define LINK_RTTY_COLUMNS             40
 #define LINK_SYNC_MS                  400     // between two resync echoes
 // the TX line is driven only while the board's own TX line lives: a running
 // UART holds it high between characters, a board without power cannot. A

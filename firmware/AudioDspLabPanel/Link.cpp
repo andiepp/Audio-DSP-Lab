@@ -15,7 +15,13 @@ enum RequestKind : uint8_t {
   REQ_REMOTE,               // the PC's request: its answer goes back to the PC
   REQ_SECRETS,              // the board's WiFi networks, for the panel to join
   REQ_PANEL,                // the panel's network state, told to the board
+  REQ_FAX_EVENTS,           // the receiver's fax lines, at the preview's width
+  REQ_RTTY,                 // the RTTY text the board kept, and the decoder's state
 };
+
+// the receiver's decoders (below, with the events)
+static void rttyAppend(const String &text, bool lineEnd);
+static void readDecoder(const std::vector<String> &w, size_t from);
 
 struct Request {
   String line;
@@ -189,6 +195,9 @@ static void readParams() {
   if (board.application == "radio") {
     enqueue("stations", REQ_STATIONS);
     enqueue("radio", REQ_RADIO);
+  } else if (board.application == "receiver") {
+    enqueue("fax events " LINK_FAX_WIDTH_TEXT, REQ_FAX_EVENTS);
+    enqueue("rtty", REQ_RTTY);
   } else if (board.application == "analyzer") {
     enqueue("sweep", REQ_SWEEP);
     enqueue("points", REQ_POINTS);
@@ -403,6 +412,17 @@ static void answered(bool ok, const std::vector<String> &w) {
         }
       }
       break;
+    case REQ_RTTY: {
+      // * "<text>" <0|1> per line, then ok <count> <decoder state>
+      board.rttyLines.clear();
+      for (const String &line : dataLines) {
+        std::vector<String> d = words(line.c_str());
+        if (d.size() >= 1) rttyAppend(d[0], d.size() >= 2 && d[1] == "1");
+      }
+      readDecoder(w, 2);
+      memset(board.faxPixels, 255, sizeof(board.faxPixels));
+      break;
+    }
     case REQ_SPECTRUM: {
       // * <index> <hz> <dB-L> <dB-R>
       spectrumAsked = false;
@@ -427,6 +447,62 @@ static void answered(bool ok, const std::vector<String> &w) {
       break;
   }
   changed();
+}
+
+// --- the receiver's decoders (design/rtty-fax.md) -------------------------------------------
+
+// text into the last lines: a new line at a line end and after LINK_RTTY_COLUMNS characters
+static void rttyAppend(const String &text, bool lineEnd) {
+  std::vector<String> &lines = board.rttyLines;
+  if (lines.empty()) lines.push_back(String());
+  for (size_t i = 0; i < text.length(); i++) {
+    if (lines.back().length() >= LINK_RTTY_COLUMNS) lines.push_back(String());
+    lines.back() += text[i];
+  }
+  if (lineEnd) lines.push_back(String());
+  while (lines.size() > LINK_RTTY_LINES) lines.erase(lines.begin());
+}
+
+// rtty <quality> <afc> normal|reverse <good> <bad>, fax <lines> <afc> <start> <stop> phasing|lines <phase>, off, no-memory
+static void readDecoder(const std::vector<String> &w, size_t from) {
+  if (w.size() <= from) return;
+  board.decoder = w[from];
+  if (board.decoder == "rtty" && w.size() >= from + 6) {
+    board.decoderQuality = w[from + 1].toFloat();
+    board.decoderAfc = w[from + 2].toFloat();
+    board.decoderReverse = w[from + 3] == "reverse";
+  } else if (board.decoder == "fax" && w.size() >= from + 7) {
+    board.faxLines = w[from + 1].toInt();
+    board.decoderAfc = w[from + 2].toFloat();
+    board.faxPhasing = w[from + 5] == "phasing";
+  }
+  board.decoderVersion++;
+}
+
+// a fax line of one part: a hex digit per pixel, g..z repeat the one before it
+// 1..20 times more; the preview moves up a row, the line goes in at the bottom
+static void faxLine(const std::vector<String> &w) {
+  // ! fax line <n> <part> <parts> <width> <data>
+  if (w.size() < 8 || w[5].toInt() != 1 || w[4].toInt() != 1) return;
+  const int width = min((int)w[6].toInt(), LINK_FAX_WIDTH);
+  memmove(board.faxPixels, board.faxPixels + LINK_FAX_WIDTH, LINK_FAX_WIDTH * (LINK_FAX_ROWS - 1));
+  uint8_t *row = board.faxPixels + LINK_FAX_WIDTH * (LINK_FAX_ROWS - 1);
+  int x = 0;
+  uint8_t last = 255;
+  const String &data = w[7];
+  for (size_t i = 0; i < data.length() && x < width; i++) {
+    const char c = data[i];
+    if (c >= '0' && c <= '9') last = (uint8_t)((c - '0') * 17);
+    else if (c >= 'a' && c <= 'f') last = (uint8_t)((c - 'a' + 10) * 17);
+    else if (c >= 'g' && c <= 'z') {
+      for (int k = 0; k < c - 'f' && x < width; k++) row[x++] = last;
+      continue;
+    } else continue;
+    row[x++] = last;
+  }
+  while (x < LINK_FAX_WIDTH) row[x++] = last;
+  board.faxLines = w[3].toInt() + 1;
+  board.decoderVersion++;
 }
 
 // --- events -----------------------------------------------------------------------------
@@ -481,6 +557,16 @@ static void event(const std::vector<String> &w) {
   } else if (name == "spectrum") {
     readSpectrumState(w, 2);
     changed();
+  } else if (name == "rtty" && w.size() >= 3) {
+    rttyAppend(w[2], w.size() >= 4 && w[3] == "1");
+    board.decoderVersion++;
+  } else if (name == "decoder") {
+    readDecoder(w, 2);
+  } else if (name == "fax" && w.size() >= 3 && w[2] == "line") {
+    faxLine(w);
+  } else if (name == "fax" && w.size() >= 3 && w[2] == "start") {
+    memset(board.faxPixels, 255, sizeof(board.faxPixels));   // a new chart: white paper
+    board.decoderVersion++;
   } else if (name == "meter" && w.size() >= 8) {
     // ! meter <s-meter> <agc-gain> <fm-offset> <squelch> <audio> <cpu> [<nr-gain>]:
     // only the meter redraws

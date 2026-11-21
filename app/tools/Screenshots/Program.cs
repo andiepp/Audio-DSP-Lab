@@ -20,6 +20,8 @@ static class Program
     static void Main(string[] args)
     {
         string root = args.Length > 0 ? args[0] : Path.Combine(RepositoryRoot(), "docs", "images", "screenshots");
+        // the simulated decoders' logs, messages and charts stay out of the user's folders
+        DecoderRecorder.Root = Path.Combine(Path.GetTempPath(), "Audio-DSP-Lab-screenshots");
         var app = new App();
         app.InitializeComponent();
         app.OpensMainWindow = false;
@@ -139,6 +141,23 @@ static class Program
         await Task.Delay(800);
         Save(window, Path.Combine(output, "receiver-designer.png"));
         Console.WriteLine($"receiver designer: {receiver.DesignInfoText} | {receiver.DesignerBoardText} | {vm.StatusInfo} | {window.ActualWidth}x{window.ActualHeight}");
+
+        // the decoders: the simulated DWD text, then a chart at 240 lines a minute
+        receiver.View = ReceiverPageViewModel.DecoderView;
+        await vm.Client!.SetAsync("decoder", "rtty");
+        await vm.RefreshFromBoardAsync();
+        await Task.Delay(22000);
+        Save(window, Path.Combine(output, "receiver-rtty.png"));
+        Console.WriteLine($"receiver rtty: {receiver.RttyStatusText} | {receiver.RttyText.Length} characters | {receiver.Messages.Count} messages");
+        await vm.Client!.SetAsync("fax-lpm", "240");
+        await vm.Client!.SetAsync("decoder", "fax");
+        await vm.RefreshFromBoardAsync();
+        await Task.Delay(40000);
+        Save(window, Path.Combine(output, "receiver-fax.png"));
+        Console.WriteLine($"receiver fax: {receiver.FaxStatusText}");
+        await vm.Client!.SetAsync("decoder", "off");
+        await vm.Client!.SetAsync("fax-lpm", "120");
+        await vm.RefreshFromBoardAsync();
         receiver.View = ReceiverPageViewModel.ReceiverView;
     }
 

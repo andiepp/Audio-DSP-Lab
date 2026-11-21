@@ -1198,6 +1198,8 @@ static void buildSectionKeys() {
 #define RX_WIDTH_KEYS                 4
 #define RX_MODES                      6
 #define RX_NRS                        3
+#define RX_DECODERS                   3
+#define RX_RTTY_HEIGHT                (LINK_RTTY_LINES * 15 + 6)
 
 static const char *const rxModes[RX_MODES] = { "off", "am", "usb", "lsb", "cw", "fm" };
 static const char *const rxModeTitles[RX_MODES] = { "Off", "AM", "USB", "LSB", "CW", "FM" };
@@ -1219,6 +1221,15 @@ static lv_obj_t *rxPassband;
 static lv_obj_t *rxNrKeys[RX_NRS];
 static lv_obj_t *rxLoadText;
 static uint32_t drawnMeter = 0xFFFFFFFF;
+// the decoders (design/rtty-fax.md): keys, their state, the text or the chart
+static const char *const rxDecoders[RX_DECODERS] = { "off", "rtty", "fax" };
+static const char *const rxDecoderTitles[RX_DECODERS] = { "Off", "RTTY", "Fax" };
+static lv_obj_t *rxDecoderKeys[RX_DECODERS];
+static lv_obj_t *rxDecoderText;
+static lv_obj_t *rxRttyBox;
+static lv_obj_t *rxFaxImage;
+static lv_image_dsc_t rxFaxDsc;
+static uint32_t drawnDecoder = 0xFFFFFFFF;
 // a drag on the dial
 static int32_t rxDragFrom = 0;                // the touch's x at the press
 static int32_t rxDragOffset = 0;              // the offset at the press
@@ -1328,6 +1339,10 @@ static void onRxNr(lv_event_t *e) {
   rxSetChoice("nr", rxNrs[(int)(intptr_t)lv_event_get_user_data(e)]);
 }
 
+static void onRxDecoder(lv_event_t *e) {
+  rxSetChoice("decoder", rxDecoders[(int)(intptr_t)lv_event_get_user_data(e)]);
+}
+
 static lv_obj_t *smallKey(lv_obj_t *parent, const char *text, int width, const lv_font_t *font) {
   lv_obj_t *key = button(parent, text, width, RX_KEY_HEIGHT);
   lv_obj_set_style_text_font(lv_obj_get_child(key, 0), font, 0);
@@ -1433,6 +1448,34 @@ static void buildReceiverHeader() {
   }
   rxLoadText = label(nr, "", &lv_font_montserrat_12, COLOUR_MUTED);
   lv_obj_set_style_pad_left(rxLoadText, 6, 0);
+
+  // the decoders: their keys and state, then the RTTY text or the fax chart's newest rows
+  lv_obj_t *decoders = row(content, 4);
+  lv_obj_set_flex_align(decoders, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+  for (int i = 0; i < RX_DECODERS; i++) {
+    rxDecoderKeys[i] = smallKey(decoders, rxDecoderTitles[i], 56, &lv_font_montserrat_14);
+    lv_obj_add_event_cb(rxDecoderKeys[i], onRxDecoder, LV_EVENT_CLICKED, (void *)(intptr_t)i);
+  }
+  rxDecoderText = label(decoders, "", &lv_font_montserrat_12, COLOUR_MUTED);
+  lv_obj_set_style_pad_left(rxDecoderText, 6, 0);
+  rxRttyBox = label(content, "", &lv_font_montserrat_12, COLOUR_TEXT);
+  lv_obj_set_size(rxRttyBox, PLOT_WIDTH, RX_RTTY_HEIGHT);
+  lv_obj_set_style_bg_color(rxRttyBox, lv_color_hex(0x141920), 0);
+  lv_obj_set_style_bg_opa(rxRttyBox, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(rxRttyBox, 4, 0);
+  lv_obj_set_style_pad_all(rxRttyBox, 3, 0);
+  lv_label_set_long_mode(rxRttyBox, LV_LABEL_LONG_CLIP);
+  rxFaxDsc = lv_image_dsc_t();
+  rxFaxDsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+  rxFaxDsc.header.cf = LV_COLOR_FORMAT_L8;
+  rxFaxDsc.header.w = LINK_FAX_WIDTH;
+  rxFaxDsc.header.h = LINK_FAX_ROWS;
+  rxFaxDsc.header.stride = LINK_FAX_WIDTH;
+  rxFaxDsc.data_size = sizeof(board.faxPixels);
+  rxFaxDsc.data = board.faxPixels;
+  rxFaxImage = lv_image_create(content);
+  lv_image_set_src(rxFaxImage, &rxFaxDsc);
+  drawnDecoder = 0xFFFFFFFF;
   refreshReceiver();
 }
 
@@ -1464,6 +1507,17 @@ static void refreshReceiver() {
   }
   const String nr = paramText("nr");
   for (int i = 0; i < RX_NRS; i++) markSelected(rxNrKeys[i], nr == rxNrs[i]);
+  const String decoder = paramText("decoder");
+  for (int i = 0; i < RX_DECODERS; i++) {
+    if (rxDecoderKeys[i] != nullptr) markSelected(rxDecoderKeys[i], decoder == rxDecoders[i]);
+  }
+  if (rxRttyBox != nullptr) {
+    if (decoder == "rtty") lv_obj_remove_flag(rxRttyBox, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(rxRttyBox, LV_OBJ_FLAG_HIDDEN);
+    if (decoder == "fax") lv_obj_remove_flag(rxFaxImage, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(rxFaxImage, LV_OBJ_FLAG_HIDDEN);
+    drawnDecoder = 0xFFFFFFFF;
+  }
 
   // the passband: low .. high around the carrier in the sketch's middle
   const auto sketchX = [](float hertz) {
@@ -1502,6 +1556,31 @@ static void refreshMeter() {
   else if (paramText("nr") == "spectral" && !isnan(board.nrGain)) snprintf(text, sizeof(text), "NR %.1f dB\nCPU %.0f %%", board.nrGain, board.rxCpu);
   else snprintf(text, sizeof(text), "CPU %.0f %%", board.rxCpu);
   lv_label_set_text(rxLoadText, text);
+}
+
+// the decoder's state, its text, its chart: only these widgets, as the events come
+static void refreshDecoder() {
+  drawnDecoder = board.decoderVersion;
+  if (rxDecoderText == nullptr) return;
+  const String decoder = paramText("decoder");
+  char text[64];
+  if (board.decoder == "no-memory") snprintf(text, sizeof(text), "no memory on the board");
+  else if (decoder == "rtty" && !isnan(board.decoderQuality))
+    snprintf(text, sizeof(text), "Q %.2f  AFC %+.0f Hz%s", board.decoderQuality, board.decoderAfc, board.decoderReverse ? "  rev" : "");
+  else if (decoder == "fax")
+    snprintf(text, sizeof(text), "%s %ld  AFC %+.0f Hz", board.faxPhasing ? "phasing" : "line", board.faxLines,
+             isnan(board.decoderAfc) ? 0.0f : board.decoderAfc);
+  else text[0] = '\0';
+  lv_label_set_text(rxDecoderText, text);
+  if (decoder == "rtty") {
+    String lines;
+    for (size_t i = 0; i < board.rttyLines.size(); i++) {
+      if (i > 0) lines += '\n';
+      lines += board.rttyLines[i];
+    }
+    lv_label_set_text(rxRttyBox, readable(lines).c_str());
+  }
+  if (decoder == "fax") lv_obj_invalidate(rxFaxImage);
 }
 
 // the receiver's tiles: what is turned most first, the equalizer and the test tone last
@@ -1582,7 +1661,7 @@ static void buildApplication() {
     // the radio: the volume beside its station keys; the bands are on the pots
     if (board.application == "radio" && name != "volume") continue;
     // the receiver: mode, tuning and NR are the header's keys
-    if (board.application == "receiver" && (name == "mode" || name == "offset" || name == "nr")) continue;
+    if (board.application == "receiver" && (name == "mode" || name == "offset" || name == "nr" || name == "decoder")) continue;
     if (synth && section != SECTION_ALL && sectionOf(name) != section) continue;
     rows.push_back((int)i);
   }
@@ -1621,6 +1700,8 @@ static void rebuild() {
   curveKind = CURVE_NONE;
   stationKeys.clear();
   rxDial = rxSign = rxStepLabel = rxBar = rxSquelchMark = rxMeterText = rxSquelchDot = rxPassband = rxLoadText = nullptr;
+  rxDecoderText = rxRttyBox = rxFaxImage = nullptr;
+  for (lv_obj_t *&key : rxDecoderKeys) key = nullptr;
   for (lv_obj_t *&key : rxModeKeys) key = nullptr;
   for (lv_obj_t *&key : rxWidthKeys) key = nullptr;
   for (lv_obj_t *&key : rxNrKeys) key = nullptr;
@@ -1853,13 +1934,15 @@ void uiPoll() {
   }
   // the receiver's meter, five times a second: only its own widgets
   if (board.meterVersion != drawnMeter) refreshMeter();
+  // the decoders' text and chart, as they come
+  if (board.decoderVersion != drawnDecoder) refreshDecoder();
 }
 
 // commands on the USB port, for screenshots and tests: "page home|app|settings",
 // "section osc|filter|env|lfo|perf|all", "edit <parameter>", "close",
 // "cursor <point>" (the Frequency Response plot's cursor on that point, -1 none),
 // "view response|thd|spectrum" (the analysis' view), "digit <0..4>" (the
-// receiver's tuning digit, 10 kHz .. 1 Hz)
+// receiver's tuning digit, 10 kHz .. 1 Hz), "scroll <pixels>" (the page's content)
 void uiCommand(const String &line) {
   if (line.startsWith("page ")) {
     const String name = line.substring(5);
@@ -1889,6 +1972,9 @@ void uiCommand(const String &line) {
     view = line == "view thd" ? VIEW_THD : line == "view spectrum" ? VIEW_SPECTRUM : VIEW_RESPONSE;
     drawnPoints = drawnSpectrum = 0xFFFFFFFF;
     refreshAnalyzer();
+  } else if (line.startsWith("scroll ")) {
+    uiPoll();
+    lv_obj_scroll_to_y(content, line.substring(7).toInt(), LV_ANIM_OFF);
   } else {
     Serial.printf("? %s\n", line.c_str());
     return;

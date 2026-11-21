@@ -16,7 +16,7 @@ namespace AudioDspLab.Simulation;
 /// </remarks>
 public sealed partial class SimulatedBoard : ILineTransport
 {
-    public const string FirmwareVersion = "1.7";
+    public const string FirmwareVersion = "1.8";
 
     private static readonly string[] DefaultStationNames =
         ["Deutschlandfunk", "Classic FM UK", "SWR3", "NDR 2", "WDR 2", "Rock Antenne", "Oldies", "SWR1"];
@@ -283,6 +283,8 @@ public sealed partial class SimulatedBoard : ILineTransport
             case "voice": if (Running(Applications.Synthesizer)) Ok(VoiceText()); break;
             case "meter": Meter(); break;
             case "rxfilter": RxFilter(args); break;
+            case "rtty": Rtty(); break;
+            case "fax": Fax(args); break;
             case "midi": if (Running(Applications.Synthesizer)) Ok("0 0 0 0"); break;
             case "load": if (Running(Applications.Synthesizer)) Ok("12.5 18.3"); break;
             case "aux": Ok($"{pots[0] / 16} {pots[1] / 16} {pots[2] / 16} {pots[3] / 16} {ProtocolText.FormatSwitch(application == Applications.SigmaStudio)}"); break;
@@ -1302,6 +1304,7 @@ public sealed partial class SimulatedBoard : ILineTransport
 
         pendingValueEvents.Clear();
         ReceiverEvents();
+        DecoderEvents();
         if (pots.Where((raw, index) => Math.Abs(raw - reportedPots[index]) >= 80).Any())
         {
             Array.Copy(pots, reportedPots, pots.Length);

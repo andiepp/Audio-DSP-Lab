@@ -89,6 +89,14 @@ internal static class SimulatedParameters
         new("test-iq-gain", ParameterKind.Number, -3, 3, 0, "dB"),
         new("test-iq-phase", ParameterKind.Number, -10, 10, 0, "deg"),
         new("filter", ParameterKind.Choice, 0, 1, 0, Choices: ["designed", "downloaded"]),
+        new("decoder", ParameterKind.Choice, 0, 2, 0, Choices: ["off", "rtty", "fax"]),
+        new("rtty-shift", ParameterKind.Choice, 0, 3, 2, Choices: ["85", "170", "450", "850"]),
+        new("rtty-polarity", ParameterKind.Choice, 0, 2, 0, Choices: ["auto", "normal", "reverse"]),
+        new("fax-lpm", ParameterKind.Choice, 0, 3, 2, Choices: ["60", "90", "120", "240"]),
+        new("fax-ioc", ParameterKind.Choice, 0, 1, 1, Choices: ["288", "576"]),
+        new("fax-slant", ParameterKind.Integer, -200, 200, 0, "ppm"),
+        new("decoder-afc", ParameterKind.Switch, 0, 1, 1),
+        new("test-mode", ParameterKind.Choice, 0, 2, 0, Choices: ["tone", "rtty", "fax"]),
     ];
 
     private static readonly SimulatedParameter[] Analyzer =
